@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Local data — never committed
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+*.lance/
+audio/
+transcripts/
+
+# The brain is git-versioned separately, not vendored into this repo.
+# Pending decision — see session notes.
+brain/
+
+# OS
+.DS_Store
