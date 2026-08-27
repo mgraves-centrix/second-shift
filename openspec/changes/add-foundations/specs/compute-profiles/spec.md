@@ -36,6 +36,10 @@ single yes or no.
 - **WHEN** CUDA is present but the local inference endpoint is unreachable
 - **THEN** the probe reports CUDA available and the endpoint unavailable as distinct findings
 
+#### Scenario: Partial stack degrades rather than aborting
+- **WHEN** the probe reports an incomplete local stack
+- **THEN** the profile resolves to `cloud`, startup proceeds, and the findings that caused the degradation are recorded and readable at runtime
+
 ### Requirement: Compute is reached only through provider interfaces
 
 All compute SHALL be accessed through the `Transcriber`, `Reasoner`, `Embedder`
@@ -49,6 +53,22 @@ endpoint details MUST NOT appear outside the providers package.
 #### Scenario: No provider leakage
 - **WHEN** the agents, night state machine or API packages are inspected
 - **THEN** no provider SDK is imported and no model identifier is hardcoded outside the providers package
+
+### Requirement: Dispatched work carries its telemetry context
+
+`Executor.dispatch` SHALL carry a telemetry descriptor identifying where
+out-of-process telemetry is sent and which invocation it attaches under.
+
+`JobResult` MUST NOT be the transport for telemetry, so that the Executor
+interface stays independent of any telemetry serialization format.
+
+#### Scenario: Dispatch carries the descriptor
+- **WHEN** a job is dispatched from within an active invocation
+- **THEN** the descriptor passed to the executor identifies the ingest destination, its credential, and the dispatching invocation id
+
+#### Scenario: Result carries no telemetry payload
+- **WHEN** a job completes and returns its result
+- **THEN** the result contains the work product only, and no telemetry records
 
 ### Requirement: Interfaces are instrumented by the base class
 

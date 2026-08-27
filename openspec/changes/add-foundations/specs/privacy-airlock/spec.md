@@ -23,8 +23,8 @@ unless the change is attributable to a recorded decision.
 - **THEN** the subsequent run records `policy_source = 'decision-upgrade'` and the originating decision remains queryable
 
 #### Scenario: Profile cannot honor the policy
-- **WHEN** a `local-only` entry is processed on a profile with no local reasoner
-- **THEN** the run does not silently execute against a remote provider
+- **WHEN** a `local-only` entry is selected for a run on a profile with no local reasoner
+- **THEN** no run is started for that entry, and it is quarantined rather than executed against a remote provider
 
 ### Requirement: Local-only never reaches a remote provider
 
@@ -44,6 +44,28 @@ by application-level convention alone.
 - **WHEN** an entry's artifacts are complete
 - **THEN** whether any cloud compute touched that entry is answerable from recorded rows alone
 
+### Requirement: Entries are quarantined when the profile cannot honor their policy
+
+Where the resolved profile cannot honor an entry's policy, the system SHALL
+quarantine that entry rather than dispatching it. Quarantined entries MUST NOT
+be silently downgraded to a weaker policy, and MUST be surfaced with the
+capability finding that caused the quarantine.
+
+Work whose policy the profile can honor MUST continue normally. A degraded
+profile reduces what runs, never what is guaranteed.
+
+#### Scenario: Local-only entry on a degraded profile
+- **WHEN** the probe finds an incomplete local stack and the profile degrades to `cloud`, and a `local-only` entry is queued
+- **THEN** the entry is quarantined, no run is created for it, and the morning brief reports it as blocked naming the probe finding
+
+#### Scenario: Cloud-assisted work continues while quarantine is active
+- **WHEN** local-only entries are quarantined on a degraded profile
+- **THEN** `cloud-assisted` entries are dispatched and processed normally
+
+#### Scenario: Quarantine clears when capability returns
+- **WHEN** a previously unreachable local reasoner becomes available and the profile resolves with local capability
+- **THEN** quarantined `local-only` entries become eligible for dispatch without manual re-entry
+
 ### Requirement: Local-only availability is a stated capability
 
 Where a resolved profile cannot honor `local-only`, the system SHALL report that
@@ -52,6 +74,14 @@ policy as unavailable rather than accepting it and downgrading silently.
 #### Scenario: Cloud profile capability report
 - **WHEN** the profile resolves to `cloud`
 - **THEN** the system reports `local-only` as unavailable, with the reason attributable to the resolved profile
+
+#### Scenario: Unavailable policy is offered as disabled, not omitted
+- **WHEN** a capture surface requests the available policies on a profile that cannot honor `local-only`
+- **THEN** `local-only` is returned marked unavailable together with its reason, rather than omitted from the list
+
+#### Scenario: Reason is specific to the finding
+- **WHEN** `local-only` is unavailable because the local reasoner endpoint is unreachable
+- **THEN** the reported reason names that finding, and does not report a generic profile-level message
 
 ### Requirement: Context is assembled and filtered locally
 

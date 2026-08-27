@@ -41,6 +41,59 @@ individual implementations.
 - **WHEN** a new provider implementation is added that overrides only its internal completion method
 - **THEN** telemetry is recorded without that implementation containing any telemetry code
 
+### Requirement: Cost is computed from versioned rates
+
+The system SHALL compute `estimated_cost_usd` at write time from a git-tracked
+rate table keyed by provider and model, where each entry carries an
+`effective_from` date. The rate in effect at the call's timestamp MUST be the
+one applied.
+
+A missing rate SHALL be a loud failure. The system MUST NOT record zero or a
+guessed cost, because the cost curve is a measurement rather than a display
+value.
+
+#### Scenario: Rate applied at write time
+- **WHEN** a model call completes for a provider and model present in the rate table
+- **THEN** `estimated_cost_usd` is computed from the rate effective at the call's timestamp
+
+#### Scenario: Missing rate
+- **WHEN** a model call completes for a provider and model absent from the rate table
+- **THEN** the call is reported as a typed failure and no cost is silently recorded as zero
+
+#### Scenario: Historical reproducibility
+- **WHEN** rates change and a new entry is added with a later `effective_from`
+- **THEN** costs already recorded are unchanged, and the rate that produced any historical cost is recoverable from the repository
+
+### Requirement: Telemetry can be attributed to out-of-process work
+
+The recorder SHALL accept telemetry attributed to work executed outside the
+orchestrator process, attaching it under the invocation that dispatched that
+work, so remote work appears in the tree at full depth rather than as an opaque
+span.
+
+All such telemetry MUST be serialized through the orchestrator's own writer. No
+external caller may open its own connection to the database.
+
+The authenticated transport that carries this telemetry from a remote job is
+delivered with the Nebius executor, not here. This requirement covers the
+recorder-side contract that transport depends on.
+
+#### Scenario: Remote work attaches under its dispatcher
+- **WHEN** telemetry is submitted for work dispatched from a known invocation
+- **THEN** the recorded invocations and model calls attach under that invocation with correct parentage and depth
+
+#### Scenario: Concurrent dispatches remain distinct
+- **WHEN** telemetry arrives for five jobs dispatched concurrently from five different invocations
+- **THEN** each job's rows attach under its own dispatching invocation, and no job's work is attributed to another
+
+#### Scenario: Submissions serialize through one writer
+- **WHEN** externally-attributed telemetry is submitted while the orchestrator is writing
+- **THEN** the write is serialized through the orchestrator's writer rather than a second connection
+
+#### Scenario: Unknown dispatcher is rejected
+- **WHEN** telemetry is submitted naming an invocation that does not exist
+- **THEN** the submission is rejected and no orphaned rows are written
+
 ### Requirement: Tool calls record redacted queries only
 
 The system SHALL record every external tool call with its endpoint, credits

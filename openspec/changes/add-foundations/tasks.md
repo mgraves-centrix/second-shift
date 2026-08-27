@@ -26,10 +26,14 @@ Depends on group 2. Groups 3 and 4 can proceed in parallel once persistence land
 - [ ] 3.3 Implement recorders for `model_calls`, `tool_calls`, `events` and `failures`, each reading the current invocation from context rather than taking it as a parameter.
 - [ ] 3.4 Implement failure classification into the taxonomy, with a normalized signature for deduplication and a fallback that preserves the original message for unrecognized errors.
 - [ ] 3.5 Implement the threaded-context helper that captures and re-attaches context across `ThreadPoolExecutor` boundaries, and document it as a sharp edge in the module docstring.
-- [ ] 3.6 Test: three nested invocations record depths 0, 1, 2 with correct parentage.
-- [ ] 3.7 Test: three concurrent sibling invocations share a parent and none inherits another sibling's context.
-- [ ] 3.8 Test: an invocation whose body raises is closed with `outcome = 'failed'` and writes a typed failure row.
-- [ ] 3.9 Test: events carry renderable scalar columns, verified by rendering a timeline without reading `payload_json`.
+- [ ] 3.6 Implement cost computation from a git-tracked `pricing.yaml` keyed by provider and model with `effective_from` dates, applying the rate in effect at the call timestamp. A missing rate raises a typed failure; it never records zero.
+- [ ] 3.7 Implement the externally-attributed telemetry path: the recorder accepts invocations and model calls naming an existing dispatching invocation, serialized through the orchestrator's single writer. Transport is out of scope here and lands with the Nebius executor.
+- [ ] 3.8 Test: three nested invocations record depths 0, 1, 2 with correct parentage.
+- [ ] 3.9 Test: three concurrent sibling invocations share a parent and none inherits another sibling's context.
+- [ ] 3.10 Test: an invocation whose body raises is closed with `outcome = 'failed'` and writes a typed failure row.
+- [ ] 3.11 Test: a known rate is applied at write time; a missing rate fails loudly; adding a later `effective_from` leaves recorded costs unchanged.
+- [ ] 3.12 Test: telemetry attributed to five concurrent dispatchers attaches under the correct parent in each case, and an unknown dispatcher is rejected without writing orphans.
+- [ ] 3.13 Test: events carry renderable scalar columns, verified by rendering a timeline without reading `payload_json`.
 
 ## 4. Provider interfaces
 
@@ -39,8 +43,10 @@ Depends on group 2. No concrete backend beyond the null implementation — real 
 - [ ] 4.2 `Reasoner.complete` takes `policy` as an explicit parameter, asserted at call time rather than read from context.
 - [ ] 4.3 Implement null/echo providers for each interface, for testing and for a profile with no backend configured.
 - [ ] 4.4 Implement the registry that binds interfaces to implementations by resolved profile.
-- [ ] 4.5 Test: a new implementation overriding only its internal method produces `model_calls` rows without containing telemetry code.
-- [ ] 4.6 Test: no provider SDK import and no hardcoded model identifier exists outside the providers package, asserted by a source scan over `agents/`, `night/` and `api/`.
+- [ ] 4.5 `Executor.dispatch` takes a telemetry descriptor carrying the ingest destination, its credential, and the dispatching invocation id. `JobResult` carries the work product only and never telemetry records.
+- [ ] 4.6 Test: dispatching from within an active invocation produces a descriptor naming that invocation, and a returned `JobResult` contains no telemetry payload.
+- [ ] 4.7 Test: a new implementation overriding only its internal method produces `model_calls` rows without containing telemetry code.
+- [ ] 4.8 Test: no provider SDK import and no hardcoded model identifier exists outside the providers package, asserted by a source scan over `agents/`, `night/` and `api/`.
 
 ## 5. Compute profile and airlock
 
@@ -49,10 +55,14 @@ Depends on groups 2 and 4.
 - [ ] 5.1 Implement the capability probe reporting CUDA availability, local endpoint reachability and speech-stack importability as independent findings.
 - [ ] 5.2 Implement profile resolution: `SECOND_SHIFT_PROFILE`, then probe, then `cloud`. Record the resolved profile and probe findings at startup.
 - [ ] 5.3 Implement policy resolution producing `effective_policy` and `policy_source` for a run, refusing to widen an entry's default without an attributable decision.
-- [ ] 5.4 Implement the capability report that marks `local-only` unavailable on profiles that cannot honor it.
-- [ ] 5.5 Test: `SECOND_SHIFT_PROFILE=cloud` overrides a working local stack.
-- [ ] 5.6 Test: profile resolves to `cloud` on a machine with no CUDA and no reachable endpoint.
-- [ ] 5.7 Test: a `local-only` entry resolves a run whose effective policy is not silently widened.
+- [ ] 5.4 Implement the capability report: it returns every policy with an availability flag and, where unavailable, the specific probe finding that caused it. Unavailable policies are returned marked, never omitted.
+- [ ] 5.5 Implement quarantine: an entry whose policy the resolved profile cannot honor is never dispatched, no run is created for it, and it is retrievable as blocked with its cause. Entries whose policy the profile can honor continue to dispatch normally.
+- [ ] 5.6 Implement quarantine release: when capability returns, previously quarantined entries become eligible again without manual re-entry.
+- [ ] 5.7 Test: `SECOND_SHIFT_PROFILE=cloud` overrides a working local stack.
+- [ ] 5.8 Test: profile resolves to `cloud` on a machine with no CUDA and no reachable endpoint.
+- [ ] 5.9 Test: a partial local stack degrades to `cloud`, startup proceeds, and the causing findings are readable at runtime.
+- [ ] 5.10 Test: a `local-only` entry on a degraded profile is quarantined with its cause, while a `cloud-assisted` entry on the same profile dispatches normally.
+- [ ] 5.11 Test: a `local-only` entry resolves a run whose effective policy is not silently widened.
 
 ## 6. Day 1 pass gates
 
@@ -62,5 +72,6 @@ These are the gates recorded in `docs/WEEK_ONE.md`. All must pass before day 2 b
 - [ ] 6.2 Gate: a test writes a run with nested `agent_invocations` at depth 2 or greater, with `model_calls` attached, and reads the tree back in correct shape.
 - [ ] 6.3 Gate: recording a `local-only` model call against a remote provider is rejected by the database constraint.
 - [ ] 6.4 Gate: profile resolution returns `cloud` on a machine with no CUDA.
-- [ ] 6.5 Run the full suite and record the baseline timing in the failure ledger for later comparison.
-- [ ] 6.6 Commit, and update `docs/WEEK_ONE.md` to mark day 1 complete with anything learned that changes later days.
+- [ ] 6.5 Gate: a `local-only` entry on a degraded profile is quarantined rather than dispatched, and the capability report names the finding.
+- [ ] 6.6 Run the full suite and record the baseline timing in the failure ledger for later comparison.
+- [ ] 6.7 Commit, and update `docs/WEEK_ONE.md` to mark day 1 complete with anything learned that changes later days.
