@@ -1,96 +1,136 @@
 # OpenSpec Workflow
 
-OpenSpec manages the lifecycle of project changes through structured proposals, implementation, and archival.
+Second Shift uses [OpenSpec](https://github.com/Fission-AI/OpenSpec) 1.11 for
+spec-driven development, with an enforcement layer ported from
+[`centrix-labs/enhanced-openspec`](https://github.com/centrix-labs/enhanced-openspec).
+
+## Why this is a port and not an install
+
+`enhanced-openspec` targets OpenSpec 0.18, which drove everything through a
+generated `openspec/AGENTS.md` and a set of `/openspec:*` commands. OpenSpec
+1.11 replaced that architecture with skills, a native `/opsx:*` command set, and
+`openspec/config.yaml`. It no longer generates `AGENTS.md` at all, and it treats
+`project.md` as legacy.
+
+Run verbatim against 1.11, the enhanced commands reference a file that will
+never exist. So the enforcement was ported into 1.11's own extension points
+rather than layered beside them:
+
+| Enhanced feature (0.18) | Where it lives now |
+|---|---|
+| Scale classification L0–L4 | `config.yaml` → `rules.proposal` |
+| Constitution check at proposal | `config.yaml` → `rules.proposal` |
+| Constitution re-check at apply | `config.yaml` → `operations.apply.guidance` |
+| Clarification-marker rules | `config.yaml` → `rules.proposal` / `rules.design` |
+| Markers forbidden in tasks | `config.yaml` → `rules.tasks` |
+| Marker pre-flight block on apply | `config.yaml` → `operations.apply.guidance` |
+| Unresolved-marker warning on archive | `config.yaml` → `operations.archive.guidance` |
+| `/openspec:clarify` | Retained as a command — 1.11 has no equivalent |
+| `openspec/constitution.md` | Unchanged — 1.11 has no constitution concept |
+
+One workflow instead of two, and it stays on upstream rails as OpenSpec keeps
+moving.
+
+**On "hard gates":** enhanced-openspec describes these as blocks the AI cannot
+bypass. In both 0.18 and here they are prompt-level instructions, not mechanical
+enforcement. The one genuinely mechanical gate in this project is the Privacy
+Airlock, which is a `CHECK` constraint in `schema.sql` — the database refuses
+the write.
 
 ## Lifecycle
 
 ```
-Request → Scale Classification → Constitution Check → Proposal → Clarify → Apply → Archive
+idea
+  │
+  ▼
+/opsx:explore ............ optional; think before proposing
+  │
+  ▼
+scale classification ..... L0? fix directly, no proposal
+  │
+  ▼
+constitution check ....... violation → BLOCKED
+  │
+  ▼
+/opsx:propose ............ proposal.md, specs/, design.md (L3+), tasks.md
+  │                        ambiguity → [NEEDS CLARIFICATION: ...]
+  ▼
+/openspec:clarify ........ resolve markers, scope → security → UX → technical
+  │
+  ▼
+markers remaining? ....... yes → BLOCKED
+  │
+  ▼
+you review and approve
+  │
+  ▼
+/opsx:apply .............. re-checks constitution, implements tasks in order
+  │
+  ▼
+/opsx:archive ............ merges deltas into openspec/specs/
 ```
 
-### 1. Scale Classification
+## Scale levels
 
-Every request is classified before any work begins:
+| Level | Name | Artifacts | When |
+|---|---|---|---|
+| 0 | Bug Fix | none — fix directly | Broken behavior, clear fix |
+| 1 | Small Task | `tasks.md` | Under a day, single component |
+| 2 | Feature | `proposal.md` + `tasks.md` | New user-facing functionality |
+| 3 | Epic | + `design.md` | Cross-system, multi-week |
+| 4 | Enterprise | + cost section, `artifacts/` | Architectural shift |
 
-| Level | Name | Triggers | Required Artifacts |
-|-------|------|----------|-------------------|
-| 0 | Bug Fix | Restores intended behavior | None — fix directly |
-| 1 | Small Task | <1 day, single component | `tasks.md` only |
-| 2 | Feature | Standard change | `proposal.md` + `tasks.md` |
-| 3 | Epic | Cross-system, multi-week | `proposal.md` + `design.md` + `tasks.md` |
-| 4 | Enterprise | Architectural shift | All L3 + cost section + `artifacts/` dir |
+## Clarification markers
 
-Level 0 requests bypass the proposal workflow entirely.
+`[NEEDS CLARIFICATION: <specific question>]`
 
-### 2. Constitution Check
+- Maximum 3 per file
+- `proposal.md` and `design.md` only — never `tasks.md`
+- Priority: scope → security → UX → technical
+- Unresolved markers block `/opsx:apply`
 
-Before creating a proposal, the AI reads `openspec/constitution.md` and checks for violations. Constitution violations are **CRITICAL BLOCKING FINDINGS** -- the proposal cannot proceed.
+Scope questions can invalidate the answers below them, which is why they are
+asked first.
 
-### 3. Proposal (`/openspec:proposal`)
-
-Creates a structured proposal with:
-- Scale level classification
-- Constitution compliance confirmation
-- Clarification markers for ambiguous requirements
-
-### 4. Clarify (`/openspec:clarify`)
-
-Resolves `[NEEDS CLARIFICATION: ...]` markers through structured Q&A. Markers are prioritized: scope > security > UX > technical.
-
-Rules:
-- Max 3 markers per spec file
-- Markers go in `proposal.md` or `design.md`, never in `tasks.md`
-- All markers must be resolved before implementation
-
-### 5. Apply (`/openspec:apply`)
-
-Implements the proposal after two pre-flight checks:
-1. No unresolved clarification markers
-2. Constitution compliance verified
-
-### 6. Archive (`/openspec:archive`)
-
-Archives completed proposals. Warns if unresolved markers exist.
-
-## Directory Structure
+## Directory layout
 
 ```
 openspec/
-├── AGENTS.md              # Auto-generated agent instructions
-├── constitution.md        # Immutable project principles
-├── project.md             # Project context
-└── proposals/
-    └── <proposal-name>/
-        ├── proposal.md    # Problem, scope, approach
-        ├── design.md      # Technical design (L3+)
-        ├── tasks.md       # Implementation tasks
-        └── artifacts/     # Supporting docs (L4)
+├── config.yaml        schema, project context, rules, operation guidance
+├── constitution.md    immutable principles — violations are blocking
+├── specs/             canonical specs — what IS built
+└── changes/           active proposals — what SHOULD change
+    ├── <change-id>/
+    │   ├── proposal.md
+    │   ├── design.md      L3+
+    │   ├── tasks.md
+    │   └── specs/         deltas: ADDED / MODIFIED / REMOVED
+    └── archive/
 ```
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `/openspec:proposal <description>` | Create a new proposal |
-| `/openspec:clarify` | Resolve clarification markers |
-| `/openspec:apply` | Implement the proposal |
-| `/openspec:archive` | Archive a completed proposal |
+| Command | Purpose |
+|---|---|
+| `/opsx:explore` | Think through an idea before proposing |
+| `/opsx:propose` | Create a change with all artifacts |
+| `/opsx:update` | Revise an existing change's artifacts |
+| `/openspec:clarify` | Resolve `[NEEDS CLARIFICATION]` markers |
+| `/opsx:apply` | Implement an approved change |
+| `/opsx:sync` | Sync deltas into main specs without archiving |
+| `/opsx:archive` | Archive a completed change |
 
-## Constitution
+CLI: `openspec list`, `openspec list --specs`, `openspec show <id>`,
+`openspec validate <id> --strict`, `openspec doctor`, `openspec status`.
 
-The constitution (`openspec/constitution.md`) defines immutable principles that all proposals must comply with. Common principles include:
+## Maintenance
 
-- Multi-tenant isolation
-- Parameterized queries only
-- Authentication on all endpoints
-- Secrets encrypted at rest
-- Test coverage requirements
-- API backward compatibility
+The CLI is installed globally at a pinned version. To move it:
 
-Add project-specific principles below the marker line in `constitution.md`.
+```bash
+npm install -g @fission-ai/openspec@<version> && openspec update --force
+```
 
-## Clarification Markers
-
-Format: `[NEEDS CLARIFICATION: <specific question>]`
-
-These markers flag ambiguous requirements for explicit resolution before implementation begins. They prevent assumptions from propagating into code.
+Check `openspec templates` and `openspec schemas` after any major version bump —
+artifact names feed `config.yaml`'s `rules` keys, and a rename would silently
+disable a rule.

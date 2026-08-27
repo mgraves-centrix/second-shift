@@ -1,0 +1,80 @@
+schema: spec-driven
+
+context: |
+  Second Shift — an always-on assistant that turns half-formed ideas into real
+  artifacts overnight, then interviews you in the morning about what it got
+  stuck on. The interview is the product. Built solo for the Nebius x NVIDIA
+  Global AI Hackathon (Personal AI track), deadline 30 Oct 2026.
+
+  Scope boundary: idea in, artifact out, memory in between. See NOT_BUILDING.md.
+
+  Stack:
+    - Orchestrator: Python + FastAPI, SQLite job queue, systemd timers
+    - Frontend: Next.js + Tailwind PWA, server-sent events
+    - Local models: Nemotron 3.5 Lightning 30B A3B (NVFP4) via vLLM;
+      Nemotron Speech Streaming 0.6B; Llama Nemotron Embed VL 1B v2
+    - Cloud: Nebius Token Factory (Nemotron 3 Super/Ultra), Nebius Serverless
+      Jobs for parallel build variants
+    - Research: Tavily. Storage: SQLite + plaintext markdown under git.
+    - Every model in the runtime path is an NVIDIA open model. No third-party
+      LLMs (Claude, GPT) in the runtime path — this is a hackathon rule.
+
+  Hardware: NVIDIA DGX Spark, aarch64, CUDA 13.0, sm_121, 128GB unified memory.
+  Never run `uv run` on the Spark — it re-resolves the env to x86_64 and
+  destroys it. Use `python -m venv` + `pip` with pinned constraints.
+
+  Key directories:
+    apps/api/secondshift/   FastAPI orchestrator; db/, telemetry/, providers/,
+                            airlock/, agents/, night/, morning/, brain/, retrieval/
+    apps/web/               Next.js PWA and dashboard; components/scrubber/ is
+                            the signature UI element
+    packages/seed/          synthetic night generator (also seeds the judge instance)
+    docs/decisions/         numbered ADRs — read before proposing architecture
+    deploy/                 spark/ systemd, tailscale/, nebius/
+
+  Conventions:
+    - Work from the repository root. Pass absolute paths. Never `cd`.
+    - Time is INTEGER epoch milliseconds UTC everywhere; local framing lives in
+      entries.captured_tz / tz_offset_min.
+    - Tables are append-only. Counters are views, never stored columns.
+    - The schema in apps/api/secondshift/db/schema.sql is the authority;
+      docs/DATA_MODEL.md explains the non-obvious choices.
+
+rules:
+  proposal:
+    - "Step 0 — Scale classification. Before anything else, classify the request L0-L4 and state the level with its rationale. L0 Bug Fix: restores intended behavior, no artifacts, fix directly and skip the proposal flow entirely. L1 Small Task: under a day, single component, tasks only. L2 Feature: standard change, proposal plus tasks. L3 Epic: cross-system or multi-week, adds a design doc. L4 Enterprise: architectural shift, adds a cost section and an artifacts/ directory."
+    - "Step 1 — Constitution check. Read openspec/constitution.md and evaluate the change against every principle. Any violation is a CRITICAL BLOCKING FINDING: report it and stop. The proposal does not proceed until the violation is resolved, or until the user explicitly overrides it naming the principle crossed."
+    - "Include a Constitution Compliance section stating the outcome of that check per principle. Never omit it and never mark it passed without having actually evaluated each principle."
+    - "Ground the proposal in current behavior before writing it: run `openspec list` and `openspec list --specs`, read the relevant ADRs in docs/decisions/, and inspect the code involved. Note gaps that need clarification rather than assuming past them."
+    - "Mark ambiguity with `[NEEDS CLARIFICATION: <specific question>]` instead of silently assuming. Maximum 3 per file. Prioritize scope over security over UX over technical. Ask the sharpest question available, not the easiest one."
+    - "Do not write implementation code at the proposal stage. Planning artifacts only."
+    - "Prefer the straightforward minimal implementation. Add complexity only when it is requested or clearly required, and keep the change tightly scoped to the requested outcome."
+    - "A proposal touching telemetry, privacy policy, retrieval, or the provider layer must state explicitly which constitution principle governs it and how the change stays compliant."
+  design:
+    - "Required at L3 and above. Write it when the change spans multiple systems, introduces a new pattern, or needs a trade-off argued before specs are committed."
+    - "State the alternatives considered and why they lost. A design doc that presents one option has not done its job."
+    - "`[NEEDS CLARIFICATION: ...]` markers are allowed here, maximum 3, same priority order as proposals."
+    - "If the change alters an accepted decision in docs/decisions/, say which ADR and whether this supersedes it. Superseding an ADR requires a new ADR, not an edit to the old one."
+  specs:
+    - "Use `## ADDED|MODIFIED|REMOVED Requirements` with at least one `#### Scenario:` per requirement."
+    - "One folder per capability. Break multi-scope efforts into distinct deltas with explicit sequencing."
+    - "Search existing requirements before writing new ones: `rg -n 'Requirement:|Scenario:' openspec/specs`."
+  tasks:
+    - "Never place `[NEEDS CLARIFICATION: ...]` markers in tasks. A task that is not fully specified does not belong in the list yet."
+    - "Ordered, small, verifiable items that each deliver visible progress. Include validation steps — tests, tooling, or a stated manual check."
+    - "Any task adding an agent invocation or a model call must include writing its telemetry row. Instrumentation is part of the task, never a follow-up."
+    - "Highlight dependencies and note which items can run in parallel."
+
+operations:
+  apply:
+    guidance:
+      - "Pre-flight 1 — Clarification markers. Search the active change directory for `[NEEDS CLARIFICATION:`. If any exist, list each with file and line, BLOCK implementation, and tell the user to run /openspec:clarify. Do not proceed and do not resolve them yourself by assumption."
+      - "Pre-flight 2 — Constitution. Re-read openspec/constitution.md and check the proposal against every principle. Any violation is a CRITICAL BLOCKING FINDING: report it, BLOCK implementation, and explain what must change for compliance."
+      - "Work tasks sequentially. After each one, confirm constitution compliance still holds — particularly the Privacy Airlock and Telemetry From Line One, which are the easiest to erode incrementally."
+      - "Only mark a task `- [x]` once it is genuinely done. The checklist must reflect reality, not intent."
+      - "If a task cannot be completed as specified, stop and say so with what blocked it. Do not silently narrow the scope."
+  archive:
+    guidance:
+      - "Before archiving, check the change for unresolved `[NEEDS CLARIFICATION:` markers and warn if any remain — archiving an under-specified change buries the ambiguity rather than resolving it."
+      - "Verify every task is genuinely complete, not merely checked off."
+      - "If the change established or altered an architectural decision, confirm a corresponding ADR exists in docs/decisions/ before archiving."
