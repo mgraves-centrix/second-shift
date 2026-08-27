@@ -30,8 +30,7 @@ data/
 audio/
 transcripts/
 
-# The brain is git-versioned separately, not vendored into this repo.
-# Pending decision — see session notes.
+# The brain is its own git repository (see docs/decisions/0001).
 brain/
 
 # OS
