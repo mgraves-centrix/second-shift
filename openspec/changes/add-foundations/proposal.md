@@ -97,10 +97,36 @@ quickly.
 never used — on the Spark it re-resolves the environment to x86_64 and destroys
 it.
 
-## Open Questions
+## Resolved Decisions
 
-[NEEDS CLARIFICATION: On the `cloud` profile, `local-only` policy cannot be honored. At capture time, should the local-only option be hidden entirely, or shown disabled with an explanation of why it is unavailable? Shown-disabled teaches the privacy model and makes the guarantee legible; hidden is less confusing but silently narrows what the user knows the product can do.]
+Settled via `/openspec:clarify` on 2026-08-27.
 
-[NEEDS CLARIFICATION: What is the source of truth for `model_calls.estimated_cost_usd`? Token Factory per-token pricing has not been verified, and the cost-per-accepted-artifact curve is a scored artifact — so a hardcoded guess is not acceptable. Options: a checked-in `pricing.yaml` updated by hand, or a startup fetch with a cached fallback.]
+**Local-only presentation.** On a profile that cannot honor `local-only`, the
+capture UI shows the option disabled with the reason attributable to the
+resolved profile and its probe findings. It is never hidden.
 
-[NEEDS CLARIFICATION: When the capability probe finds a partial local stack — CUDA present but the vLLM endpoint unreachable, say — should profile resolution fall back to `cloud`, or fail loudly? Silent fallback would run a `local-only` idea into a profile that cannot accept it, which the Airlock would then reject at the database. Failing loudly is safer but blocks startup on a transient condition.]
+This keeps "local-only is a hardware capability, not a preference" legible at
+exactly the point where a user would otherwise assume the guarantee applies, and
+it means the judge instance — which runs the `cloud` profile — still shows that
+the Airlock exists rather than concealing it.
+
+**Pricing.** Per-token rates live in a git-tracked `pricing.yaml`, keyed by
+provider and model, with an `effective_from` date on every entry. Cost is
+computed at write time from the rate in effect, so a historical cost curve stays
+reproducible from the repository alone.
+
+A weekly agent-driven refresh keeps the file current. That automation is a
+separate change and is not day-1 scope; day 1 reads the file. A missing rate is
+a loud failure, never a silent zero — the cost curve is a scored artifact and
+understating it is worse than stopping.
+
+**Partial local stack.** When the capability probe finds an incomplete local
+stack, profile resolution degrades to `cloud` and the system keeps running, but
+every `local-only` entry is quarantined: it is never dispatched, and it appears
+in the morning brief as blocked, naming the probe finding that caused it.
+Cloud-assisted work proceeds normally.
+
+This keeps the night productive without ever placing a `local-only` idea on a
+profile that cannot honor it. The database `CHECK` remains the last line of
+defence rather than the first, and the degraded state is explicit in the
+capability report rather than absorbed silently.

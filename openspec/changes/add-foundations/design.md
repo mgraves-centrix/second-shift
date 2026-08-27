@@ -119,7 +119,26 @@ exist.
 **Out-of-process telemetry is unsolved here.** Serverless Jobs run remotely and
 must rejoin the invocation tree.
 
-[NEEDS CLARIFICATION: How does a Nebius Serverless Job report its telemetry back into the invocation tree? Options: the job returns a structured telemetry blob in its result which the orchestrator replays into the recorder; the job writes directly to a shared endpoint; or job-internal work is recorded as one opaque invocation with no children. The first preserves the tree and keeps SQLite single-writer, but requires a stable serialization format decided before the Executor interface is frozen.]
+A Serverless Job posts telemetry directly to an authenticated ingest endpoint on
+the orchestrator as it runs, so the parallel build fan-out is visible live rather
+than arriving in a lump when the job returns.
+
+`Executor.dispatch` therefore carries a telemetry descriptor — ingest URL,
+credential, and the dispatching invocation id — so the job's invocations attach
+under the correct parent. No telemetry serialization is needed in `JobResult`,
+which keeps the Executor interface narrow. This is the interface consequence
+that had to be settled before day 1 could freeze it.
+
+Two consequences are accepted, and both belong to the day-5 Nebius change rather
+than to day 1:
+
+- **The ingest endpoint is a second writer in front of SQLite.** It must
+  serialize through a queue owned by the orchestrator rather than opening its own
+  connection.
+- **It must be reachable from Nebius without exposing the machine that holds the
+  brain to the public internet.** Joining the job to the tailnet is the intended
+  route. A publicly reachable endpoint would widen the attack surface on the
+  always-on machine and requires an explicit decision before it is built.
 
 **Single-writer SQLite.** WAL mode plus one process is fine. If the night state
 machine and the API ever write concurrently under load, this becomes a
