@@ -36,7 +36,10 @@ def _modules_outside_providers() -> list[Path]:
     return [
         p
         for p in PACKAGE_ROOT.rglob("*.py")
-        if PROVIDERS_DIR not in p.parents and p != PROVIDERS_DIR
+        if PROVIDERS_DIR not in p.parents
+        and p != PROVIDERS_DIR
+        # AppleDouble sidecars match *.py but are binary, not source.
+        and not p.name.startswith(".")
     ]
 
 

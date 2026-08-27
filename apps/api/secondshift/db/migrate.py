@@ -46,6 +46,11 @@ def discover(directory: Path | None = None) -> list[Migration]:
     directory = directory or MIGRATIONS_DIR
     found: list[Migration] = []
     for path in sorted(directory.glob("*.sql")):
+        # Dotfiles are never migrations. macOS tar emits AppleDouble sidecars
+        # ("._0001_initial.sql") that match the glob but are binary metadata;
+        # failing on those would break every deploy from a Mac.
+        if path.name.startswith("."):
+            continue
         match = _FILENAME.match(path.name)
         if not match:
             raise ValueError(

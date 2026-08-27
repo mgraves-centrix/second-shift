@@ -1,6 +1,16 @@
-# Pinned constraints. Regenerate with:
-#   pip freeze --exclude-editable > constraints.txt
-# Never use `uv run` on the Spark: it re-resolves the environment to x86_64
-# and destroys it. `uv pip install` into an already-active venv is fine.
-pytest==8.3.4
+# Pinned constraints, generated from a known-good environment:
+#   ./.venv/bin/pip freeze --exclude-editable > constraints.txt
+#
+# Regenerate rather than hand-edit. This file previously pinned pytest==8.3.4
+# alongside pytest-asyncio==1.4.0, which requires pytest>=8.4 — an environment
+# that cannot be installed. It went unnoticed because the local venv had been
+# upgraded in place and never rebuilt from these pins.
+#
+# Never use `uv run` on the Spark: it re-resolves the environment to x86_64 and
+# destroys it. `uv pip install` into an already-active venv is fine.
+iniconfig==2.3.0
+packaging==26.3
+pluggy==1.6.0
+Pygments==2.21.0
+pytest==9.1.1
 pytest-asyncio==1.4.0

@@ -39,8 +39,25 @@ thing it exists to inform.
 - Quarantine is derived from the current capability report, not stored as
   status. Release is therefore automatic, and no migration was needed to add a
   status value.
-- Local dev is Python 3.14; the Spark's version is unverified. Confirm before
-  the day-4 vLLM spike.
+- **Verified on the Spark** (<spark-host>, Ubuntu 24.04.4, aarch64, Python
+  3.12.3): 79/79 passing, ~2.75s. Local dev is Python 3.14 — the Spark's 3.12 is
+  the target, and it stays there. Upgrading it would forfeit prebuilt aarch64
+  wheels for vLLM, NeMo and torch, which is the landmine the whole plan avoids.
+- The live probe on real hardware reports `cuda: available`, reasoner
+  unreachable, speech stack absent — so the Spark today resolves to `cloud`,
+  `degraded=True`, and would quarantine `local-only` entries naming both true
+  causes. The degradation path is confirmed working before it is needed.
+- `nvidia-smi` resolves at `/usr/bin/nvidia-smi` under a stripped environment,
+  so the probe works from a systemd unit. This was the suspected day-1 bug; it
+  is not present.
+- **Tailscale SSH check-mode blocks scripted access.** Every attempt mints a new
+  browser approval URL and expires on its own schedule. Direct LAN SSH to
+  <spark-host> with key auth works and is what deploys should use. Worth
+  settling before day 4.
+- Two defects found only by running on a second machine: `constraints.txt`
+  pinned an uninstallable pair, and macOS `tar` AppleDouble sidecars broke both
+  migration discovery and the source scan. Transfers to the Spark need
+  `COPYFILE_DISABLE=1`.
 
 
 Schema, telemetry recorder, provider interfaces, compute-profile resolution.
