@@ -8,8 +8,9 @@
 -- night view renders in the timezone the idea was captured in, not the
 -- server's. Never store local time in a timestamp column.
 
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
+-- Connection pragmas (journal_mode, foreign_keys, busy_timeout) are set by the
+-- connection factory, not here: they are properties of a connection, and a
+-- PRAGMA cannot run inside the transaction that wraps a migration.
 
 -- ---------------------------------------------------------------------------
 -- Capture

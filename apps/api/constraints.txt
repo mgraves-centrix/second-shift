@@ -1,0 +1,6 @@
+# Pinned constraints. Regenerate with:
+#   pip freeze --exclude-editable > constraints.txt
+# Never use `uv run` on the Spark: it re-resolves the environment to x86_64
+# and destroys it. `uv pip install` into an already-active venv is fine.
+pytest==8.3.4
+pytest-asyncio==1.4.0

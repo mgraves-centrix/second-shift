@@ -1,0 +1,43 @@
+# Per-token rates. Git-tracked so a historical cost curve is reproducible from
+# the repository alone: costs already recorded never change, and the rate that
+# produced any past cost is recoverable by reading the entry in effect then.
+#
+# A missing rate is a loud failure, never a silent zero. The cost-per-accepted-
+# artifact curve is a measurement, and understating it is worse than stopping.
+#
+# Refreshed weekly. Never edit a past entry to correct a rate — append a new
+# one with a later effective_from, so history stays reproducible.
+#
+# Rates are USD per million tokens. effective_from is an ISO-8601 UTC date.
+
+[[rate]]
+provider = "local-vllm"
+model = "*"
+effective_from = "2026-01-01"
+prompt_usd_per_mtok = 0.0
+completion_usd_per_mtok = 0.0
+note = "Local inference on owned hardware. Zero marginal token cost by definition; this is what makes a local-only idea visibly free."
+
+[[rate]]
+provider = "token-factory"
+model = "nemotron-3.5-lightning-30b-a3b"
+effective_from = "2026-08-27"
+prompt_usd_per_mtok = 0.0
+completion_usd_per_mtok = 0.0
+note = "PLACEHOLDER - unverified. Replace before the first cloud-assisted run."
+
+[[rate]]
+provider = "token-factory"
+model = "nemotron-3-super-120b-a12b"
+effective_from = "2026-08-27"
+prompt_usd_per_mtok = 0.0
+completion_usd_per_mtok = 0.0
+note = "PLACEHOLDER - unverified. Replace before the first cloud-assisted run."
+
+[[rate]]
+provider = "token-factory"
+model = "nemotron-3-ultra-550b-a55b"
+effective_from = "2026-08-27"
+prompt_usd_per_mtok = 0.0
+completion_usd_per_mtok = 0.0
+note = "PLACEHOLDER - unverified. Replace before the first cloud-assisted run."
