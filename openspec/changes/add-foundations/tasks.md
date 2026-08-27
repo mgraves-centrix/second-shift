@@ -39,39 +39,39 @@ Depends on group 2. Groups 3 and 4 can proceed in parallel once persistence land
 
 Depends on group 2. No concrete backend beyond the null implementation — real backends arrive with their spikes on days 4–6.
 
-- [ ] 4.1 Define `Transcriber`, `Reasoner`, `Embedder` and `Executor` as abstract base classes. Each public method is concrete and owns telemetry; implementations override an internal `_do_*` method only.
-- [ ] 4.2 `Reasoner.complete` takes `policy` as an explicit parameter, asserted at call time rather than read from context.
-- [ ] 4.3 Implement null/echo providers for each interface, for testing and for a profile with no backend configured.
-- [ ] 4.4 Implement the registry that binds interfaces to implementations by resolved profile.
-- [ ] 4.5 `Executor.dispatch` takes a telemetry descriptor carrying the ingest destination, its credential, and the dispatching invocation id. `JobResult` carries the work product only and never telemetry records.
-- [ ] 4.6 Test: dispatching from within an active invocation produces a descriptor naming that invocation, and a returned `JobResult` contains no telemetry payload.
-- [ ] 4.7 Test: a new implementation overriding only its internal method produces `model_calls` rows without containing telemetry code.
-- [ ] 4.8 Test: no provider SDK import and no hardcoded model identifier exists outside the providers package, asserted by a source scan over `agents/`, `night/` and `api/`.
+- [x] 4.1 Define `Transcriber`, `Reasoner`, `Embedder` and `Executor` as abstract base classes. Each public method is concrete and owns telemetry; implementations override an internal `_do_*` method only.
+- [x] 4.2 `Reasoner.complete` takes `policy` as an explicit parameter, asserted at call time rather than read from context.
+- [x] 4.3 Implement null/echo providers for each interface, for testing and for a profile with no backend configured.
+- [x] 4.4 Implement the registry that binds interfaces to implementations by resolved profile.
+- [x] 4.5 `Executor.dispatch` takes a telemetry descriptor carrying the ingest destination, its credential, and the dispatching invocation id. `JobResult` carries the work product only and never telemetry records.
+- [x] 4.6 Test: dispatching from within an active invocation produces a descriptor naming that invocation, and a returned `JobResult` contains no telemetry payload.
+- [x] 4.7 Test: a new implementation overriding only its internal method produces `model_calls` rows without containing telemetry code.
+- [x] 4.8 Test: no provider SDK import and no hardcoded model identifier exists outside the providers package, asserted by a source scan over `agents/`, `night/` and `api/`.
 
 ## 5. Compute profile and airlock
 
 Depends on groups 2 and 4.
 
-- [ ] 5.1 Implement the capability probe reporting CUDA availability, local endpoint reachability and speech-stack importability as independent findings.
-- [ ] 5.2 Implement profile resolution: `SECOND_SHIFT_PROFILE`, then probe, then `cloud`. Record the resolved profile and probe findings at startup.
-- [ ] 5.3 Implement policy resolution producing `effective_policy` and `policy_source` for a run, refusing to widen an entry's default without an attributable decision.
-- [ ] 5.4 Implement the capability report: it returns every policy with an availability flag and, where unavailable, the specific probe finding that caused it. Unavailable policies are returned marked, never omitted.
-- [ ] 5.5 Implement quarantine: an entry whose policy the resolved profile cannot honor is never dispatched, no run is created for it, and it is retrievable as blocked with its cause. Entries whose policy the profile can honor continue to dispatch normally.
-- [ ] 5.6 Implement quarantine release: when capability returns, previously quarantined entries become eligible again without manual re-entry.
-- [ ] 5.7 Test: `SECOND_SHIFT_PROFILE=cloud` overrides a working local stack.
-- [ ] 5.8 Test: profile resolves to `cloud` on a machine with no CUDA and no reachable endpoint.
-- [ ] 5.9 Test: a partial local stack degrades to `cloud`, startup proceeds, and the causing findings are readable at runtime.
-- [ ] 5.10 Test: a `local-only` entry on a degraded profile is quarantined with its cause, while a `cloud-assisted` entry on the same profile dispatches normally.
-- [ ] 5.11 Test: a `local-only` entry resolves a run whose effective policy is not silently widened.
+- [x] 5.1 Implement the capability probe reporting CUDA availability, local endpoint reachability and speech-stack importability as independent findings.
+- [x] 5.2 Implement profile resolution: `SECOND_SHIFT_PROFILE`, then probe, then `cloud`. Record the resolved profile and probe findings at startup.
+- [x] 5.3 Implement policy resolution producing `effective_policy` and `policy_source` for a run, refusing to widen an entry's default without an attributable decision.
+- [x] 5.4 Implement the capability report: it returns every policy with an availability flag and, where unavailable, the specific probe finding that caused it. Unavailable policies are returned marked, never omitted.
+- [x] 5.5 Implement quarantine: an entry whose policy the resolved profile cannot honor is never dispatched, no run is created for it, and it is retrievable as blocked with its cause. Entries whose policy the profile can honor continue to dispatch normally.
+- [x] 5.6 Implement quarantine release: when capability returns, previously quarantined entries become eligible again without manual re-entry.
+- [x] 5.7 Test: `SECOND_SHIFT_PROFILE=cloud` overrides a working local stack.
+- [x] 5.8 Test: profile resolves to `cloud` on a machine with no CUDA and no reachable endpoint.
+- [x] 5.9 Test: a partial local stack degrades to `cloud`, startup proceeds, and the causing findings are readable at runtime.
+- [x] 5.10 Test: a `local-only` entry on a degraded profile is quarantined with its cause, while a `cloud-assisted` entry on the same profile dispatches normally.
+- [x] 5.11 Test: a `local-only` entry resolves a run whose effective policy is not silently widened.
 
 ## 6. Day 1 pass gates
 
 These are the gates recorded in `docs/WEEK_ONE.md`. All must pass before day 2 begins.
 
-- [ ] 6.1 Gate: migrations apply clean against a fresh database.
-- [ ] 6.2 Gate: a test writes a run with nested `agent_invocations` at depth 2 or greater, with `model_calls` attached, and reads the tree back in correct shape.
-- [ ] 6.3 Gate: recording a `local-only` model call against a remote provider is rejected by the database constraint.
-- [ ] 6.4 Gate: profile resolution returns `cloud` on a machine with no CUDA.
-- [ ] 6.5 Gate: a `local-only` entry on a degraded profile is quarantined rather than dispatched, and the capability report names the finding.
-- [ ] 6.6 Run the full suite and record the baseline timing in the failure ledger for later comparison.
-- [ ] 6.7 Commit, and update `docs/WEEK_ONE.md` to mark day 1 complete with anything learned that changes later days.
+- [x] 6.1 Gate: migrations apply clean against a fresh database.
+- [x] 6.2 Gate: a test writes a run with nested `agent_invocations` at depth 2 or greater, with `model_calls` attached, and reads the tree back in correct shape.
+- [x] 6.3 Gate: recording a `local-only` model call against a remote provider is rejected by the database constraint.
+- [x] 6.4 Gate: profile resolution returns `cloud` on a machine with no CUDA.
+- [x] 6.5 Gate: a `local-only` entry on a degraded profile is quarantined rather than dispatched, and the capability report names the finding.
+- [x] 6.6 Run the full suite and record the baseline timing in the failure ledger for later comparison.
+- [x] 6.7 Commit, and update `docs/WEEK_ONE.md` to mark day 1 complete with anything learned that changes later days.

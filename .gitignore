@@ -35,3 +35,6 @@ brain/
 
 # OS
 .DS_Store
+
+# Python virtualenv
+.venv/

@@ -530,6 +530,12 @@ class Repository:
             "SELECT * FROM model_calls WHERE run_id = ? ORDER BY ts_ms, id", (run_id,)
         ).fetchall()
 
+    def queued_entries(self) -> list[sqlite3.Row]:
+        """Entries awaiting a run. Screened against capability before dispatch."""
+        return self._conn.execute(
+            "SELECT * FROM entries WHERE status = 'queued' ORDER BY created_at_ms, id"
+        ).fetchall()
+
     def failure_ledger(self) -> list[sqlite3.Row]:
         """Recurrence derived from signatures, never a stored counter."""
         return self._conn.execute(

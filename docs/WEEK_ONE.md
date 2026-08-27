@@ -18,7 +18,30 @@ gains a full extra week. Voice upgrades the same path later without changing it.
 
 ---
 
-## Day 1 — Thu 27 Aug — Foundations
+## Day 1 — Thu 27 Aug — Foundations ✅ COMPLETE
+
+**Baseline:** 79 tests, ~0.24s, arm64 / Darwin / Python 3.14.6. Recorded here
+rather than in the failure ledger: that table is typed for failures and is
+queried by the planner at planning time, so a timing row would pollute the
+thing it exists to inform.
+
+**What changed for later days:**
+
+- `check_same_thread` had to be disabled on the SQLite connection. Threaded
+  work records its own telemetry, and out-of-process telemetry ingests through
+  the same connection; serialization is the recorder's lock. Anything writing
+  outside `Recorder` must take that lock — relevant to the day-2 API.
+- `pricing.toml`, not `pricing.yaml`. `tomllib` is stdlib from 3.11 and this
+  project cannot afford another wheel on aarch64. **Cloud rates are
+  placeholders and every cloud call will fail loudly until day 5 replaces
+  them** — that is deliberate, but it means the first Token Factory call is
+  blocked on real pricing.
+- Quarantine is derived from the current capability report, not stored as
+  status. Release is therefore automatic, and no migration was needed to add a
+  status value.
+- Local dev is Python 3.14; the Spark's version is unverified. Confirm before
+  the day-4 vLLM spike.
+
 
 Schema, telemetry recorder, provider interfaces, compute-profile resolution.
 Telemetry is written before the first agent exists, because telemetry retrofitted
