@@ -22,10 +22,10 @@ probe (CUDA present? vLLM reachable? NeMo importable?), else `cloud`.
 
 | | `spark` | `workstation` | `cloud` |
 |---|---|---|---|
-| Transcriber | Parakeet TDT, local | Parakeet TDT, local | hosted ASR |
-| Reasoner (local-only policy) | Nemotron Nano via vLLM | Nemotron Nano via vLLM | **unavailable** |
-| Reasoner (cloud-assisted) | Nemotron via Token Factory | Token Factory | Token Factory |
-| Embedder | NVIDIA embedding model, local | local small model | Token Factory embeddings |
+| Transcriber | Nemotron Speech 0.6B, local | Nemotron Speech 0.6B, local | hosted ASR |
+| Reasoner (local-only policy) | Lightning 30B via vLLM | Lightning 30B via vLLM | **unavailable** |
+| Reasoner (cloud-assisted) | Lightning local, Super/Ultra via Token Factory | Token Factory | Token Factory |
+| Embedder | Nemotron Embed 1B, local | Nemotron Embed 1B, local | Token Factory embeddings |
 | Executor | Nebius Serverless Jobs | Nebius Serverless Jobs | Nebius Serverless Jobs |
 | Night trigger | systemd timer | systemd timer | scheduled job |
 
@@ -114,8 +114,9 @@ Nebius to satisfy a rule, and nothing is kept local out of habit.
 
 The research synthesis, architect, and critic turns. These are long-context,
 high-quality-bar calls where a small local model is genuinely the wrong tool:
-synthesizing twenty Tavily extracts into a brief is not a task for Nano. This is
-a capability argument, not a compliance one.
+synthesizing twenty Tavily extracts into a brief is work for Super, not for a
+30B model with 3B active. This is a capability argument, not a compliance one.
+Exact bindings: [MODELS.md](MODELS.md).
 
 ### Nebius Serverless Jobs — parallel variant generation
 

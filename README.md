@@ -78,22 +78,24 @@ is deliberately excluded and why.
 | Layer | Technology |
 |---|---|
 | Capture | PWA — Next.js / React, Web Audio API |
-| ASR | NVIDIA Parakeet TDT 1.1B via NeMo, local |
-| Local reasoning | NVIDIA Nemotron Nano, served by vLLM |
-| Cloud reasoning | NVIDIA Nemotron via Nebius Token Factory |
+| ASR | Nemotron Speech Streaming 0.6B, local |
+| Local reasoning | Nemotron 3.5 Lightning 30B A3B (NVFP4), vLLM |
+| Cloud reasoning | Nemotron 3 Super / Ultra via Nebius Token Factory |
 | Overnight compute | Nebius Serverless Jobs |
 | Judge demo hosting | Nebius |
 | Web research | Tavily |
-| Embeddings | NVIDIA NV-Embed, local |
+| Embeddings | Llama Nemotron Embed VL 1B v2, local |
 | Memory | Plaintext markdown + SQLite, git-versioned |
 | Orchestrator | Python + FastAPI, SQLite job queue, systemd timers |
 | Dashboard | Next.js + Tailwind, server-sent events |
-| TTS | Riva/Magpie, Piper fallback — unverified, non-blocking |
+| TTS | MagpieTTS via NeMo Speech — non-blocking |
 
 Target hardware: NVIDIA DGX Spark (GB10 Grace Blackwell, 128GB unified memory,
 aarch64, CUDA 13.0, sm_121).
 
-No third-party LLMs in the runtime path.
+Every model in the runtime path is an NVIDIA open model. See
+[docs/MODELS.md](docs/MODELS.md) for exact bindings and
+[THIRD_PARTY.md](THIRD_PARTY.md) for licenses.
 
 ---
 

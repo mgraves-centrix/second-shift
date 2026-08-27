@@ -8,7 +8,6 @@ You may obtain a copy of the License at
     http://www.apache.org/licenses/LICENSE-2.0
 
 This product includes software and models developed by third parties,
-including NVIDIA (Parakeet, Nemotron, NV-Embed) and others. Those
-components are governed by their own licenses, which are not superseded
-by the Apache License above. See THIRD_PARTY.md (forthcoming) for the
-component inventory and license terms.
+including NVIDIA (the Nemotron model family). Those components are
+governed by their own licenses, which are not superseded by the Apache
+License above. See THIRD_PARTY.md for the component inventory and terms.

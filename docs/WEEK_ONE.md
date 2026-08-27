@@ -82,23 +82,39 @@ dogfooding gate. Do not let it eat the weekend.
 
 ---
 
-## Day 4–5 — Sun 30 / Mon 31 — Spike B: vLLM + Nemotron Nano on sm_121
+## Day 4 — Sun 30 Aug — Spike B: vLLM + Nemotron 3.5 Lightning on the Spark
 
-The highest-uncertainty item on the critical path. CUDA 13 / sm_121 / aarch64 is
-a thin-support corner: no prebuilt flash-attn wheels, and anything pinning torch
-below 2.6 will not support the architecture.
+**Downgraded from the highest-risk item on the critical path.** NVIDIA publishes
+an official vLLM recipe naming **DGX Spark (GB10)** as a supported target, and
+ships a speculative-decoding variant literally called **DSpark** — "preferred on
+DGX Spark for latency." The aarch64 work has been done upstream.
 
-**Pass gate** — OpenAI-compatible endpoint answers 3 concurrent requests,
-stable over 30 minutes, tokens/sec recorded in the failure ledger as a baseline.
+The risk is no longer *will it run*. It is *which quantization and
+speculative-decoding configuration*, which is tuning, not porting.
 
-**Abort criteria** — hard timebox 1.5 days. Fall back in order:
-1. TensorRT-LLM
-2. `llama.cpp` GGUF — loses continuous batching; acceptable at this concurrency
-3. Route all reasoning to Token Factory and reframe `local-only` as *deferred*
-   rather than *local*
+Serve `nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4` on vLLM ≥ 0.27.1 with
+DSpark speculative decoding.
 
-Option 3 materially weakens the Airlock story, so if it comes into play,
-escalate rather than absorbing it quietly.
+**Pass gate** — OpenAI-compatible endpoint answers 3 concurrent requests, stable
+over 30 minutes, tokens/sec recorded as a baseline in the failure ledger.
+Resident memory leaves headroom for ASR and the embedder.
+
+**Abort criteria** — timebox **half a day**, down from 1.5. Fall back in order:
+1. NVFP4 without DSpark speculative decoding — throughput over latency
+2. BF16 reference checkpoint if the quantized path misbehaves (roughly 60GB
+   resident; verify headroom before committing)
+3. Route reasoning to Token Factory and reframe `local-only` as *deferred*
+
+Option 3 materially weakens the Airlock story. If it comes into play, escalate
+rather than absorbing it quietly.
+
+**Memory note:** a MoE model holds *all* 30B parameters resident. "3B active" is
+a compute figure, not a memory one. NVFP4 is the default deployment target for
+exactly this reason.
+
+**The freed day is banked as slack.** A week-one plan with zero slack fails on
+first contact. If it survives to Wednesday unspent, pull the seed generator
+forward — it unblocks the most downstream work.
 
 ---
 
@@ -123,14 +139,18 @@ redesign; knowing in week 6 does not.
 
 ---
 
-## Day 6 — Tue 1 Sep — Spike D: Parakeet on aarch64 + synthetic night generator
+## Day 6 — Tue 1 Sep — Spike D: Nemotron Speech on aarch64 + synthetic night generator
 
-**Parakeet** — timebox half a day.
+**ASR** — timebox half a day. Target is
+`nvidia/nemotron-speech-streaming-en-0.6b`, not Parakeet TDT 1.1B: it is the
+current packaging of the same cache-aware streaming Parakeet FastConformer
+encoder, at roughly half the size, with streaming and punctuation built in —
+better suited to push-to-talk than a batch model.
 Pass gate: 60s of phone audio transcribes at acceptable WER, resident alongside
 vLLM without OOM, latency recorded.
-Abort: fall back to (1) an aarch64 NeMo container image, (2) the smaller
-`parakeet-tdt-0.6b-v2`, (3) defer voice. Text capture is already live, so this
-never blocks anything.
+Abort: fall back to (1) an aarch64 NeMo container image, (2) Parakeet TDT 1.1B,
+(3) defer voice. Text capture is already live, so this never blocks anything.
+NeMo wheels on ARM remain the real risk here — keep the timebox honest.
 
 **Synthetic night generator** — the highest-leverage item not in the original
 brief. It generates a full 6-hour night: 400+ events across lanes, a nested
@@ -165,9 +185,10 @@ actually broke.
 
 ## Explicitly not in week one
 
-**TTS.** Non-blocking by design and week one has no slack. Timeboxed half-day in
-week 3. If Riva/Magpie does not build on aarch64, Piper; if Piper does not,
-text-only briefings ship and nothing is lost.
+**TTS.** Still not week one — but the odds improved. MagpieTTS ships inside NeMo
+Speech, the same dependency stack the ASR spike already installs, so it is no
+longer an orphan dependency with its own porting risk. Timeboxed half-day in
+week 3. If it does not build, text-only briefings ship and nothing is lost.
 
 **The celestial layer.** Week 6, after the scrubber works. It is worth real time
 — but only once, and only on a foundation that already renders.
