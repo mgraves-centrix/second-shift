@@ -220,6 +220,7 @@ CREATE TABLE decisions (
   id                 TEXT PRIMARY KEY,
   entry_id           TEXT NOT NULL REFERENCES entries(id),
   raised_by_run_id   TEXT REFERENCES runs(id),
+  raised_by_invocation_id TEXT REFERENCES agent_invocations(id),  -- which interviewer version asked
   raised_at_ms       INTEGER NOT NULL,
   question           TEXT NOT NULL,
   rationale          TEXT,                      -- why the agent could not proceed
@@ -324,6 +325,63 @@ CREATE TABLE eval_results (
   model_call_id  TEXT REFERENCES model_calls(id),
   UNIQUE(eval_run_id, eval_prompt_id, sample_index)
 );
+
+-- ---------------------------------------------------------------------------
+-- Payload capture — preserves the option to train later
+-- ---------------------------------------------------------------------------
+
+-- model_calls records what a call COST. This records what it SAID. Without it,
+-- no night that has already run can ever become training data, because a token
+-- count cannot be reconstructed into a prompt. Cheap now, impossible to backfill
+-- — the same argument that puts telemetry on day one.
+--
+-- Text lives on disk, not in SQLite: contexts run to 1M tokens and payloads will
+-- outweigh every other table combined within weeks.
+--
+-- PRIVACY: this table holds raw, unredacted content for local-only ideas. It is
+-- local by construction and is excluded from "export your brain" by default. It
+-- must never be synced, uploaded, or included in a judge deployment.
+CREATE TABLE model_call_payloads (
+  model_call_id    TEXT PRIMARY KEY REFERENCES model_calls(id),
+  prompt_path      TEXT NOT NULL,      -- data/payloads/<yyyy-mm>/<id>.prompt.json
+  completion_path  TEXT NOT NULL,
+  prompt_bytes     INTEGER,
+  completion_bytes INTEGER,
+  captured_at_ms   INTEGER NOT NULL,
+  redacted         INTEGER NOT NULL DEFAULT 0,
+  -- synthetic data and anything the user excludes never enters a training set
+  training_eligible INTEGER NOT NULL DEFAULT 1,
+  retention_class  TEXT NOT NULL DEFAULT 'standard'
+                   CHECK (retention_class IN ('standard','ephemeral','pinned'))
+);
+CREATE INDEX idx_payloads_eligible ON model_call_payloads(training_eligible, captured_at_ms);
+
+-- The interviewer preference dataset, materialized from data already collected.
+-- `accepted` is the label: a question worth asking got decided; one that was
+-- deferred or went obsolete was not. This is the cleanest training signal in the
+-- system, and it accumulates from the first week of dogfooding whether or not a
+-- fine-tune is ever run.
+CREATE VIEW interviewer_training_pairs AS
+SELECT
+  d.id            AS decision_id,
+  d.entry_id,
+  d.question,
+  d.rationale,
+  d.answer,
+  d.status,
+  CASE WHEN d.status = 'decided'                  THEN 1
+       WHEN d.status IN ('deferred','obsolete')   THEN 0
+       ELSE NULL END AS accepted,
+  d.raised_at_ms,
+  d.answered_at_ms,
+  ag.name    AS agent_name,
+  ag.version AS agent_version,
+  r.brain_sha
+FROM decisions d
+LEFT JOIN agent_invocations ai ON ai.id = d.raised_by_invocation_id
+LEFT JOIN agents ag            ON ag.id = ai.agent_id
+LEFT JOIN runs r               ON r.id  = d.raised_by_run_id
+WHERE d.is_synthetic = 0;
 
 -- ---------------------------------------------------------------------------
 -- Rollups — what the dashboard reads

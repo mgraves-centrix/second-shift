@@ -72,6 +72,14 @@ portability requirement makes decisive. This sits behind the `Embedder` and
 retrieval interfaces; swapping in a real index later is a one-module change.
 LanceDB is not adopted. See `docs/decisions/0002`.
 
+**`model_call_payloads` is separate from `model_calls`.** One records what a
+call cost, the other what it said. They are split because the cost row is small,
+indexed and queried constantly, while payload text is large, written once, and
+read rarely. Keeping prompts on disk behind a path reference stops 1M-token
+contexts from dominating every query plan in the database. See
+`docs/decisions/0007` — the point of capturing payloads at all is to preserve the
+option of training later, which cannot be backfilled from token counts.
+
 ## Entity map
 
 ```
