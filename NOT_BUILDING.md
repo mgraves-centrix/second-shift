@@ -29,6 +29,7 @@ this file and into the plan — this file is never silently edited.
 | Third-party LLMs in the runtime path | Not a scope call — a rules call. The system must be evaluated on how it uses Nemotron and Nebius. |
 | A general chat interface | The morning interview is structured and agenda-driven. An open chat box would quietly replace it and the product would become a worse ChatGPT. |
 | Editing artifacts in-app | Artifacts land as files. Edit them in the tool that edits that kind of file. |
+| Robotics or any physical-hardware loop | Considered and declined 27 Aug 2026. The Physical AI track was evaluated; Second Shift is a Personal AI track entry. Artifacts are files, not motion. |
 | Autonomous execution of generated code | Generated builds are produced, not run unsupervised. Sandboxing an arbitrary code executor is a project, not a feature. |
 
 ---
