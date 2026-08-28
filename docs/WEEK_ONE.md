@@ -94,7 +94,7 @@ responsive web page. Installability is polish; the logged entry is the gate.
 
 Found by checking rather than assuming, on 2026-08-27.
 
-### 1. Offline capture needs TLS, so Spike A moves earlier
+### 1. Offline capture needs TLS — Spike A blocked on a permission
 
 Service workers require a secure context — HTTPS, or `localhost`. A phone
 reaching `http://<host>:8000` over the tailnet is neither. Without a service
@@ -110,10 +110,25 @@ network" requirement depends on it.
 rather than one: offline capture now, and the microphone later. The `mkcert`
 fallback in its abort ladder also produces a secure context and remains valid.
 
-### 2. The brain repository does not exist
+**Status 2026-08-27: blocked, not failed.** Tailscale 1.102.2 is installed and
+Serve is available on the Spark, whose tailnet name is
+`<host>.<tailnet>.ts.net`. A static test target that reports
+`isSecureContext` and attempts a service-worker registration is in place at
+`~/spike-a`. `tailscale serve` returns `cert access denied` and passwordless
+sudo is not configured, so the spike cannot proceed without a change only the
+owner can make. `CertDomains` is empty, which suggests HTTPS certificates may
+also need enabling for the tailnet in the admin console.
 
-ADR 0001 specifies a sibling repository. Nothing has created it, locally or on
-GitHub, and day 3 requires committing entries to it.
+### 2. The brain repository — done, local only
+
+Created at `../second-shift-brain`, git-initialised, seeded and committed. Topic
+files (`profile.md`, `style-guide.md`, `skills/`) are rewritten in place; the
+journal is append-only. Seeded deliberately naive rather than empty, so the
+week-8 diff shows refinement rather than accumulation from nothing.
+
+**No remote is configured.** Nothing is published and nothing can be pushed by
+accident. Whether it gets a private GitHub remote or stays local with its own
+backup is still yours to decide — but it must never be public.
 
 **It must be private.** The code repository went public on 2026-08-27; the brain
 holds captured ideas and a personal profile. Decide before day 3 whether it is
