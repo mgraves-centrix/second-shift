@@ -12,7 +12,23 @@ draw on rather than re-deriving it — and what is **still open**, which becomes
 
 ---
 
-## Blocking issue to resolve first
+## Resolved 2026-08-27
+
+- **Eval baseline is split.** Day 3 records prompts, `rubric_sha` and
+  `brain_sha`; scoring runs day 5 once a judge exists. Detail below.
+- **Geolocation: configured home, per-entry override.** Home lat/long in config
+  keeps capture frictionless; an explicit override covers capture while
+  travelling. No browser geolocation prompt.
+- **Brain layout: stable topic files plus a dated journal.** Detail below.
+- **Offline replay dedup** uses the client-generated ULID as an idempotency
+  key. The client already needs an id to queue an entry offline.
+- **Titles are derived, not entered.** Typing a title is friction on the one
+  interaction that must stay frictionless.
+- **Repository is public** as of 2026-08-27, Apache 2.0, history audited first.
+
+---
+
+## The eval sequencing problem, and its resolution
 
 **The day-3 eval baseline has no judge.** `docs/WEEK_ONE.md` puts the week-1
 eval baseline on day 3, but the local reasoner does not exist until day 4 and
@@ -30,9 +46,17 @@ cannot silently slip. Two workable shapes:
 - **Move the baseline to day 5.** Simpler, but the brain has then absorbed two
   more days of dogfooding, so "week 1" measures a slightly later brain.
 
-The first preserves the measurement; the second is less work. This is a real
-decision, not a detail — it belongs in the `evals` proposal as a blocking
-question.
+**Resolved: split the baseline.**
+
+Day 3 records only what cannot be reconstructed later — the five fixed prompts,
+the `rubric_sha`, and the `brain_sha` of a two-day-old brain. No model is
+required for that. Day 5 generates and scores against that recorded brain
+state, once Token Factory is verified.
+
+`eval_runs` already separates `brain_sha` from `judge_model`, so this needs no
+schema change. What it does need is for the day-5 scoring run to be pinned to
+the day-3 `brain_sha` rather than to whatever HEAD is by then — that is the
+whole point, and it is the one thing that can silently go wrong.
 
 ---
 
@@ -47,10 +71,13 @@ day-3 dogfooding starts the memory clock that cannot be restarted.
 later; policy selected at capture; unavailable policies shown disabled with
 their specific reason (never hidden); offline-tolerant queue.
 
-**Open:** whether latitude/longitude are captured per entry or configured once
-(the celestial layer needs them, but a per-capture geolocation prompt adds
-friction to the one interaction that must stay frictionless); how a replayed
-offline queue avoids duplicate entries; whether titles are derived or entered.
+**Also decided:** home lat/long in config with a per-entry override; offline
+replay deduplicated on the client-generated ULID; titles derived rather than
+entered.
+
+**Open:** what the capture surface shows while an entry is queued offline and
+not yet acknowledged by the server — silence risks a re-tap and a duplicate the
+idempotency key then swallows invisibly.
 
 ### 2. `brain` — day 3
 
@@ -60,9 +87,15 @@ commits to.
 **Decided:** ADR 0001 — separate repository, not a subdirectory or submodule;
 human-readable markdown; `runs.brain_sha` pins state per run.
 
-**Open:** file layout — per-day files, per-entry files, or by topic; commit
-granularity (per entry, per stage, per night); what the brain contains on day
-one before any night has run.
+**Also decided:** stable topic files — `profile.md`, `style-guide.md`,
+`skills/*.md` — rewritten in place as the system learns, alongside a dated
+append-only journal for raw history. The eight-week diff is read off the topic
+files: a diff of an append-only log is just more stuff, while a diff of an
+edited belief file *is* the learning claim, visible.
+
+**Open:** commit granularity (per entry, per stage, or per night); what the
+topic files contain on day one, before any night has run, so that week 1 is a
+real baseline rather than an empty one.
 
 ### 3. `evals` — day 3, subject to the blocking issue above
 

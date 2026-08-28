@@ -92,15 +92,17 @@ responsive web page. Installability is polish; the logged entry is the gate.
 
 ## Day 3 — Sat 29 Aug — 🚩 DOGFOODING STARTS
 
-Wire capture to the brain repo: every entry appends to a dated markdown file and
-commits. Run the week-1 eval baseline — even with no orchestrator, the baseline
-must exist now or the week-8 comparison has no left-hand side.
+Wire capture to the brain repo: every entry appends to the dated journal and
+commits. Record the eval baseline's **inputs** — no model exists yet, so this
+records what cannot be reconstructed later and defers scoring to day 5.
 
 **Pass gate**
 - Every idea from today forward is captured in the real system. No exceptions,
   no notes app.
-- `eval_runs` row exists with `brain_sha`, `judge_model`, `rubric_sha` pinned.
-- 5 prompts × 3 samples recorded.
+- The five held-out prompts and the rubric are fixed and committed.
+- An `eval_runs` row exists pinning `rubric_sha` and the day-3 `brain_sha`.
+- The brain's topic files exist and are non-empty, so week 1 is a real baseline
+  rather than an empty one.
 
 **Abort criteria** — none. If this slips, the whole submission thesis slips with
 it. Everything below yields to it.
@@ -169,8 +171,14 @@ Three deliverables, all small, all load-bearing:
    target is required. This is a submission-blocking assumption and it does not
    get to sit unexamined until week seven.
 
+**Also on day 5 — score the week-1 eval baseline.** Generate and score the five
+prompts against the `brain_sha` recorded on day 3, not against HEAD. Pinning to
+the recorded SHA is the entire point of splitting the baseline, and it is the
+one step that can silently go wrong and quietly weaken the eight-week delta.
+
 **Pass gate** — both calls succeed with telemetry rows; the judge-hosting
-question has a written answer in `docs/decisions/`.
+question has a written answer in `docs/decisions/`; `eval_results` rows exist
+for 5 prompts × 3 samples, linked to the day-3 `brain_sha`.
 
 **Abort criteria** — if Serverless Jobs are unusable, the build stage runs local
 and Nebius usage narrows to Token Factory. That still satisfies the rules but
