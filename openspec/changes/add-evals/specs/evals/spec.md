@@ -48,6 +48,10 @@ generation, never to the current one.
 - **WHEN** an awaiting-scoring run is scored days later, after the brain has changed
 - **THEN** the results are attributed to the brain commit recorded at baseline, not to the brain's current commit
 
+#### Scenario: Generation reads the brain at the recorded commit
+- **WHEN** an awaiting-scoring run is generated and scored after the brain has changed
+- **THEN** the brain content used is what that commit holds, not what the working tree currently holds — otherwise the pinning records a state the output was never produced from
+
 #### Scenario: The recorded state is not overwritten by scoring
 - **WHEN** scoring completes for a previously recorded run
 - **THEN** the run's brain commit is unchanged
