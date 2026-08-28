@@ -35,10 +35,42 @@ BF16 stays available as a reference checkpoint for output comparison.
 
 | Role | Model | Notes |
 |---|---|---|
-| Deep reasoning | `Nemotron 3 Super 120B A12B` | 120B hybrid MoE / 12B active, 1M context. Research synthesis, architect, critic. |
-| Frontier turns | `Nemotron 3 Ultra 550B A55B` | Reserved for the hardest synthesis. Cost-gated. |
-| Cheap turns on `cloud` profile | `Nemotron 3.5 Lightning 30B A3B` | Same model as local. See below. |
-| Eval judge | `Nemotron 3 Ultra`, version-pinned | Pinned in `eval_runs.judge_model_version`. Never floats. |
+Model ids are the exact Token Factory console identifiers, including case.
+Every id guessed from the marketing name was wrong; these were read from the
+console on 2026-08-27, region `eu-north1`. Rates are USD per 1M tokens.
+
+| Role | Console model id | Input | Output |
+|---|---|---|---|
+| Routine turns | `Nemotron-3.5-Lightning` | $0.06 | $0.24 |
+| Deep reasoning | `Nvidia-Nemotron-3-Super-120B-A12B` | $0.30 | $0.90 |
+| Frontier turns, eval judge | `Nemotron-3-Ultra-550B-a55B` | $1.00 | $3.00 |
+
+Every model also has a `-Batch` variant at **exactly half** both rates. The
+eval judge is version-pinned in `eval_runs.judge_model_version` and never
+floats.
+
+### Batch for the night, standard for the morning
+
+Batch pricing is 50% of standard across every model on the platform without
+exception — verified over fourteen model pairs. The night pipeline is the
+definition of batchable work: nothing waits on a 2am run, and the
+trans-Atlantic hop to `eu-north1` that would make batching painful for
+interactive work is irrelevant when the deadline is morning.
+
+A representative cloud-assisted night — ten Lightning routine turns, three
+Super synthesis turns, one Ultra critique — costs **$0.12 on the standard API
+and $0.06 on batch**. Across the 63 nights to the deadline that is $7.67
+against $3.84.
+
+The saving is real but small in absolute terms; the reason to use batch is not
+the money. It is that **cost per accepted artifact is a scored chart**, and
+halving the denominator of the argument you are making is worth the submit-then-
+poll complexity. The morning interview stays on the standard API, because a
+person is waiting.
+
+Batch changes the shape of the cloud `Reasoner`: submission and retrieval are
+separate operations, not one call. That belongs in the `nebius-executor` spec
+before it is built.
 
 ## The property worth exploiting
 

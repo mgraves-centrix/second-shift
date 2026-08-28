@@ -1,14 +1,24 @@
-# Per-token rates. Git-tracked so a historical cost curve is reproducible from
-# the repository alone: costs already recorded never change, and the rate that
-# produced any past cost is recoverable by reading the entry in effect then.
+# Per-token rates, USD per million tokens. effective_from is an ISO-8601 UTC date.
+#
+# Git-tracked so a historical cost curve is reproducible from the repository
+# alone: costs already recorded never change, and the rate that produced any
+# past cost is recoverable by reading the entry in effect at that timestamp.
 #
 # A missing rate is a loud failure, never a silent zero. The cost-per-accepted-
-# artifact curve is a measurement, and understating it is worse than stopping.
+# artifact curve is a scored measurement, and understating it is worse than
+# stopping.
 #
-# Refreshed weekly. Never edit a past entry to correct a rate — append a new
-# one with a later effective_from, so history stays reproducible.
+# `model` MUST be the exact Token Factory console identifier, including case.
+# Three IDs were guessed wrong before being read from the console — every guess
+# was wrong. A mismatch here does not warn; it raises MissingRate mid-run.
 #
-# Rates are USD per million tokens. effective_from is an ISO-8601 UTC date.
+# Never edit a past entry to correct a rate. Append a new one with a later
+# effective_from so history stays reproducible. (This file was rewritten once,
+# on 2026-08-27, while no model_calls existed anywhere — there was no history to
+# preserve. That exemption does not apply again.)
+#
+# Rates read from the Token Factory console, region eu-north1, on 2026-08-27.
+# The effective_from dates are the console's own, not the date they were read.
 
 [[rate]]
 provider = "local-vllm"
@@ -18,25 +28,50 @@ prompt_usd_per_mtok = 0.0
 completion_usd_per_mtok = 0.0
 note = "Local inference on owned hardware. Zero marginal token cost by definition; this is what makes a local-only idea visibly free."
 
-# Lightning and Ultra are DELIBERATELY ABSENT.
-#
-# Only blended figures are published for them — Lightning ~$0.08/Mtok and Ultra
-# ~$1.20/Mtok, each computed over a 7:2:1 cache/input/output ratio. A blended
-# number cannot be split back into input and output rates without knowing the
-# cache-hit price, and a guessed split would produce a cost curve that is wrong
-# in a way nothing surfaces.
-#
-# An absent rate raises MissingRate and fails the call loudly. That is the
-# correct behaviour: the cost curve is a scored measurement, and a plausible
-# wrong number is worse than a stopped run.
-#
-# To add them, read the input and output prices from the Token Factory console
-# (tokenfactory.nebius.com -> organization -> prices) and append entries here.
+# --- Nemotron 3.5 Lightning — the routine-turn model, local and cloud ---------
 
 [[rate]]
 provider = "token-factory"
-model = "nemotron-3-super-120b-a12b"
-effective_from = "2026-08-27"
+model = "Nemotron-3.5-Lightning"
+effective_from = "2026-08-01"
+prompt_usd_per_mtok = 0.06
+completion_usd_per_mtok = 0.24
+
+[[rate]]
+provider = "token-factory"
+model = "Nemotron-3.5-Lightning-Batch"
+effective_from = "2026-08-01"
+prompt_usd_per_mtok = 0.03
+completion_usd_per_mtok = 0.12
+
+# --- Nemotron 3 Super — research synthesis, architect, critic -----------------
+
+[[rate]]
+provider = "token-factory"
+model = "Nvidia-Nemotron-3-Super-120B-A12B"
+effective_from = "2026-03-01"
 prompt_usd_per_mtok = 0.30
 completion_usd_per_mtok = 0.90
-note = "Source: Artificial Analysis provider table, 2026-08-27 — a third-party aggregator, not Nebius directly. Confirm against the Token Factory console and supersede with a new effective_from entry if it differs. Do not edit this entry; history must stay reproducible."
+
+[[rate]]
+provider = "token-factory"
+model = "Nvidia-Nemotron-3-Super-120B-A12B-Batch"
+effective_from = "2026-03-01"
+prompt_usd_per_mtok = 0.15
+completion_usd_per_mtok = 0.45
+
+# --- Nemotron 3 Ultra — frontier turns and the pinned eval judge --------------
+
+[[rate]]
+provider = "token-factory"
+model = "Nemotron-3-Ultra-550B-a55B"
+effective_from = "2026-06-01"
+prompt_usd_per_mtok = 1.00
+completion_usd_per_mtok = 3.00
+
+[[rate]]
+provider = "token-factory"
+model = "Nemotron-3-Ultra-550B-a55B-Batch"
+effective_from = "2026-06-01"
+prompt_usd_per_mtok = 0.50
+completion_usd_per_mtok = 1.50
