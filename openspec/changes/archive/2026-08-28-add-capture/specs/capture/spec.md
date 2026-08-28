@@ -112,7 +112,7 @@ SHALL be kept unchanged and the divergence recorded.
 
 An entry SHALL record the policy the user chose, unmodified. The system MUST NOT
 substitute, downgrade or reject a policy because the current profile cannot
-honor it — an unhonourable policy is a quarantine decision made later, not a
+honor it — a policy the profile cannot honor is a quarantine decision made later, not a
 capture-time rewrite.
 
 #### Scenario: Local-only captured on a profile that cannot honor it

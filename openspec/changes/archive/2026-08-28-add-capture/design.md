@@ -21,7 +21,7 @@ captured ideas.
 **Non-Goals:**
 - Voice, ASR, microphone, HTTPS. Day 3–4.
 - The brain journal append. Day 3, though the seam is reserved here.
-- Any night behaviour, retrieval, or the interview.
+- Any night behavior, retrieval, or the interview.
 - A queue management UI. See the scope boundary below.
 
 ## Decisions

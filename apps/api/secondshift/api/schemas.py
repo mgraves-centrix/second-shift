@@ -68,7 +68,7 @@ class CapabilityResponse(BaseModel):
 
     A filtered list of selectable options would hide that the Airlock exists —
     which matters most on the judge deployment, where the cloud profile cannot
-    honour local-only at all.
+    honor local-only at all.
     """
 
     profile: str

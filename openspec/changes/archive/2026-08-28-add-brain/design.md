@@ -20,7 +20,7 @@ request.
 - Writing topic files back. That is the distiller, and it does not exist.
 - Retrieval or embedding over the brain. Separate capability, and per ADR 0002 it
   is brute-force over SQLite blobs when it arrives.
-- Any night behaviour.
+- Any night behavior.
 
 ## Decisions
 

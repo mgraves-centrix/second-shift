@@ -142,6 +142,6 @@ UI, so "why did this idea cost 40x that one" always has an answer on screen.
 - License terms for Nemotron 3 Super and Ultra as served by Token Factory.
 - Whether `nemotron-speech-streaming-en-0.6b` and the reasoner can be co-resident
   on the Spark under sustained load without contention.
-- Current Token Factory catalogue and per-token pricing, for
+- Current Token Factory catalog and per-token pricing, for
   `model_calls.estimated_cost_usd`. Pricing must be read from a config file,
   never hardcoded — the cost curve is a scored artifact.

@@ -47,7 +47,7 @@ installable PWA that captures text, queues offline, and drains on reconnect.
   server already holds without it.
 
 Not in this change: voice, ASR, HTTPS/microphone (day 3–4 spike), the brain
-journal append (day 3), and any night behaviour.
+journal append (day 3), and any night behavior.
 
 ## Capabilities
 
@@ -93,7 +93,7 @@ is precisely the boundary, which is why it is a marker and not a decision.
 - **Replay is a silent success**: `200` with the stored entry. Not `409`, and
   not an `IntegrityError` — an unhandled duplicate would classify as
   `orchestrator_crash` and swamp the failure ledger with routine client
-  behaviour within days.
+  behavior within days.
 - **A replayed id with different content keeps the stored version.** Entries are
   append-only; the divergence is recorded as an event rather than resolved.
 - **`capture_profile` is the profile the client was told about**, sent with the
@@ -142,7 +142,7 @@ surface was shown — which policies were offered, which were unavailable, and t
 specific probe finding for each unavailable one.
 
 This makes "did I choose `cloud-assisted` deliberately, or because `local-only`
-was greyed out that week?" answerable permanently. Without it the local-versus-
+was grayed out that week?" answerable permanently. Without it the local-versus-
 cloud token chart can report a degraded endpoint as though it were user
 preference, and that chart is how the Airlock is proven rather than asserted.
 

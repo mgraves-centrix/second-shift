@@ -1,6 +1,6 @@
 """Policy vocabulary and the call-time airlock guard.
 
-The database `CHECK` on `model_calls` is the last line of defence: it makes a
+The database `CHECK` on `model_calls` is the last line of defense: it makes a
 privacy breach unrecordable. This module is the first — it refuses the call
 before it is made, so a `local-only` idea never reaches the network at all
 rather than being caught on the way into the database afterwards.

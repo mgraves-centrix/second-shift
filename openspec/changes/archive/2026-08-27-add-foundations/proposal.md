@@ -128,5 +128,5 @@ Cloud-assisted work proceeds normally.
 
 This keeps the night productive without ever placing a `local-only` idea on a
 profile that cannot honor it. The database `CHECK` remains the last line of
-defence rather than the first, and the degraded state is explicit in the
+defense rather than the first, and the degraded state is explicit in the
 capability report rather than absorbed silently.

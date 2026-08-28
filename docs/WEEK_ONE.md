@@ -158,7 +158,7 @@ instead, and that port must not be 8000 — a restored Qwen container claims it.
 
 ### 2. The brain repository — done, local only
 
-Created at `../second-shift-brain`, git-initialised, seeded and committed. Topic
+Created at `../second-shift-brain`, git-initialized, seeded and committed. Topic
 files (`profile.md`, `style-guide.md`, `skills/`) are rewritten in place; the
 journal is append-only. Seeded deliberately naive rather than empty, so the
 week-8 diff shows refinement rather than accumulation from nothing.

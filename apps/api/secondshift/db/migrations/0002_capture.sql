@@ -9,7 +9,7 @@ ALTER TABLE events ADD COLUMN entry_id TEXT REFERENCES entries(id);
 CREATE INDEX idx_events_entry ON events(entry_id, ts_ms);
 
 -- What the capture surface was OFFERED, not only what it chose. Without it a
--- cloud-assisted choice made because local-only was greyed out is
+-- cloud-assisted choice made because local-only was grayed out is
 -- indistinguishable from one made freely, and the local-versus-cloud token
 -- ratio can report a degraded endpoint as though it were user preference.
 ALTER TABLE entries ADD COLUMN offered_capability_json TEXT;

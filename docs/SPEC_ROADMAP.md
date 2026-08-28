@@ -19,7 +19,7 @@ draw on rather than re-deriving it — and what is **still open**, which becomes
   `brain_sha`; scoring runs day 5 once a judge exists. Detail below.
 - **Geolocation: configured home, per-entry override.** Home lat/long in config
   keeps capture frictionless; an explicit override covers capture while
-  travelling. No browser geolocation prompt.
+  traveling. No browser geolocation prompt.
 - **Brain layout: stable topic files plus a dated journal.** Detail below.
 - **Offline replay dedup** uses the client-generated ULID as an idempotency
   key. The client already needs an id to queue an entry offline.

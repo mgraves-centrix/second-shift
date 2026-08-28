@@ -143,6 +143,6 @@ Queries that retrieve an entry's history MUST return these events.
 - **WHEN** an event occurs during a run that is working on a known entry
 - **THEN** it may name both, and appears in both the run's timeline and the entry's history
 
-#### Scenario: Existing timeline behaviour is unchanged
+#### Scenario: Existing timeline behavior is unchanged
 - **WHEN** a run's timeline is retrieved
 - **THEN** it returns the run's events as before, whether or not they name an entry

@@ -1,4 +1,4 @@
-// Offline queue behaviour.
+// Offline queue behavior.
 //
 // Node 24 runs TypeScript directly and ships a test runner, so this needs one
 // dependency — a fake IndexedDB — rather than a browser test stack.

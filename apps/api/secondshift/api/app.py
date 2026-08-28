@@ -157,7 +157,7 @@ def create_app(context: Context) -> FastAPI:
                 tz_offset_min=request.tz_offset_min,
                 modality=request.modality,
                 # Policy is recorded as INTENT. It is never filtered by what the
-                # current profile can honour; an unhonourable policy is a
+                # current profile can honor; a policy the profile cannot honor is a
                 # quarantine decision made later, not a capture-time rewrite.
                 default_policy=request.policy,
                 status="queued",

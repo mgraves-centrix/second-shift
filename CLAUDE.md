@@ -30,6 +30,11 @@ then interviews you in the morning about what it got stuck on.
 - **This repository is public.** No hostnames, tailnet names, private addresses,
   usernames or home paths in tracked files — use placeholders and environment
   variables. `scripts/check-no-environment.sh` enforces it.
+- **American English** in all prose, comments and commit messages.
+  `scripts/check-american-english.sh` enforces it. `AnalyserNode` is exempt: it
+  is the real Web Audio API identifier.
+- **The brain lives on the always-on machine**, beside the database. A working
+  copy on a laptop is a clone, never the original.
 
 <!-- OPENSPEC:START -->
 ## OpenSpec
