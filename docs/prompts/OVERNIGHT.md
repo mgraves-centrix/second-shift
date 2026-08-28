@@ -199,19 +199,38 @@ let failures be loud.
 American English. No hostnames, addresses, usernames or home paths in tracked
 files — use placeholders; both check scripts must pass before every merge.
 
-## Use agents
+## Use agents, in parallel, without letting them collide
 
-Delegate genuinely independent work and run agents concurrently in one message:
-surveys of unfamiliar code; an adversarial pre-review of a spec you are about to
-write, asking what it fails to say; independent implementation of an isolated
-module with its own tests.
+Run as much concurrently as the work genuinely allows. Launch independent agents
+in a single message so they run at the same time.
 
-Do not delegate: the airlock, the telemetry recorder, migrations, or the
-argument in a proposal. Review everything an agent returns against the spec —
-its output is a draft, and you are accountable for it.
+**Read-only agents are always safe in parallel.** Surveys, adversarial
+pre-reviews, spec critiques, source scans. Use several at once and use them
+freely — the adversarial pre-review has already earned its place twice, finding
+four defects in shipped code before `capture`, and nine environment variables
+where the plan said eight before `configuration`.
 
-The adversarial pre-review has already earned its place once: it found four real
-defects in shipped code before `capture` was written. Use it on every proposal.
+**Writing agents must own disjoint files.** Two agents editing the same module
+produce a merge you did not ask for and cannot review. Before delegating any
+implementation, decide the file ownership and state it in the agent's prompt:
+"you own `packages/seed/**` and `apps/api/tests/test_seed.py`; touch nothing
+else." If two pieces of work cannot be given disjoint ownership, they are not
+parallel work — do them yourself, in order.
+
+**Use `isolation: "worktree"`** for any agent that writes, so it works in its own
+checkout and cannot see or clobber another's in-progress edits. Merge its branch
+yourself once you have reviewed the diff against the spec.
+
+**Sequence by shared surface, parallelize by new surface.** A refactor of
+existing shared modules is sequential work: `config.py`, `pricing.py`,
+`repo.py`, `main.py` are read by everything, and concurrent edits there conflict
+by construction. A capability that lives in a new package is parallel work.
+Land the shared refactor first, then fan out.
+
+**Do not delegate:** the airlock, the telemetry recorder, migrations, the
+argument in a proposal, or anything touching the running deployment. Review
+everything an agent returns against the spec before merging it — its output is a
+draft, and you are accountable for it.
 
 ## Morning report
 
