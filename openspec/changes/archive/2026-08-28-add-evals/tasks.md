@@ -34,6 +34,6 @@ Depends on group 1.
 ## 4. Entry point and gates
 
 - [x] 4.1 Add a command-line entry point to record a baseline, to score an awaiting run, and to summarize.
-- [ ] 4.2 Gate: full suite passes locally and on the Spark.
-- [ ] 4.3 Gate: `openspec validate --strict` for the change and every canonical spec.
-- [ ] 4.4 Gate: both check scripts pass.
+- [x] 4.2 Gate: full suite passes locally and on the Spark.
+- [x] 4.3 Gate: `openspec validate --strict` for the change and every canonical spec.
+- [x] 4.4 Gate: both check scripts pass.
