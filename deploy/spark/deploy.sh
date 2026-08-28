@@ -24,7 +24,7 @@ echo "shipping to ${USER_NAME}@${HOST}:${REMOTE}..."
 COPYFILE_DISABLE=1 tar czf - \
     --exclude='.venv' --exclude='node_modules' --exclude='__pycache__' \
     --exclude='*.pyc' --exclude='.next' \
-    apps/api apps/web/out config deploy \
+    apps/api apps/web/out packages config deploy \
   | ssh "${USER_NAME}@${HOST}" "rm -rf ${REMOTE} && mkdir -p ${REMOTE} && tar xzf - -C ${REMOTE}"
 
 echo "installing..."
