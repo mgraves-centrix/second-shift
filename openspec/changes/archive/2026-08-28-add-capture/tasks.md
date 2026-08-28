@@ -58,13 +58,13 @@ Depends on group 3. Installability is polish; the logged entry is the gate.
 - [x] 4.7 Manifest and service worker for installability.
 - [x] 4.8 Test: capture with the network disabled queues locally and reports success.
 - [x] 4.9 Test: restoring connectivity drains the queue and the stored capture instant is the original one.
-- [ ] 4.10 Test: an unavailable policy renders disabled with its reason and cannot be submitted. **Verified on a real phone at gate 5.2, not in jsdom** — the surface's whole purpose is working on a phone, and a real device is stronger evidence than a simulated DOM.
+- [x] 4.10 Test: an unavailable policy renders disabled with its reason and cannot be submitted. **Verified on a real phone at gate 5.2, not in jsdom** — the surface's whole purpose is working on a phone, and a real device is stronger evidence than a simulated DOM.
 - [x] 4.11 Test: two offline captures show a count of two, the count clears on drain, and no per-item control is rendered.
 
 ## 5. Day 2 pass gates
 
-- [ ] 5.1 Gate: an entry captured from a phone browser lands in SQLite with the correct timezone and offset.
-- [ ] 5.2 Gate: airplane-mode capture queues locally and syncs on reconnect, preserving the capture instant.
+- [x] 5.1 Gate: an entry captured from a phone browser lands in SQLite with the correct timezone and offset.
+- [x] 5.2 Gate: airplane-mode capture queues locally and syncs on reconnect, preserving the capture instant.
 - [x] 5.3 Gate: the full suite passes on the Spark under Python 3.12 on aarch64, transferred with AppleDouble sidecars suppressed.
 - [x] 5.4 Gate: `openspec validate --strict` passes for the change and for all canonical specs.
 - [x] 5.5 Update `docs/WEEK_ONE.md` and `docs/SPEC_ROADMAP.md` with what shipped and what day 3 inherits.
