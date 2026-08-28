@@ -30,8 +30,13 @@ data/
 audio/
 transcripts/
 
-# The brain is its own git repository (see docs/decisions/0001).
-brain/
+# The brain is its own git repository (see docs/decisions/0001), and lives on
+# the always-on machine — not here. Anchored to the repository root: a bare
+# `brain/` matches ANY directory of that name at any depth, which silently
+# excluded apps/api/secondshift/brain/, openspec/specs/brain/, and the archived
+# change's spec deltas from every commit. The tests were tracked; the module
+# they test was not.
+/brain/
 
 # OS
 .DS_Store
