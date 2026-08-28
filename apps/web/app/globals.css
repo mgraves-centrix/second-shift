@@ -1,0 +1,70 @@
+:root {
+  --bg: #0b0d10;
+  --panel: #14181d;
+  --line: #232a32;
+  --text: #e6eaef;
+  --muted: #8b96a5;
+  --accent: #7ef0a8;
+  --warn: #f0c97e;
+  --disabled: #4a545f;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  /* The capture screen must stay reachable with a keyboard open on a phone. */
+  min-height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+main { max-width: 34rem; margin: 0 auto; padding: 1.25rem; }
+
+h1 { font-size: 1.05rem; font-weight: 600; margin: 0; letter-spacing: 0.01em; }
+
+.bar { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+
+.pending { font-size: 0.85rem; color: var(--warn); }
+.pending[data-zero="true"] { color: var(--muted); }
+
+textarea {
+  width: 100%;
+  min-height: 9rem;
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+fieldset { border: 0; padding: 0; margin: 1rem 0 0; }
+legend { font-size: 0.8rem; color: var(--muted); padding: 0 0 0.5rem; }
+
+.policy {
+  display: flex; gap: 0.7rem; align-items: flex-start;
+  padding: 0.7rem 0.8rem; margin-bottom: 0.5rem;
+  border: 1px solid var(--line); border-radius: 0.5rem; background: var(--panel);
+  cursor: pointer;
+}
+.policy[data-available="false"] { cursor: not-allowed; opacity: 0.65; }
+.policy-name { font-weight: 500; }
+.policy[data-available="false"] .policy-name { color: var(--disabled); }
+.policy-reason { display: block; font-size: 0.8rem; color: var(--muted); margin-top: 0.15rem; }
+
+button {
+  width: 100%; margin-top: 1.1rem; padding: 0.9rem;
+  border: 0; border-radius: 0.6rem;
+  background: var(--accent); color: #07130c;
+  font: inherit; font-weight: 600; cursor: pointer;
+}
+button:disabled { background: var(--disabled); color: var(--bg); cursor: not-allowed; }
+
+.status { margin-top: 0.9rem; min-height: 1.4rem; font-size: 0.9rem; color: var(--accent); }
+.status[data-kind="warn"] { color: var(--warn); }

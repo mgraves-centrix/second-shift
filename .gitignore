@@ -38,3 +38,6 @@ brain/
 
 # Python virtualenv
 .venv/
+
+# Next.js build output
+apps/web/out/

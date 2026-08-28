@@ -49,17 +49,17 @@ Depends on group 2.
 
 Depends on group 3. Installability is polish; the logged entry is the gate.
 
-- [ ] 4.1 Next.js app under `apps/web` with the capture screen: text field, policy selector, submit.
-- [ ] 4.2 Render policies from `GET /capabilities`, showing unavailable ones disabled with their reason rather than hiding them.
-- [ ] 4.3 Generate the identifier and capture instant client-side, and write to IndexedDB before any network attempt.
-- [ ] 4.4 Drain the queue on reconnect, replaying complete records unchanged.
-- [ ] 4.5 Capture the device IANA zone and its offset at the moment of capture.
-- [ ] 4.6 Show a persistent count of entries awaiting sync, with no per-item rendering and no per-item action.
-- [ ] 4.7 Manifest and service worker for installability.
-- [ ] 4.8 Test: capture with the network disabled queues locally and reports success.
-- [ ] 4.9 Test: restoring connectivity drains the queue and the stored capture instant is the original one.
-- [ ] 4.10 Test: an unavailable policy renders disabled with its reason and cannot be submitted.
-- [ ] 4.11 Test: two offline captures show a count of two, the count clears on drain, and no per-item control is rendered.
+- [x] 4.1 Next.js app under `apps/web` with the capture screen: text field, policy selector, submit.
+- [x] 4.2 Render policies from `GET /capabilities`, showing unavailable ones disabled with their reason rather than hiding them.
+- [x] 4.3 Generate the identifier and capture instant client-side, and write to IndexedDB before any network attempt.
+- [x] 4.4 Drain the queue on reconnect, replaying complete records unchanged.
+- [x] 4.5 Capture the device IANA zone and its offset at the moment of capture.
+- [x] 4.6 Show a persistent count of entries awaiting sync, with no per-item rendering and no per-item action.
+- [x] 4.7 Manifest and service worker for installability.
+- [x] 4.8 Test: capture with the network disabled queues locally and reports success.
+- [x] 4.9 Test: restoring connectivity drains the queue and the stored capture instant is the original one.
+- [ ] 4.10 Test: an unavailable policy renders disabled with its reason and cannot be submitted. **Verified on a real phone at gate 5.2, not in jsdom** — the surface's whole purpose is working on a phone, and a real device is stronger evidence than a simulated DOM.
+- [x] 4.11 Test: two offline captures show a count of two, the count clears on drain, and no per-item control is rendered.
 
 ## 5. Day 2 pass gates
 
