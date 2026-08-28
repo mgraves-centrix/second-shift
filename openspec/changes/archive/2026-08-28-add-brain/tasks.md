@@ -44,8 +44,8 @@ Depends on group 1.
 ## 5. Deployment and gates
 
 - [x] 5.1 Add a systemd timer that runs sync, alongside the existing user service.
-- [ ] 5.2 Gate: the three already-captured entries appear in the journal, under their own dates, and the brain is committed.
-- [ ] 5.3 Gate: full suite passes on the Spark, transferred with AppleDouble sidecars suppressed.
-- [ ] 5.4 Gate: `openspec validate --strict` for the change and every canonical spec.
-- [ ] 5.5 Gate: no environment details enter the repository — the check script passes.
-- [ ] 5.6 Update the roadmap and the week plan with what shipped and what the eval baseline now depends on.
+- [x] 5.2 Gate: the three already-captured entries appear in the journal, under their own dates, and the brain is committed.
+- [x] 5.3 Gate: full suite passes on the Spark, transferred with AppleDouble sidecars suppressed.
+- [x] 5.4 Gate: `openspec validate --strict` for the change and every canonical spec.
+- [x] 5.5 Gate: no environment details enter the repository — the check script passes.
+- [x] 5.6 Update the roadmap and the week plan with what shipped and what the eval baseline now depends on.

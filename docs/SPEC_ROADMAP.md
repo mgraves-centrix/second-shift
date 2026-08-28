@@ -80,7 +80,7 @@ entered.
 not yet acknowledged by the server — silence risks a re-tap and a duplicate the
 idempotency key then swallows invisibly.
 
-### 2. `brain` — day 3
+### 2. `brain` — shipped 28 Aug
 
 The plaintext memory: a sibling git repository the orchestrator reads and
 commits to.
@@ -94,11 +94,19 @@ append-only journal for raw history. The eight-week diff is read off the topic
 files: a diff of an append-only log is just more stuff, while a diff of an
 edited belief file *is* the learning claim, visible.
 
-**Open:** commit granularity (per entry, per stage, or per night); what the
-topic files contain on day one, before any night has run, so that week 1 is a
-real baseline rather than an empty one; and whether the brain repository is
-GitHub-private or local-only — the code repository is public, and the brain
-holds captured ideas and a personal profile.
+**Resolved and shipped.** One commit per sync batch. Sync stages `journal/`
+rather than the tree, so a hand-edited topic file is never swept into an
+automated commit. Local-only, no remote, mirrored to a NAS.
+
+**The brain lives on the always-on machine**, beside the database the
+orchestrator writes — not on the development laptop. ADR 0001 said "sibling
+repository" and left the machine implicit; sync has no brain to write to if the
+two are on different hosts, which only became obvious when sync first ran. Edit
+topic files there, or clone and push back.
+
+**Still open:** what the topic files should contain, which is a question for
+their subject rather than for the code. The seeded profile is explicitly a
+sketch asking to be corrected.
 
 ### 3. `evals` — day 3, subject to the blocking issue above
 

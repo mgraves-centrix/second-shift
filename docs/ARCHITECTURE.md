@@ -156,7 +156,7 @@ README.
 
 | Principle | How it is enforced |
 |---|---|
-| Brain is plaintext under git | Separate sibling repo; the API shells out to git. No memory in an opaque store. |
+| Brain is plaintext under git | Separate repository on the always-on machine, beside the database the orchestrator writes. The API shells out to git; no memory in an opaque store. |
 | Privacy Airlock | `CHECK` constraint on `model_calls` — a local-only row cannot name a remote provider. The write aborts. |
 | No empty mornings | `run_stages` rows commit independently; the morning brief is a query over whatever reached `complete`. |
 | Text-first | Every voice path has a text sibling route. TTS is never on a critical path. |
