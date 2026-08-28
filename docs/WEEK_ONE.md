@@ -75,7 +75,28 @@ in week six has gaps exactly where the eight-week trend needs continuity.
 
 ---
 
-## Day 2 — Fri 28 Aug — Capture API + minimal PWA
+## Day 2 — Fri 28 Aug — Capture API + minimal PWA ✅ SHIPPED
+
+Live at **https://<host>.<tailnet>.ts.net** — the PWA and its API on one
+origin, behind Tailscale Serve's certificate, running as a systemd **user**
+service (no sudo needed to install it).
+
+Verified end to end through the tailnet: an entry whose capture instant was
+three days before receipt stored that instant, not the receipt; a replay
+returned 200 with `duplicate: true` and created no second row; the title was
+derived without a model; and `local-only` was stored as intent.
+
+The API listens on **8080, not 8000** — a local vLLM server claims 8000, and the
+capability probe should not have to distinguish two different things on one port.
+
+**Two things still need doing, both requiring sudo:**
+
+- `sudo loginctl enable-linger mgraves` — without it the user service does not
+  start until someone logs in, and "every idea, no exceptions" means surviving a
+  reboot unattended.
+- Optionally install the system unit at `deploy/spark/second-shift-api.service`
+  instead, which does the same without lingering.
+
 
 `POST /entries`, entry list, SSE stream. PWA shell: installable, text capture,
 IndexedDB offline queue that drains on reconnect.
@@ -156,12 +177,11 @@ not a recoverable mistake.
 Day 3's gate requires them fixed and committed. They measure getting better at
 being *you*, so they need your judgment rather than a plausible draft.
 
-### 4. Nothing runs the API persistently
+### 4. Nothing runs the API persistently — resolved
 
-`deploy/` does not exist and `add-capture` has no task that serves the app.
-"Every idea from today forward, no exceptions" needs a service that is up when
-an idea arrives and survives a reboot — a systemd unit on the Spark, bound
-through Tailscale Serve. Capture builds the application; nothing yet runs it.
+`deploy/spark/` now holds a deploy script, a system unit and a user unit. The
+user unit is installed and running; `loginctl enable-linger` is still needed for
+it to start unattended after a reboot.
 
 ---
 

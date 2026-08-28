@@ -1,0 +1,17 @@
+[Unit]
+Description=Second Shift capture API (user service)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/second-shift
+Environment=SECOND_SHIFT_DB=%h/second-shift-data/second-shift.db
+# Not port 8000: a local vLLM server claims that, and the capability probe would
+# then have to distinguish two different things listening on one port.
+ExecStart=%h/second-shift/apps/api/.venv/bin/uvicorn \
+    secondshift.api.main:app --host 127.0.0.1 --port 8080
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

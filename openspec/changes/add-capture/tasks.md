@@ -65,6 +65,6 @@ Depends on group 3. Installability is polish; the logged entry is the gate.
 
 - [ ] 5.1 Gate: an entry captured from a phone browser lands in SQLite with the correct timezone and offset.
 - [ ] 5.2 Gate: airplane-mode capture queues locally and syncs on reconnect, preserving the capture instant.
-- [ ] 5.3 Gate: the full suite passes on the Spark under Python 3.12 on aarch64, transferred with AppleDouble sidecars suppressed.
-- [ ] 5.4 Gate: `openspec validate --strict` passes for the change and for all canonical specs.
-- [ ] 5.5 Update `docs/WEEK_ONE.md` and `docs/SPEC_ROADMAP.md` with what shipped and what day 3 inherits.
+- [x] 5.3 Gate: the full suite passes on the Spark under Python 3.12 on aarch64, transferred with AppleDouble sidecars suppressed.
+- [x] 5.4 Gate: `openspec validate --strict` passes for the change and for all canonical specs.
+- [x] 5.5 Update `docs/WEEK_ONE.md` and `docs/SPEC_ROADMAP.md` with what shipped and what day 3 inherits.

@@ -14,8 +14,10 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import dataclass
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Response, status
+from fastapi.staticfiles import StaticFiles
 
 from ..airlock.capability import CapabilityReport, build_report
 from ..config import ResolvedProfile, resolve_profile
@@ -32,6 +34,12 @@ from .schemas import (
     PolicyAvailabilityResponse,
 )
 from .titles import derive_title
+
+
+#: The exported PWA, when it has been built. Serving it from the API keeps the
+#: capture app and its API on one origin — no CORS, no second process to be down
+#: at 2am, and `NEXT_PUBLIC_API_BASE` can stay empty.
+WEB_EXPORT = Path(__file__).resolve().parents[3] / "web" / "out"
 
 
 @dataclass
@@ -179,5 +187,9 @@ def create_app(context: Context) -> FastAPI:
         )
         response.status_code = status.HTTP_201_CREATED
         return _entry_response(ctx.repo.get_entry(entry_id), duplicate=False)
+
+    # Mounted last so every API route is matched first.
+    if WEB_EXPORT.is_dir():
+        app.mount("/", StaticFiles(directory=WEB_EXPORT, html=True), name="web")
 
     return app

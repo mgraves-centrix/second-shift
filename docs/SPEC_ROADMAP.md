@@ -4,7 +4,8 @@ What gets specified next, in the order the work unblocks. One OpenSpec change
 per capability unless noted.
 
 Shipped: `persistence`, `telemetry`, `compute-profiles`, `privacy-airlock`
-(archived as `2026-08-27-add-foundations`).
+(`2026-08-27-add-foundations`, and `2026-08-27-fix-probe-model-identity`).
+`capture` implemented and deployed; archiving pending the on-phone gates.
 
 Each entry lists what is **already decided** — so the proposal has material to
 draw on rather than re-deriving it — and what is **still open**, which becomes
