@@ -41,6 +41,6 @@ re-litigated.
 
 | Feature | When |
 |---|---|
-| TTS for the morning briefing | After text briefing works end to end. Unverified on aarch64; must never block. |
+| TTS for the morning briefing | After text briefing works end to end. Verified on aarch64 2026-08-28; must still never block. |
 | Celestial layer on the night scrubber | After the scrubber works. It is polish, and it is worth real time — but only once. |
 | Vector search over the brain | Only when keyword + recency retrieval demonstrably falls over. |

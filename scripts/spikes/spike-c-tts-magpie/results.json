@@ -1,0 +1,62 @@
+{
+  "voices": {
+    "Aria": 0,
+    "Jason": 1,
+    "John": 2,
+    "Leo": 3,
+    "Sofia": 4
+  },
+  "languages": [
+    "ar-AE",
+    "ar-MSA",
+    "ar-SA",
+    "de",
+    "en",
+    "es",
+    "fr",
+    "hi",
+    "it",
+    "ja",
+    "ko",
+    "pt-BR",
+    "vi",
+    "zh"
+  ],
+  "results": {
+    "Aria": {
+      "ok": true,
+      "gen_s": 4.14,
+      "audio_s": 7.29,
+      "rtf": 0.567,
+      "peak": 0.559
+    },
+    "Jason": {
+      "ok": true,
+      "gen_s": 3.23,
+      "audio_s": 7.38,
+      "rtf": 0.437,
+      "peak": 0.538
+    },
+    "John": {
+      "ok": true,
+      "gen_s": 3.8,
+      "audio_s": 8.64,
+      "rtf": 0.44,
+      "peak": 0.636
+    },
+    "Leo": {
+      "ok": true,
+      "gen_s": 3.33,
+      "audio_s": 7.52,
+      "rtf": 0.442,
+      "peak": 0.487
+    },
+    "Sofia": {
+      "ok": true,
+      "gen_s": 3.24,
+      "audio_s": 7.48,
+      "rtf": 0.434,
+      "peak": 0.546
+    }
+  }
+}

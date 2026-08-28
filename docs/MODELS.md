@@ -18,7 +18,7 @@ Concrete bindings for `agents.default_model_local` and
 | Turn-taking | Parakeet Realtime EOU | 120M | End-of-utterance detection at 80–160ms. |
 | Embedder | `nvidia/llama-nemotron-embed-vl-1b-v2` | ~1.7B, 2048-dim | NVIDIA Open Model License, commercial use. |
 | Reranker | `nvidia/llama-nemotron-rerank-1b-v2` | ~1.7B, 8192 seq | Optional, week 4+. |
-| TTS | MagpieTTS via NeMo Speech | — | Shares the ASR dependency stack. |
+| TTS | `nvidia/magpie_tts_multilingual_357m` | 357M | Verified on GB10 2026-08-28. RTF ~0.44, 1.85 GB. Five fixed voices. |
 
 ### Verified serving configuration, 2026-08-27
 
@@ -53,6 +53,35 @@ the difference between the reasoner sharing the box comfortably with ASR,
 embeddings and a reranker, and it not sharing at all.
 
 BF16 stays available as a reference checkpoint for output comparison.
+
+### Verified TTS configuration, 2026-08-28
+
+```
+nvidia/magpie_tts_multilingual_357m        # public, not gated, no HF token
+nvidia/nemo-nano-codec-22khz-1.89kbps-21.5fps   # pulled automatically
+nemo_toolkit[tts] @ git+https://github.com/NVIDIA/NeMo.git@main   # 3.1.0+6281c939a
+torch 2.13.0+cu130   # aarch64 wheel, cuda True on NVIDIA GB10
+```
+
+RTF ~0.44 steady state at 22.05 kHz mono, 1.85 GB resident, measured with the
+reasoner container up. **Python must be pinned to 3.12** — NeMo's dependencies
+cap at `<3.14`. `peft` is a real import-time dependency that `[tts]` omits.
+
+**Exactly five voices, fixed, no cloning:**
+
+| Voice | `speaker_index` |
+|---|---|
+| Aria | 0 |
+| Jason | 1 |
+| John | 2 |
+| Leo | 3 |
+| Sofia | 4 |
+
+These are fixed speaker context embeddings — the model accepts no reference
+audio, so the set cannot be extended without finetuning. 14 language tags:
+`ar-AE ar-MSA ar-SA de en es fr hi it ja ko pt-BR vi zh`.
+
+See `scripts/spikes/spike-c-tts-magpie/FINDINGS.md`.
 
 ## Cloud — Nebius Token Factory
 

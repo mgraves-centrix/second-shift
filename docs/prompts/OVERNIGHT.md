@@ -43,12 +43,14 @@ less than none, because it looks done.
    default), and a way to print the resolved configuration and where each value
    came from. Include **voice** and **brain location** as first-class settings.
 
-   Voice is a placeholder with no implementation behind it: TTS is unverified on
-   this hardware and which voices exist is unknown until the week-3 spike. Model
-   the setting so that landing TTS is data entry, and make an unset or unusable
-   voice degrade to text rather than failing — text-first is a constitution
-   principle, and a briefing that will not render because a voice is missing
-   violates it.
+   Voice still has no implementation behind it, but it is no longer an unknown:
+   the TTS spike ran on 2026-08-28 and MagpieTTS gives exactly five fixed voices
+   — `Aria`, `Jason`, `John`, `Leo`, `Sofia`, selected by integer index. Model
+   the setting as a closed enum over those five, not an open string, and note
+   that the model accepts no reference audio, so the set cannot grow without
+   finetuning. An unset or unusable voice must still degrade to text rather
+   than failing — text-first is a constitution principle, and a briefing that
+   will not render because a voice is missing violates it.
 
    Migrating existing settings must not break the running deployment. Old names
    keep working, or you migrate every reference and prove it on the machine.

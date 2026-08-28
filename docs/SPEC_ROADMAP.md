@@ -237,10 +237,10 @@ with very different risk.
 real-time frequency and amplitude data with no dependency on anything unproven —
 Spike A already confirmed `getUserMedia` passes on the phone.
 
-**Its speech waits on TTS**, which is still unverified on aarch64. But TTS output
-is audio, and the same `AnalyserNode` reads it through
-`createMediaElementSource`. One component, two sources: the assistant half lights
-up whenever TTS lands, and nothing blocks on it until then.
+**Its speech no longer waits on TTS.** MagpieTTS was verified on the Spark on
+2026-08-28 — five fixed voices, RTF ~0.44, 22.05 kHz. TTS output is audio, and
+the same `AnalyserNode` reads it through `createMediaElementSource`. One
+component, two sources, and both sources now exist.
 
 **What it must show to be worth building.** A bouncing waveform is decoration and
 every demo has one. The version that earns its place visualizes the *turn-taking
@@ -256,7 +256,8 @@ That makes it evidence of a working system rather than an animation over one, an
 it is the same argument that makes the night scrubber worth building.
 
 **Sequencing.** The input half belongs with `morning-interview`. The output half
-is gated on the TTS spike, and must never block the interview shipping — the
+is no longer gated on the TTS spike, but must still never block the interview
+shipping — the
 constitution's text-first principle means every voice interaction has a working
 text equivalent, and a visualization of speech that does not exist is not an
 exception to that.

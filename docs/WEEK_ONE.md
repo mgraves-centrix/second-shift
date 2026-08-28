@@ -426,10 +426,17 @@ actually broke.
 
 ## Explicitly not in week one
 
-**TTS.** Still not week one — but the odds improved. MagpieTTS ships inside NeMo
-Speech, the same dependency stack the ASR spike already installs, so it is no
-longer an orphan dependency with its own porting risk. Timeboxed half-day in
-week 3. If it does not build, text-only briefings ship and nothing is lost.
+**TTS.** Still not week one, but no longer a risk either — **the week-3 spike
+was pulled forward and run on 2026-08-28, and it passed.** All five MagpieTTS
+voices synthesize on GB10 at RTF ~0.44 in 1.85 GB, alongside the reasoner.
+
+The premise was wrong in a useful direction: this was justified as sharing "the
+dependency stack the ASR spike already installs," but the ASR spike had not run
+and the Spark had no NeMo, no torch and no CUDA toolkit outside containers. The
+full dependency cost was paid here, so **the ASR spike now inherits a working
+NeMo 3.1.0 aarch64 environment** rather than the other way round.
+
+See `scripts/spikes/spike-c-tts-magpie/FINDINGS.md`.
 
 **The celestial layer.** Week 6, after the scrubber works. It is worth real time
 — but only once, and only on a foundation that already renders.

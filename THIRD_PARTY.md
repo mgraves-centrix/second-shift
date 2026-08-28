@@ -19,7 +19,7 @@ card at install time — terms change.
 | Parakeet Realtime EOU | NVIDIA | verify at model card | verify |
 | `llama-nemotron-embed-vl-1b-v2` | NVIDIA | NVIDIA Open Model License | yes |
 | `llama-nemotron-rerank-1b-v2` | NVIDIA | NVIDIA Open Model License + Llama 3.2 Community License | yes |
-| MagpieTTS | NVIDIA NeMo Speech | verify at model card | verify |
+| `magpie_tts_multilingual_357m` | NVIDIA NeMo Speech | NVIDIA Open Model License | yes |
 
 **Not used:** NV-Embed-v2 — CC-BY-NC-4.0 (non-commercial). Replaced by
 `llama-nemotron-embed-vl-1b-v2`, which does the same job from the same vendor at
