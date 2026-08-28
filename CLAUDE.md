@@ -27,6 +27,9 @@ then interviews you in the morning about what it got stuck on.
 - Tables are append-only. Counters are views, never stored columns.
 - Every agent invocation and model call writes telemetry, including during
   development. Instrumentation is part of the task, never a follow-up.
+- **This repository is public.** No hostnames, tailnet names, private addresses,
+  usernames or home paths in tracked files — use placeholders and environment
+  variables. `scripts/check-no-environment.sh` enforces it.
 
 <!-- OPENSPEC:START -->
 ## OpenSpec

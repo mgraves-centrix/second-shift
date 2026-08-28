@@ -1,3 +1,8 @@
+# Template. Substitute REPLACE_USER before installing:
+#   sed "s/REPLACE_USER/$USER/g" second-shift-api.service | sudo tee /etc/systemd/system/second-shift-api.service
+#
+# The user unit beside this one needs no substitution and no sudo — it uses %h.
+
 [Unit]
 Description=Second Shift capture API
 Documentation=https://github.com/mgraves-centrix/second-shift
@@ -7,11 +12,11 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=REPLACE_USER
-WorkingDirectory=$HOME/second-shift
-Environment=SECOND_SHIFT_DB=$HOME/second-shift-data/second-shift.db
+WorkingDirectory=/home/REPLACE_USER/second-shift
+Environment=SECOND_SHIFT_DB=/home/REPLACE_USER/second-shift-data/second-shift.db
 # The port is deliberately not 8000: a local vLLM server claims that, and the
 # capability probe would then be asked to distinguish two things on one port.
-ExecStart=$HOME/second-shift/apps/api/.venv/bin/uvicorn \
+ExecStart=/home/REPLACE_USER/second-shift/apps/api/.venv/bin/uvicorn \
     secondshift.api.main:app --host 127.0.0.1 --port 8080
 Restart=always
 RestartSec=5

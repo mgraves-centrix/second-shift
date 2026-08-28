@@ -4,6 +4,14 @@
 # may appear outside the providers package — constitution principle 5, asserted
 # by a source scan in the test suite.
 #
+# Port allocation is deliberate and non-overlapping:
+#   8080  Second Shift API
+#   8200  local reasoner (this)
+#   8000  left free — the vLLM default, and what an ad-hoc server will grab
+#   11434 ollama
+# Sharing 8000 would mean the probe had to distinguish two different services on
+# one socket, which is a guarantee resting on start order.
+#
 # `local_reasoner_model` is the identifier the local server reports for itself.
 # For vLLM that is whatever `--served-model-name` was set to at launch, which is
 # why this is configuration and not a constant: the probe cannot know it
@@ -12,4 +20,4 @@
 [local]
 reasoner_model = "nemotron-3.5-lightning"
 reasoner_host = "127.0.0.1"
-reasoner_port = 8000
+reasoner_port = 8200

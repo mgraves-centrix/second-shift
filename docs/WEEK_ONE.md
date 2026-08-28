@@ -118,7 +118,7 @@ Found by checking rather than assuming, on 2026-08-27.
 ### 1. Offline capture needs TLS — Spike A ✅ PASSED, 2026-08-27
 
 Service workers require a secure context — HTTPS, or `localhost`. A phone
-reaching `http://<host>:8000` over the tailnet is neither. Without a service
+reaching `http://<host>:<port>` over the tailnet is neither. Without a service
 worker there is no cached app shell, so **the app cannot load with no network,
 and therefore cannot capture offline at all.** IndexedDB works over plain HTTP,
 but only once the page has loaded, which is exactly what fails.

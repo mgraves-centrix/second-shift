@@ -9,9 +9,13 @@
 # x86_64 and destroys it.
 set -euo pipefail
 
-HOST="${SPARK_HOST:-<spark-host>}"
-USER_NAME="${SPARK_USER:-mgraves}"
-REMOTE="/home/${USER_NAME}/second-shift"
+# No defaults: a deployment target is environment, and environment does not
+# belong in a public repository. Set these, or the script refuses.
+: "${SPARK_HOST:?set SPARK_HOST to the target host or IP}"
+: "${SPARK_USER:?set SPARK_USER to the account to deploy as}"
+HOST="${SPARK_HOST}"
+USER_NAME="${SPARK_USER}"
+REMOTE="${SPARK_PATH:-/home/${USER_NAME}/second-shift}"
 
 echo "building the web export..."
 NEXT_PUBLIC_API_BASE="" npm --prefix apps/web run build >/dev/null
