@@ -160,3 +160,47 @@ class TestDownstreamOfIdentity:
         resolved = resolve_profile(env={}, probe_result=probe)
         assert resolved.profile is Profile.SPARK
         assert build_report(resolved).is_available(Policy.LOCAL_ONLY) is True
+
+
+class TestEndpointConfiguration:
+    """The endpoint is configuration. A config nothing reads only looks configured."""
+
+    def test_port_comes_from_configuration_not_a_literal(self, tmp_path, monkeypatch):
+        from secondshift import config
+
+        cfg = tmp_path / "models.toml"
+        cfg.write_text(
+            '[local]\nreasoner_model = "m"\nreasoner_host = "192.0.2.10"\n'
+            "reasoner_port = 9999\n"
+        )
+        monkeypatch.setattr(config, "_MODELS_CONFIG", cfg)
+        assert config.local_endpoint() == ("192.0.2.10", 9999)
+
+    def test_environment_overrides_the_file(self, tmp_path, monkeypatch):
+        from secondshift import config
+
+        cfg = tmp_path / "models.toml"
+        cfg.write_text('[local]\nreasoner_port = 9999\n')
+        monkeypatch.setattr(config, "_MODELS_CONFIG", cfg)
+        monkeypatch.setenv(config.ENV_LOCAL_PORT, "7777")
+        assert config.local_endpoint()[1] == 7777
+
+    def test_probe_uses_the_configured_endpoint(self, tmp_path, monkeypatch, model_endpoint):
+        from secondshift import config
+
+        port = model_endpoint([EXPECTED])
+        cfg = tmp_path / "models.toml"
+        cfg.write_text(
+            f'[local]\nreasoner_model = "{EXPECTED}"\n'
+            f'reasoner_host = "127.0.0.1"\nreasoner_port = {port}\n'
+        )
+        monkeypatch.setattr(config, "_MODELS_CONFIG", cfg)
+        result = config.probe(speech_module="definitely_not_installed")
+        assert result.available(LOCAL_REASONER) is True
+
+    def test_missing_config_falls_back_without_raising(self, tmp_path, monkeypatch):
+        from secondshift import config
+
+        monkeypatch.setattr(config, "_MODELS_CONFIG", tmp_path / "absent.toml")
+        assert config.local_endpoint() == ("127.0.0.1", 8000)
+        assert config.expected_local_model() == ""

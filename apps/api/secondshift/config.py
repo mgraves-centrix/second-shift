@@ -28,6 +28,8 @@ from pathlib import Path
 
 ENV_PROFILE = "SECOND_SHIFT_PROFILE"
 ENV_LOCAL_MODEL = "SECOND_SHIFT_LOCAL_MODEL"
+ENV_LOCAL_HOST = "SECOND_SHIFT_LOCAL_HOST"
+ENV_LOCAL_PORT = "SECOND_SHIFT_LOCAL_PORT"
 
 _MODELS_CONFIG = Path(__file__).resolve().parents[3] / "config" / "models.toml"
 
@@ -105,6 +107,30 @@ def _check_cuda() -> Capability:
     return Capability(CUDA, False, "no CUDA device detected (nvidia-smi not found)")
 
 
+def _local_config() -> dict:
+    """The `[local]` block from the models config, or empty if unreadable."""
+    try:
+        return tomllib.loads(_MODELS_CONFIG.read_text()).get("local", {})
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+
+
+def local_endpoint() -> tuple[str, int]:
+    """Where the local reasoner is expected to listen.
+
+    Read from configuration rather than defaulted, because the port is a
+    deployment choice: 8000 is the vLLM default and therefore the port an
+    unrelated server will grab, which is exactly the collision the probe should
+    not have to arbitrate.
+    """
+    local = _local_config()
+    env_port = os.environ.get(ENV_LOCAL_PORT)
+    return (
+        os.environ.get(ENV_LOCAL_HOST) or local.get("reasoner_host", "127.0.0.1"),
+        int(env_port) if env_port else int(local.get("reasoner_port", 8000)),
+    )
+
+
 def expected_local_model() -> str:
     """The identifier the local reasoner must report for itself.
 
@@ -116,10 +142,7 @@ def expected_local_model() -> str:
     override = os.environ.get(ENV_LOCAL_MODEL)
     if override:
         return override
-    try:
-        return tomllib.loads(_MODELS_CONFIG.read_text())["local"]["reasoner_model"]
-    except (OSError, KeyError, tomllib.TOMLDecodeError):
-        return ""
+    return _local_config().get("reasoner_model", "")
 
 
 def _served_models(host: str, port: int, timeout: float) -> list[str] | None:
@@ -203,18 +226,19 @@ def _check_speech(module: str) -> Capability:
 
 def probe(
     *,
-    reasoner_host: str = "127.0.0.1",
-    reasoner_port: int = 8000,
+    reasoner_host: str | None = None,
+    reasoner_port: int | None = None,
     expected_model: str | None = None,
     speech_module: str = "nemo",
     checks: dict[str, Callable[[], Capability]] | None = None,
 ) -> ProbeResult:
     """Run every capability check independently."""
+    configured_host, configured_port = local_endpoint()
+    host = reasoner_host if reasoner_host is not None else configured_host
+    port = reasoner_port if reasoner_port is not None else configured_port
     runners: dict[str, Callable[[], Capability]] = checks or {
         CUDA: _check_cuda,
-        LOCAL_REASONER: lambda: _check_endpoint(
-            reasoner_host, reasoner_port, expected_model
-        ),
+        LOCAL_REASONER: lambda: _check_endpoint(host, port, expected_model),
         SPEECH_STACK: lambda: _check_speech(speech_module),
     }
     return ProbeResult({name: run() for name, run in runners.items()})
