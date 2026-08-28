@@ -39,7 +39,7 @@ thing it exists to inform.
 - Quarantine is derived from the current capability report, not stored as
   status. Release is therefore automatic, and no migration was needed to add a
   status value.
-- **Verified on the Spark** (<spark-host>, Ubuntu 24.04.4, aarch64, Python
+- **Verified on the Spark** (Ubuntu 24.04.4, aarch64, Python
   3.12.3): 79/79 passing, ~2.75s. Local dev is Python 3.14 — the Spark's 3.12 is
   the target, and it stays there. Upgrading it would forfeit prebuilt aarch64
   wheels for vLLM, NeMo and torch, which is the landmine the whole plan avoids.
@@ -51,9 +51,9 @@ thing it exists to inform.
   so the probe works from a systemd unit. This was the suspected day-1 bug; it
   is not present.
 - **Tailscale SSH check-mode blocks scripted access.** Every attempt mints a new
-  browser approval URL and expires on its own schedule. Direct LAN SSH to
-  <spark-host> with key auth works and is what deploys should use. Worth
-  settling before day 4.
+  browser approval URL and expires on its own schedule regardless of the ssh
+  client's timeout. Direct SSH over the LAN with key auth works and is what
+  deploys should use. Worth settling before day 4.
 - Two defects found only by running on a second machine: `constraints.txt`
   pinned an uninstallable pair, and macOS `tar` AppleDouble sidecars broke both
   migration discovery and the source scan. Transfers to the Spark need
