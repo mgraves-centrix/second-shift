@@ -14,7 +14,8 @@ then interviews you in the morning about what it got stuck on.
 | `docs/decisions/` | Numbered ADRs. Read before proposing architecture. |
 | `docs/MODELS.md` | Exact model bindings per compute profile. |
 
-`apps/api/secondshift/db/schema.sql` is the authority on the data model.
+`apps/api/secondshift/db/migrations/` is the authority on the data model;
+`0001_initial.sql` is the base schema.
 
 ## Conventions
 

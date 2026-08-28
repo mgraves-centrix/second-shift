@@ -1,7 +1,7 @@
 # Data Model
 
-Schema lives in [`apps/api/secondshift/db/schema.sql`](../apps/api/secondshift/db/schema.sql)
-and is the authority. This document explains the choices that are not obvious
+Schema lives in [`apps/api/secondshift/db/migrations/`](../apps/api/secondshift/db/migrations/)
+and is the authority; `0001_initial.sql` is the base schema. This document explains the choices that are not obvious
 from reading the DDL.
 
 ## Conventions
