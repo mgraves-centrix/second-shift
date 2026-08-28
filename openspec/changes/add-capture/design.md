@@ -82,6 +82,19 @@ deferred construction — nothing about the entry is decided at drain time.
 This is what makes idempotency work: the server can treat a replay as a lookup
 because the client's record is already complete and immutable.
 
+### Migration 0002 is now fully determined
+
+Three additions, all to empty tables:
+
+- `events.entry_id` — so capture-time telemetry has somewhere to attach and is
+  readable back. Without it capture is a silent exemption from principle 7.
+- `entries.offered_capability_json` — the capability report shown at capture.
+- `entries.received_at_ms` — server receipt, alongside the client's authoritative
+  capture instant.
+
+The last two came out of clarification rather than the original design, which is
+the argument for having asked before writing 0002 rather than after.
+
 ### The scope boundary around a pending-entry view
 
 `NOT_BUILDING.md` excludes task management, and a list of pending items with
@@ -89,10 +102,15 @@ retry and delete is task management wearing a different name. But showing
 nothing is a real failure: the user re-taps, the idempotency key silently
 absorbs it, and they believe they captured two ideas.
 
-This is the change's sharpest open question rather than a decision, and it is
-marked as one. Whatever the answer, the constraint is that a pending view is
-**read-only status**. The moment it grows an action other than "capture another",
-it has crossed the line and needs an explicit override.
+Resolved: a persistent read-only **count**, with no per-item surface at all.
+
+The count closes the duplicate-tap hole, and the absence of per-item rendering
+is what keeps the boundary enforceable — there is no row for an action to be
+attached to. A list would have been more reassuring and one decision away from
+becoming a queue manager.
+
+Any per-item action added later crosses the line in `NOT_BUILDING.md` and needs
+an explicit override.
 
 ## Risks / Trade-offs
 
@@ -108,9 +126,11 @@ foundation survived every spike risk. These install cleanly on aarch64 — none
 carries a compiled extension that has caused trouble — but the property of
 having no runtime dependencies is being spent, and it should be spent knowingly.
 
-**Client clock skew is unbounded.** A phone with a wrong clock writes a wrong
-`created_at_ms` and there is no server-side correction. The third open question
-covers what, if anything, bounds it.
+**Client clock skew is unbounded, deliberately.** A wrong phone clock writes a
+wrong `created_at_ms`, and nothing corrects it. `received_at_ms` makes the
+disagreement visible rather than hiding it, but any ordering that relies on
+`created_at_ms` inherits the client's clock. That is the accepted cost of never
+losing a real capture and never overwriting an observation.
 
 **The PWA is unproven ground.** Installability, IndexedDB persistence and
 service-worker drain are each individually simple and collectively fiddly. The

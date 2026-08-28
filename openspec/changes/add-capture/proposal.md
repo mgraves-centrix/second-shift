@@ -122,10 +122,46 @@ had none beyond the standard library.
 **Risk:** this is the last change before real data exists. Migration 0003 is
 cheap; migration 0003 *that alters existing rows* is not.
 
-## Open Questions
+## Resolved Decisions
 
-[NEEDS CLARIFICATION: What does the capture surface show for an entry that is queued offline and not yet acknowledged by the server? Silence invites a re-tap, and the idempotency key then swallows the duplicate invisibly — the user believes they captured two ideas and one vanished. But a queued-entry list with retry, edit or delete is task management, which NOT_BUILDING.md excludes. Where is the line: a transient confirmation only, a read-only pending count, or a read-only list of pending items?]
+Settled via `/openspec:clarify` on 2026-08-27.
 
-[NEEDS CLARIFICATION: Should `entries` record the capability report that was shown at capture — which policies were offered, which were unavailable, and why? Without it, "did I choose cloud-assisted deliberately, or because local-only was greyed out that week?" is permanently unanswerable, and the local-versus-cloud chart may tell a story about a degraded endpoint rather than about intent. It costs one column and must land in migration 0002; after day 3 it cannot be backfilled for any existing row.]
+**Pending entries.** The capture surface shows a persistent read-only count of
+entries waiting to sync — "2 waiting to sync" — and nothing per-item.
 
-[NEEDS CLARIFICATION: What bounds a client-supplied `created_at_ms`? A phone with a fast clock produces a future timestamp; a three-day-old queued entry drains with a past one, which is correct and must be preserved. Options: accept anything and record server receipt time alongside; reject timestamps more than some window in the future; or clamp and record that clamping occurred. Sort order across the whole system depends on this column.]
+The count is enough that a re-tap is obviously unnecessary, which closes the
+duplicate hole. It deliberately offers no per-item surface, so there is nothing
+for a retry, edit or delete control to attach to later. That is the scope
+guarantee, not an oversight: `NOT_BUILDING.md` excludes task management, and a
+visible list of items is one product decision away from swipe-to-delete.
+
+Adding any per-item action requires an explicit override naming the line being
+crossed, per constitution principle 6.
+
+**The capability offer is recorded.** `entries` carries the report the capture
+surface was shown — which policies were offered, which were unavailable, and the
+specific probe finding for each unavailable one.
+
+This makes "did I choose `cloud-assisted` deliberately, or because `local-only`
+was greyed out that week?" answerable permanently. Without it the local-versus-
+cloud token chart can report a degraded endpoint as though it were user
+preference, and that chart is how the Airlock is proven rather than asserted.
+
+Stored as JSON on the entry rather than as a normalized table: it is written
+once, read rarely, never queried across rows, and its shape follows the
+capability report rather than a schema of its own. It lands in migration 0002
+and cannot be backfilled for any row captured before it.
+
+**Client timestamps are accepted unbounded, with server receipt recorded
+alongside.** `created_at_ms` is the client's instant and is authoritative;
+`received_at_ms` records when the server saw it.
+
+Nothing is rejected and nothing is silently corrected. A queue drained three
+days later keeps its true capture time, which is the entire point of the offline
+requirement. A phone with a wrong clock produces a visible disagreement between
+the two columns rather than an invisible corruption of one, so it stays
+diagnosable and correctable later.
+
+Rejecting an implausible timestamp would mean losing a real capture on the one
+interaction that must never fail. Clamping would overwrite what the client
+observed, and a recorded value in this system is what actually happened.
