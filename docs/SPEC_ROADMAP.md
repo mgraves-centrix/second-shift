@@ -149,6 +149,39 @@ telemetry.
 **Open:** the ingest transport and its authentication; retry and idempotency
 when a job reports telemetry twice.
 
+#### Pricing structure observed in the Token Factory console, 2026-08-27
+
+Nemotron rows were not in the captured extract, but the tariff structure is
+consistent enough across the eleven models that were to be worth designing
+against.
+
+- **Batch is exactly 50% of standard**, input and output, across every model
+  observed — DeepSeek R1/V3/V3.2/V4, Devstral, Cosmos3, even FLUX per-image.
+  Zero exceptions.
+- **`-fast` variants cost roughly 2.5x standard** (DeepSeek-R1 $0.80/$2.40
+  against fast at $2.00/$6.00).
+- **Output is consistently 2-3x input.** Completion-heavy stages dominate cost,
+  so a verbose critic is expensive in a way a long prompt is not.
+- Region is `eu-north1`. Every cloud call crosses the Atlantic from the Spark.
+- **Dedicated endpoints bill by GPU hour**: H100 $4.05, H200 $4.70, B200 $7.40,
+  B300 $8.10, L40S $2.00. This is a real answer to the judge-hosting question —
+  a dedicated endpoint is rentable by the hour rather than requiring a serverless
+  app target.
+
+**The design consequence: the night pipeline should use the Batch API.**
+Overnight work is the definition of batchable — nothing waits on a 2am run, and
+the trans-Atlantic latency that would make batching painful for interactive work
+is irrelevant when the deadline is morning. If Nemotron follows the observed
+tariff, this halves cloud spend on every night, and cost per accepted artifact
+is a scored chart.
+
+The morning interview is the exception and must stay on the standard API: a
+person is waiting.
+
+This needs confirming for Nemotron specifically before it is built on, and it
+changes what `Executor` and the cloud `Reasoner` look like — a batch submission
+is submit-then-poll, not request-response.
+
 ### 6. `synthetic-seed` — day 6
 
 The night generator. Unblocks all frontend work and seeds the judge instance.
