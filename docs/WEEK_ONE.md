@@ -209,6 +209,37 @@ Resident memory leaves headroom for ASR and the embedder.
 Option 3 materially weakens the Airlock story. If it comes into play, escalate
 rather than absorbing it quietly.
 
+### Blocking finding, 2026-08-27: the Spark is not idle
+
+The box is already serving **`Qwen/Qwen3.8-27B-FP8`** through vLLM in the
+`vllm-qwen38` container, on **port 8000**, with `--gpu-memory-utilization 0.80`.
+It holds **93.4 GiB**, leaving 16 GiB of 121 GiB available. Its restart policy is
+`always`, so it survives a reboot. `ollama.service` is also enabled and
+listening on 11434, currently with no model resident.
+
+Two consequences, and the first is worse than the second.
+
+**1. The capability probe checks that a port answers, not what answers.**
+`config._check_endpoint` opens a socket to `127.0.0.1:8000` and calls that a
+local reasoner. Right now that port answers — with Qwen. Run today, the probe
+reports `local_reasoner: available`, the profile resolves to `spark`,
+`local-only` is reported available, and every local-only reasoning call is
+routed to a **non-NVIDIA model**, silently. `model_calls.model` would record the
+identifier the code intended, not the one that actually answered, so the
+telemetry would agree with the mistake.
+
+That is a hackathon rules violation — no third-party models in the runtime path
+— reached without anyone doing anything wrong. **The probe must verify served
+model identity, not port liveness**, before anything is allowed to route to a
+local reasoner. This is a defect in the shipped `compute-profiles` capability and
+needs its own change.
+
+**2. There is not enough memory for Spike B.** Lightning NVFP4 needs roughly
+15-17 GiB resident and 16 GiB is available. The spike would OOM, or fit with
+nothing to spare and no room for ASR or the embedder. Either stop the Qwen
+container for the duration, or lower its `--gpu-memory-utilization` and restart
+it. Decide before day 4 rather than discovering it at the prompt.
+
 **Memory note:** a MoE model holds *all* 30B parameters resident. "3B active" is
 a compute figure, not a memory one. NVFP4 is the default deployment target for
 exactly this reason.
