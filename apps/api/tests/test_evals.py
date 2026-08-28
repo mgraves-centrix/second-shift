@@ -211,7 +211,7 @@ class TestSampling:
         assert len(rows) == 6
         assert sorted({r["sample_index"] for r in rows}) == [0, 1, 2]
 
-    def test_summary_reports_a_centre_and_a_spread(self, runner, rubric):
+    def test_summary_reports_a_center_and_a_spread(self, runner, rubric):
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
         summary = runner.score(run_id, judge=StubJudge(), generate=_generate, rubric=rubric)
