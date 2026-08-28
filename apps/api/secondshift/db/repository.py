@@ -457,6 +457,54 @@ class Repository:
             },
         )
 
+    def insert_artifact(
+        self,
+        *,
+        run_id: str,
+        entry_id: str,
+        stage: str,
+        kind: str,
+        path: str,
+        variant_group: str | None = None,
+        variant_index: int | None = None,
+        variant_rank: int | None = None,
+        content_sha: str | None = None,
+        artifact_bytes: int | None = None,
+        produced_by_invocation_id: str | None = None,
+        created_at_ms: int | None = None,
+        artifact_id: str | None = None,
+        is_synthetic: bool = False,
+    ) -> str:
+        """Record a produced artifact.
+
+        `variant_group` ties parallel builds of one thing together and
+        `variant_rank` carries the critic's ordering within it — the two columns
+        that make a fan-out legible as a comparison rather than as five unrelated
+        files.
+        """
+        ts = created_at_ms if created_at_ms is not None else now_ms()
+        aid = self._id(artifact_id, ts)
+        self._insert(
+            "artifacts",
+            {
+                "id": aid,
+                "run_id": run_id,
+                "entry_id": entry_id,
+                "stage": stage,
+                "kind": kind,
+                "variant_group": variant_group,
+                "variant_index": variant_index,
+                "variant_rank": variant_rank,
+                "path": path,
+                "content_sha": content_sha,
+                "bytes": artifact_bytes,
+                "created_at_ms": ts,
+                "produced_by_invocation_id": produced_by_invocation_id,
+                "is_synthetic": int(is_synthetic),
+            },
+        )
+        return aid
+
     # -- interview ---------------------------------------------------------
 
     def insert_decision(
@@ -517,6 +565,55 @@ class Repository:
             raise ValueError(
                 f"invocation {invocation_id!r} is unknown or already closed"
             )
+
+    def close_run(
+        self,
+        run_id: str,
+        *,
+        outcome: str,
+        furthest_stage: str | None = None,
+        ended_at_ms: int | None = None,
+    ) -> None:
+        """Close an open run. Refuses to close one that is already closed.
+
+        Without this nothing ever set `ended_at_ms`, so every run looked like it
+        was still in flight — including finished ones, which makes "how long did
+        last night take" unanswerable from the data.
+        """
+        ts = ended_at_ms if ended_at_ms is not None else now_ms()
+        cursor = self._conn.execute(
+            "UPDATE runs SET ended_at_ms = ?, outcome = ?, "
+            "furthest_stage = COALESCE(?, furthest_stage) "
+            "WHERE id = ? AND ended_at_ms IS NULL",
+            (ts, outcome, furthest_stage, run_id),
+        )
+        if cursor.rowcount != 1:
+            raise ValueError(f"run {run_id!r} is unknown or already closed")
+
+    def complete_run_stage(
+        self,
+        stage_id: str,
+        *,
+        status: str,
+        ended_at_ms: int | None = None,
+        committed_at_ms: int | None = None,
+        commit_sha: str | None = None,
+    ) -> None:
+        """Close out a stage, recording when its output was committed.
+
+        "No empty mornings" is a query over stages that reached `complete`, and
+        a stage with no end time cannot answer it.
+        """
+        ts = ended_at_ms if ended_at_ms is not None else now_ms()
+        cursor = self._conn.execute(
+            "UPDATE run_stages SET status = ?, ended_at_ms = ?, "
+            "committed_at_ms = COALESCE(?, committed_at_ms), "
+            "commit_sha = COALESCE(?, commit_sha) "
+            "WHERE id = ? AND ended_at_ms IS NULL",
+            (status, ts, committed_at_ms, commit_sha, stage_id),
+        )
+        if cursor.rowcount != 1:
+            raise ValueError(f"run stage {stage_id!r} is unknown or already closed")
 
     def answer_decision(
         self,

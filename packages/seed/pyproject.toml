@@ -1,0 +1,21 @@
+[project]
+name = "secondshift-seed"
+version = "0.1.0"
+description = "Deterministic synthetic night generator for Second Shift"
+requires-python = ">=3.12"
+
+# `secondshift` is deliberately absent from dependencies. It is a path
+# dependency published nowhere, installed editable from apps/api, and naming it
+# here would make this package uninstallable against any index. Install both
+# from the repository:
+#
+#     pip install -e apps/api -e packages/seed
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["secondshift_seed*"]
