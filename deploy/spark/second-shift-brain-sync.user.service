@@ -1,0 +1,10 @@
+[Unit]
+Description=Second Shift brain sync (journal captured entries)
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/second-shift
+Environment=SECOND_SHIFT_DB=%h/second-shift-data/second-shift.db
+Environment=SECOND_SHIFT_BRAIN=%h/second-shift-brain
+ExecStart=%h/second-shift/apps/api/.venv/bin/python -m secondshift.brain

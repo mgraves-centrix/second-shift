@@ -89,8 +89,33 @@ dependency to do what four commands already do.
 that writes malformed markdown is not caught by anything, and the failure mode
 is a diff nobody can read in week 8 rather than an error in week 3.
 
-## Open Questions
+## Resolved Decisions
 
-[NEEDS CLARIFICATION: What is the commit granularity — one commit per entry, one per sync batch, or one per night? Per entry gives the finest history and makes `git log` a capture timeline, but produces hundreds of commits that bury any hand-edit you make. Per night is readable but loses within-night ordering. Per batch is the middle and depends on timer frequency. This determines what `git log` on the brain is *for*, which is worth deciding deliberately rather than falling out of the implementation.]
+Settled via `/openspec:clarify` on 2026-08-28.
 
-[NEEDS CLARIFICATION: What should sync do when the brain has uncommitted changes — for example a `profile.md` edited by hand and not yet committed? Committing them alongside the journal mixes a human's unfinished thought into an automated commit and attributes it to the machine. Refusing to sync protects the edit but stops journaling until someone notices. Committing only the journal paths leaves a dirty tree, which is honest but means the working state and HEAD disagree, and `brain_sha` then does not describe what is actually on disk.]
+**One commit per sync batch.** Each run commits everything it journaled, with a
+message naming the count and the dates covered.
+
+At a short timer interval that is a handful of commits a day — ordered, readable,
+and few enough that a hand-edit to `profile.md` stays visible in `git log`
+rather than buried. Per-entry commits would produce hundreds over eight weeks and
+recreate inside the brain the exact burying that ADR 0001 separated the
+repositories to avoid.
+
+Within-night ordering is not lost: it lives inside each journal file, which is
+where someone reading a day's ideas would look for it.
+
+**Sync commits only the journal paths.** A hand-edited `profile.md` is staged by
+nobody and committed by nobody; sync stages `journal/` and commits that alone.
+
+Your unfinished thought stays yours, and journaling never stalls waiting for you
+to finish it. Refusing to sync would mean an edit left overnight costs a night of
+ideas reaching the brain — the exact failure this capability exists to prevent.
+
+The cost is accepted: the working tree stays dirty, so `brain_sha` describes HEAD
+rather than what is on disk. That is the right attribution anyway — a run is
+shaped by committed memory, not by an edit in progress.
+
+This also protects the one signal the eight-week diff depends on: which changes
+were *learned* and which were *told*. Sweeping a human edit into an automated
+commit would blur exactly that.

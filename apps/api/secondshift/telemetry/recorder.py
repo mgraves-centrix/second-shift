@@ -152,6 +152,21 @@ class Recorder:
 
     # -- capture -----------------------------------------------------------
 
+    def record_run(self, **fields: Any) -> str:
+        """Open a run under the writer lock, pinning the brain's current commit.
+
+        Pinned at start, not at end: the memory that shaped a run is the state it
+        began from. Where the brain cannot be read the commit is left unset
+        rather than filled with a placeholder, which would later be
+        indistinguishable from a real state.
+        """
+        if "brain_sha" not in fields:
+            from ..brain.repo import BrainRepo
+
+            fields["brain_sha"] = BrainRepo().head()
+        with self._lock:
+            return self._repo.insert_run(**fields)
+
     def record_entry(self, **fields: Any) -> str:
         """Insert a captured entry under the writer lock.
 

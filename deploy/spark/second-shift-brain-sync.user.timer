@@ -1,0 +1,13 @@
+[Unit]
+Description=Journal captured entries into the brain
+
+[Timer]
+# Frequent enough that the brain reflects reality within minutes, infrequent
+# enough that git log stays readable. Entries are durable in SQLite regardless,
+# so this trades staleness against commit noise, never safety.
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

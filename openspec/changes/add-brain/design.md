@@ -89,8 +89,19 @@ a window where a crash loses nothing but the brain looks stale. Entries are
 durable in SQLite either way, so this is about how quickly the brain reflects
 reality, not about safety.
 
+### Sync stages paths, never the tree
+
+`git add journal/` rather than `git add -A`. That one choice is what keeps a
+human edit out of an automated commit, and it means sync is safe to run on a
+schedule against a repository someone is actively editing.
+
+A consequence worth stating: the working tree may be dirty at any time, so
+`brain_sha` describes HEAD and not the files on disk. This is correct rather
+than merely tolerable — a run is shaped by committed memory, and an edit in
+progress has not yet been claimed by anyone.
+
 **Hand-editing and automation share a working tree.** The user is expected to
 edit `profile.md` — the seeded version explicitly asks to be corrected. An
 automated commit that sweeps up a half-finished edit is worse than one that
-refuses. This is the second open question, and it is a question about respecting
-someone's unfinished work rather than a technical one.
+refuses. Resolved by staging paths rather than the tree: sync commits `journal/` and
+leaves everything else alone.
