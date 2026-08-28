@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -18,6 +19,11 @@ from secondshift.evals.judge import (
 from secondshift.evals.runner import AWAITING, EvalRunner, NoJudgeConfigured
 
 GOOD = {d: 4 for d in DIMENSIONS}
+
+#: Derived from this file's location, never hardcoded: an absolute developer
+#: path fails on the target machine and leaks a home directory into a public
+#: repository.
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture
@@ -64,7 +70,9 @@ def _generate(prompt: str, brain, sample: int) -> str:
 
 class TestContent:
     def test_real_candidates_parse(self):
-        found = load_prompts("/Users/mattgraves/Development/second-shift/config/evals/candidates.md")
+        """The shipped candidate file must actually parse, wherever it is checked out."""
+        candidates = REPO_ROOT / "config" / "evals" / "candidates.md"
+        found = load_prompts(candidates)
         assert len(found) == 10
         assert all(c.prompt and c.slug for c in found)
 

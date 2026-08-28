@@ -23,7 +23,10 @@ PATTERNS=(
 status=0
 for pattern in "${PATTERNS[@]}"; do
   # Placeholders are the point of this check, so they are not findings.
-  hits=$(git grep -InE "$pattern" -- . ':!package-lock.json' ':!scripts/check-no-environment.sh' 2>/dev/null \
+  # --untracked so a file that has not been committed yet is still checked.
+  # git grep defaults to tracked files only, which meant a brand-new file passed
+  # the check right up until the moment it was added — the one moment it matters.
+  hits=$(git grep -InE --untracked "$pattern" -- . ':!package-lock.json' ':!scripts/check-no-environment.sh' 2>/dev/null \
          | grep -vE '<host>|<tailnet>|<spark-host>|REPLACE_USER|\$HOME|\$\{?USER' || true)
   if [ -n "$hits" ]; then
     echo "environment detail found ($pattern):"
@@ -32,5 +35,5 @@ for pattern in "${PATTERNS[@]}"; do
   fi
 done
 
-[ $status -eq 0 ] && echo "clean: no environment details in tracked files"
+[ $status -eq 0 ] && echo "clean: no environment details in tracked or new files"
 exit $status

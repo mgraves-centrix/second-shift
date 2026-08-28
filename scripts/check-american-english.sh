@@ -20,7 +20,7 @@ WORDS=(honour behaviour initialis summaris catalogue defence colour favour
 
 status=0
 for word in "${WORDS[@]}"; do
-  hits=$(git grep -Iin "$word" -- . \
+  hits=$(git grep -Iin --untracked "$word" -- . \
            ':!*package-lock.json' ':!LICENSE' ':!.claude/commands' ':!.claude/skills' \
            ':!scripts/check-american-english.sh' 2>/dev/null || true)
   if [ -n "$hits" ]; then
