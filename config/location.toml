@@ -1,0 +1,14 @@
+# Home coordinates for the celestial layer on the night view.
+#
+# Configuration rather than a browser geolocation prompt: capture is the one
+# interaction that must stay frictionless, and a permission dialog on it is a
+# cost paid every time to serve a rendering detail. An entry may carry an
+# explicit override when it was captured somewhere else.
+#
+# Approximate is fine. Sun and moon position at city resolution is
+# indistinguishable from exact at the scale this renders.
+
+[home]
+lat = 42.3601
+lon = -71.0589
+label = "home"

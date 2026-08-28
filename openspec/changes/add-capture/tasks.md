@@ -30,20 +30,20 @@ Depends on group 1. These are defects in shipped code, fixed before they matter.
 
 Depends on group 2.
 
-- [ ] 3.1 Add FastAPI, uvicorn and pydantic to `pyproject.toml`, regenerate `constraints.txt` from a clean install, and verify the pins resolve from scratch.
-- [ ] 3.2 Request and response models: identifier, capture instant, IANA zone, UTC offset, policy, text, optional location and capture profile. Reject anything asserting synthetic status.
-- [ ] 3.3 `POST /entries` writing through the recorder-owned path, returning the stored entry on replay without creating a second row or recording a failure.
-- [ ] 3.4 Record a capture event against the entry, including one for a replay whose content diverges from what is stored.
-- [ ] 3.5 Persist the capability report served to the surface onto the entry, so an unavailable-at-capture policy is identifiable afterwards.
-- [ ] 3.6 `GET /capabilities` serving the capability report, with unavailable policies present and marked with their finding.
-- [ ] 3.7 Derive a title from content deterministically, with no model call.
-- [ ] 3.8 Read home coordinates from `config/location.toml`, allowing a per-request override.
-- [ ] 3.9 Test: an entry captured at one instant and submitted much later stores the capture instant, not the receipt instant.
-- [ ] 3.10 Test: submitting the same entry twice yields one row, two successes, and no failure row.
-- [ ] 3.11 Test: a replayed identifier with altered text keeps the stored version and records the divergence as an event on that entry.
-- [ ] 3.12 Test: `local-only` is accepted and stored intact on a profile that cannot honor it, and the entry is then quarantined rather than rewritten.
-- [ ] 3.13 Test: `GET /capabilities` on a degraded profile returns `local-only` marked unavailable with the specific probe finding, not a generic message.
-- [ ] 3.14 Test: a request asserting synthetic status is ignored and the server's determination is recorded.
+- [x] 3.1 Add FastAPI, uvicorn and pydantic to `pyproject.toml`, regenerate `constraints.txt` from a clean install, and verify the pins resolve from scratch.
+- [x] 3.2 Request and response models: identifier, capture instant, IANA zone, UTC offset, policy, text, optional location and capture profile. Reject anything asserting synthetic status.
+- [x] 3.3 `POST /entries` writing through the recorder-owned path, returning the stored entry on replay without creating a second row or recording a failure.
+- [x] 3.4 Record a capture event against the entry, including one for a replay whose content diverges from what is stored.
+- [x] 3.5 Persist the capability report served to the surface onto the entry, so an unavailable-at-capture policy is identifiable afterwards.
+- [x] 3.6 `GET /capabilities` serving the capability report, with unavailable policies present and marked with their finding.
+- [x] 3.7 Derive a title from content deterministically, with no model call.
+- [x] 3.8 Read home coordinates from `config/location.toml`, allowing a per-request override.
+- [x] 3.9 Test: an entry captured at one instant and submitted much later stores the capture instant, not the receipt instant.
+- [x] 3.10 Test: submitting the same entry twice yields one row, two successes, and no failure row.
+- [x] 3.11 Test: a replayed identifier with altered text keeps the stored version and records the divergence as an event on that entry.
+- [x] 3.12 Test: `local-only` is accepted and stored intact on a profile that cannot honor it, and the entry is then quarantined rather than rewritten.
+- [x] 3.13 Test: `GET /capabilities` on a degraded profile returns `local-only` marked unavailable with the specific probe finding, not a generic message.
+- [x] 3.14 Test: a request asserting synthetic status is ignored and the server's determination is recorded.
 
 ## 4. PWA
 
