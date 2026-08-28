@@ -71,3 +71,19 @@ Development and seed data must never be *acted upon*, not merely never counted.
 - **WHEN** synthetic entries exist in a queued state alongside real ones
 - **THEN** the query that selects entries for dispatch returns only the real ones
 
+### Requirement: Concurrent writes are serialized
+
+All writes to the database SHALL be serialized through a single lock. Because
+the connection's own cross-thread guard is deliberately disabled, no component
+may write outside that lock.
+
+Any repository primitive that does not take the lock MUST say so, and MUST NOT
+be called from a request handler or from concurrent work.
+
+#### Scenario: Capture concurrent with night work
+- **WHEN** an entry is captured while the orchestrator is writing
+- **THEN** both writes serialize through the same lock rather than interleaving on the shared connection
+
+#### Scenario: Unlocked primitives are marked
+- **WHEN** a repository method writes without taking the lock
+- **THEN** its documentation states that it is unsafe for concurrent use and names the safe alternative
