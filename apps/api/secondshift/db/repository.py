@@ -16,7 +16,7 @@ import sqlite3
 from typing import Any
 
 from .connection import now_ms
-from .ids import new_ulid
+from .ids import new_ulid, timestamp_ms
 
 # Tables whose rows are never modified after insertion. Completion columns on
 # other tables are written through the named operations below.
@@ -62,6 +62,7 @@ class Repository:
     def insert_entry(
         self,
         *,
+        created_at_ms: int,
         captured_tz: str,
         tz_offset_min: int,
         modality: str,
@@ -77,12 +78,26 @@ class Repository:
         source_device: str | None = None,
         lat: float | None = None,
         lon: float | None = None,
-        created_at_ms: int | None = None,
+        offered_capability_json: str | None = None,
+        received_at_ms: int | None = None,
         entry_id: str | None = None,
         is_synthetic: bool = False,
     ) -> str:
-        ts = created_at_ms if created_at_ms is not None else now_ms()
-        eid = self._id(entry_id, ts)
+        """Insert a captured entry.
+
+        `created_at_ms` is the CLIENT's capture instant and is required — it is
+        never the insert time. For a queue drained hours later those differ by
+        hours, which is exactly the case the offline requirement exists to
+        serve. `received_at_ms` records when the server saw it; the two are kept
+        independent and neither corrects the other.
+
+        NOT LOCKED. Request handlers must use `Recorder.record_entry`, which
+        takes the writer lock. See ADR 0008.
+        """
+        ts = created_at_ms
+        eid = entry_id or new_ulid(ts)
+        if entry_id is not None:
+            self._assert_identifier_agrees(entry_id, ts)
         self._insert(
             "entries",
             {
@@ -103,10 +118,33 @@ class Repository:
                 "title": title,
                 "source_device": source_device,
                 "capture_profile": capture_profile,
+                "offered_capability_json": offered_capability_json,
+                "received_at_ms": received_at_ms,
                 "is_synthetic": int(is_synthetic),
             },
         )
         return eid
+
+    @staticmethod
+    def _assert_identifier_agrees(entry_id: str, created_at_ms: int) -> None:
+        """A client-supplied identifier must be a ULID carrying its own instant.
+
+        Ordering uses `ORDER BY created_at_ms, id`. If the identifier's embedded
+        timestamp disagrees with the recorded instant, that ordering sorts by two
+        different clocks and is not a total order over anything meaningful.
+        """
+        try:
+            embedded = timestamp_ms(entry_id)
+        except ValueError as exc:
+            raise ValueError(
+                f"entry id {entry_id!r} is not a ULID; client-supplied "
+                "identifiers must be well-formed"
+            ) from exc
+        if embedded != created_at_ms:
+            raise ValueError(
+                f"entry id {entry_id!r} carries instant {embedded} but "
+                f"created_at_ms is {created_at_ms}; they must agree"
+            )
 
     # -- the night ---------------------------------------------------------
 
@@ -333,6 +371,7 @@ class Repository:
         label: str,
         run_id: str | None = None,
         agent_invocation_id: str | None = None,
+        entry_id: str | None = None,
         severity: str = "info",
         duration_ms: int | None = None,
         payload_json: str | None = None,
@@ -341,12 +380,13 @@ class Repository:
     ) -> int:
         ts = ts_ms if ts_ms is not None else now_ms()
         cursor = self._conn.execute(
-            "INSERT INTO events (run_id, agent_invocation_id, ts_ms, lane, kind, "
-            "label, severity, duration_ms, payload_json, is_synthetic) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO events (run_id, agent_invocation_id, entry_id, ts_ms, lane, "
+            "kind, label, severity, duration_ms, payload_json, is_synthetic) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 run_id,
                 agent_invocation_id,
+                entry_id,
                 ts,
                 lane,
                 kind,
@@ -497,6 +537,36 @@ class Repository:
         if cursor.rowcount != 1:
             raise ValueError(f"decision {decision_id!r} is unknown or already answered")
 
+    #: Transitions an entry may make. Anything else is refused.
+    _ENTRY_TRANSITIONS = {
+        ("captured", "queued"),
+        ("queued", "running"),
+        ("running", "answered"),
+        ("running", "queued"),
+        ("answered", "archived"),
+        ("queued", "archived"),
+    }
+
+    def transition_entry(self, entry_id: str, *, to_status: str) -> None:
+        """Move an entry to a new status, refusing transitions that are not permitted.
+
+        Named rather than generic: the persistence spec forbids an
+        `update_entry(**fields)`, and a status machine with no guard is how an
+        entry ends up somewhere nothing queries.
+        """
+        row = self.get_entry(entry_id)
+        if row is None:
+            raise ValueError(f"entry {entry_id!r} is unknown")
+        current = row["status"]
+        if (current, to_status) not in self._ENTRY_TRANSITIONS:
+            raise ValueError(
+                f"entry {entry_id!r} cannot move {current!r} -> {to_status!r}"
+            )
+        self._conn.execute(
+            "UPDATE entries SET status = ? WHERE id = ? AND status = ?",
+            (to_status, entry_id, current),
+        )
+
     def resolve_failure(
         self, failure_id: str, *, resolution: str, resolved_at_ms: int | None = None
     ) -> None:
@@ -530,10 +600,52 @@ class Repository:
             "SELECT * FROM model_calls WHERE run_id = ? ORDER BY ts_ms, id", (run_id,)
         ).fetchall()
 
-    def queued_entries(self) -> list[sqlite3.Row]:
-        """Entries awaiting a run. Screened against capability before dispatch."""
+    #: An entry is eligible for a run only when it is queued, is real, and has
+    #: something to reason about. Synthetic rows must never be *acted on*, not
+    #: merely never counted — the day-6 night generator writes queued synthetic
+    #: entries, and without this the real orchestrator would dispatch them.
+    _ELIGIBLE = (
+        "status = 'queued' AND is_synthetic = 0 "
+        "AND COALESCE(TRIM(raw_text), '') != ''"
+    )
+
+    def dispatch_eligible_entries(self) -> list[sqlite3.Row]:
+        """Entries the night may act on. Screened against capability after this."""
         return self._conn.execute(
-            "SELECT * FROM entries WHERE status = 'queued' ORDER BY created_at_ms, id"
+            f"SELECT * FROM entries WHERE {self._ELIGIBLE} ORDER BY created_at_ms, id"
+        ).fetchall()
+
+    def ineligible_entries(self) -> list[tuple[sqlite3.Row, str]]:
+        """Queued entries that cannot be dispatched, each with its reason.
+
+        An entry that can never run must not be silently invisible; that is how
+        an idea disappears without anyone noticing it never happened.
+        """
+        rows = self._conn.execute(
+            f"SELECT * FROM entries WHERE status = 'queued' AND NOT ({self._ELIGIBLE}) "
+            "ORDER BY created_at_ms, id"
+        ).fetchall()
+        out: list[tuple[sqlite3.Row, str]] = []
+        for row in rows:
+            if row["is_synthetic"]:
+                reason = "synthetic entries are never dispatched"
+            else:
+                reason = "entry has no content to reason about"
+            out.append((row, reason))
+        return out
+
+    def get_entry(self, entry_id: str) -> sqlite3.Row | None:
+        """Fetch one entry. The idempotent replay path returns what is stored."""
+        return self._conn.execute(
+            "SELECT * FROM entries WHERE id = ?", (entry_id,)
+        ).fetchone()
+
+    def entry_history(self, entry_id: str) -> list[sqlite3.Row]:
+        """Events naming this entry, including those with no run."""
+        return self._conn.execute(
+            "SELECT id, ts_ms, lane, kind, label, severity, duration_ms, run_id "
+            "FROM events WHERE entry_id = ? ORDER BY ts_ms, id",
+            (entry_id,),
         ).fetchall()
 
     def failure_ledger(self) -> list[sqlite3.Row]:

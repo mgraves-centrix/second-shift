@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from secondshift.db import connection, migrate
+from secondshift.db.connection import now_ms
 from secondshift.db.repository import Repository
 from secondshift.telemetry.pricing import PricingTable, Rate
 from secondshift.telemetry.recorder import Recorder
@@ -54,6 +55,7 @@ def agent_id(repo) -> str:
 @pytest.fixture
 def run_id(repo) -> str:
     entry = repo.insert_entry(
+        created_at_ms=now_ms(),
         captured_tz="America/Los_Angeles",
         tz_offset_min=-420,
         modality="text",

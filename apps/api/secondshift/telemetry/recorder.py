@@ -150,6 +150,25 @@ class Recorder:
         finally:
             ctx.release(token)
 
+    # -- capture -----------------------------------------------------------
+
+    def record_entry(self, **fields: Any) -> str:
+        """Insert a captured entry under the writer lock.
+
+        `Repository.insert_entry` is the unlocked primitive. Request handlers
+        must come through here: the connection has `check_same_thread` disabled
+        so that threaded work can record telemetry, and FastAPI runs synchronous
+        handlers in a threadpool — so a capture arriving while the night writes
+        is a real interleaving, not a theoretical one. ADR 0008.
+        """
+        with self._lock:
+            return self._repo.insert_entry(**fields)
+
+    def transition_entry(self, entry_id: str, *, to_status: str) -> None:
+        """Move an entry between statuses under the writer lock."""
+        with self._lock:
+            self._repo.transition_entry(entry_id, to_status=to_status)
+
     # -- calls -------------------------------------------------------------
 
     def record_model_call(
@@ -242,6 +261,7 @@ class Recorder:
         lane: str,
         kind: str,
         label: str,
+        entry_id: str | None = None,
         severity: str = "info",
         duration_ms: int | None = None,
         payload_json: str | None = None,
@@ -255,6 +275,7 @@ class Recorder:
                 lane=lane,
                 kind=kind,
                 label=label,
+                entry_id=entry_id,
                 severity=severity,
                 duration_ms=duration_ms,
                 payload_json=payload_json,

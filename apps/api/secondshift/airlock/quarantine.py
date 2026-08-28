@@ -66,7 +66,7 @@ class Quarantine:
     def _screen_all(self) -> list[Screening]:
         return [
             self.screen(row["id"], row["default_policy"])
-            for row in self._repo.queued_entries()
+            for row in self._repo.dispatch_eligible_entries()
         ]
 
     def dispatchable(self) -> list[Screening]:

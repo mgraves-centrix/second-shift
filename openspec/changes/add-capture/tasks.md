@@ -3,28 +3,28 @@
 Blocks everything. This is the last migration that runs against empty tables;
 after day-3 dogfooding it would alter the only copy of a week of captured ideas.
 
-- [ ] 1.1 Write `db/migrations/0002_capture.sql` adding `events.entry_id` as a nullable foreign key to `entries`, with an index on `(entry_id, ts_ms)` so an entry's history is retrievable without scanning.
-- [ ] 1.2 Add `entries.offered_capability_json` holding the capability report shown at capture, and `entries.received_at_ms` holding the server receipt instant.
-- [ ] 1.3 Test: migration applies to a fresh database and to one already at version 1, and `PRAGMA integrity_check` returns ok in both cases.
-- [ ] 1.4 Test: an event naming an entry survives a round trip and is retrievable by entry.
-- [ ] 1.5 Test: an entry stores both instants independently, and a capture instant ahead of server time is preserved rather than rejected or clamped.
+- [x] 1.1 Write `db/migrations/0002_capture.sql` adding `events.entry_id` as a nullable foreign key to `entries`, with an index on `(entry_id, ts_ms)` so an entry's history is retrievable without scanning.
+- [x] 1.2 Add `entries.offered_capability_json` holding the capability report shown at capture, and `entries.received_at_ms` holding the server receipt instant.
+- [x] 1.3 Test: migration applies to a fresh database and to one already at version 1, and `PRAGMA integrity_check` returns ok in both cases.
+- [x] 1.4 Test: an event naming an entry survives a round trip and is retrievable by entry.
+- [x] 1.5 Test: an entry stores both instants independently, and a capture instant ahead of server time is preserved rather than rejected or clamped.
 
 ## 2. Repository and recorder corrections
 
 Depends on group 1. These are defects in shipped code, fixed before they matter.
 
-- [ ] 2.1 `queued_entries` excludes synthetic rows and entries with no content, and is renamed to state that it returns dispatch-eligible entries rather than merely queued ones.
-- [ ] 2.2 Add `ineligible_entries` returning queued entries that cannot be dispatched, each with the reason — so an entry is never silently invisible.
-- [ ] 2.3 Add `get_entry`, so the idempotent replay path can return what the server already holds.
-- [ ] 2.4 `insert_entry` requires an explicit capture instant rather than defaulting to insert time, and validates that the supplied identifier is a well-formed ULID whose embedded timestamp matches.
-- [ ] 2.5 Add a named entry status transition operation that refuses a transition not permitted from the current status. No generic entry update.
-- [ ] 2.6 Add a recorder-owned entry write that takes the recorder's lock, and document `insert_entry` as the unlocked primitive that request handlers must not call.
-- [ ] 2.7 Extend the event recorder to accept an entry, and add an entry-history read.
-- [ ] 2.8 Test: a synthetic queued entry is absent from the eligible set and present in the ineligible set with its reason.
-- [ ] 2.9 Test: an empty text entry is ineligible with its reason, not absent.
-- [ ] 2.10 Test: `insert_entry` rejects a malformed identifier, and rejects one whose embedded timestamp disagrees with the capture instant.
-- [ ] 2.11 Test: a status transition that is not permitted from the current status is refused.
-- [ ] 2.12 Test: concurrent writes from multiple threads through the recorder serialize and lose nothing.
+- [x] 2.1 `queued_entries` excludes synthetic rows and entries with no content, and is renamed to state that it returns dispatch-eligible entries rather than merely queued ones.
+- [x] 2.2 Add `ineligible_entries` returning queued entries that cannot be dispatched, each with the reason — so an entry is never silently invisible.
+- [x] 2.3 Add `get_entry`, so the idempotent replay path can return what the server already holds.
+- [x] 2.4 `insert_entry` requires an explicit capture instant rather than defaulting to insert time, and validates that the supplied identifier is a well-formed ULID whose embedded timestamp matches.
+- [x] 2.5 Add a named entry status transition operation that refuses a transition not permitted from the current status. No generic entry update.
+- [x] 2.6 Add a recorder-owned entry write that takes the recorder's lock, and document `insert_entry` as the unlocked primitive that request handlers must not call.
+- [x] 2.7 Extend the event recorder to accept an entry, and add an entry-history read.
+- [x] 2.8 Test: a synthetic queued entry is absent from the eligible set and present in the ineligible set with its reason.
+- [x] 2.9 Test: an empty text entry is ineligible with its reason, not absent.
+- [x] 2.10 Test: `insert_entry` rejects a malformed identifier, and rejects one whose embedded timestamp disagrees with the capture instant.
+- [x] 2.11 Test: a status transition that is not permitted from the current status is refused.
+- [x] 2.12 Test: concurrent writes from multiple threads through the recorder serialize and lose nothing.
 
 ## 3. Capture API
 

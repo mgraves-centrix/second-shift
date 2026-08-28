@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+from secondshift.db.connection import now_ms
+
 from secondshift.airlock.capability import build_report
 from secondshift.airlock.policy import Policy, PolicySource, resolve_policy
 from secondshift.airlock.quarantine import Quarantine
@@ -140,6 +142,7 @@ class TestQuarantine:
     def queued(self, repo):
         def _add(policy: str) -> str:
             return repo.insert_entry(
+                created_at_ms=now_ms(),
                 captured_tz="America/Los_Angeles",
                 tz_offset_min=-420,
                 modality="text",

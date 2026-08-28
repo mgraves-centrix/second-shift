@@ -23,9 +23,12 @@ def _migration_dir(tmp_path: Path, count: int) -> Path:
 class TestMigrations:
     def test_fresh_database_applies_every_migration(self, db):
         conn = db("fresh.db")
+        expected = [m.version for m in migrate.discover()]
         applied = migrate.migrate(conn)
-        assert applied == [1]
-        assert migrate.current_version(conn) == 1
+        # Assert against what is on disk, not a hardcoded count: a new migration
+        # should not fail this test, only a migration that does not apply.
+        assert applied == expected
+        assert migrate.current_version(conn) == max(expected)
 
     def test_rerun_applies_nothing(self, db):
         conn = db("rerun.db")

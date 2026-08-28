@@ -23,6 +23,7 @@ from secondshift.config import (
     resolve_profile,
 )
 from secondshift.db import migrate
+from secondshift.db.connection import now_ms
 from secondshift.providers.base import Message
 
 
@@ -53,8 +54,9 @@ def _degraded() -> ProbeResult:
 def test_gate_6_1_migrations_apply_clean(db):
     """Gate 6.1 — migrations apply clean against a fresh database."""
     conn = db("gate.db")
-    assert migrate.migrate(conn) == [1]
-    assert migrate.current_version(conn) == 1
+    expected = [m.version for m in migrate.discover()]
+    assert migrate.migrate(conn) == expected
+    assert migrate.current_version(conn) == max(expected)
     assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
 
 
@@ -143,6 +145,7 @@ def test_gate_6_4_no_cuda_resolves_to_cloud():
 def test_gate_6_5_degraded_profile_quarantines_local_only(repo):
     """Gate 6.5 — quarantined rather than dispatched, and the cause is named."""
     private = repo.insert_entry(
+        created_at_ms=now_ms(),
         captured_tz="America/Los_Angeles",
         tz_offset_min=-420,
         modality="text",
@@ -152,6 +155,7 @@ def test_gate_6_5_degraded_profile_quarantines_local_only(repo):
         raw_text="something private",
     )
     shared = repo.insert_entry(
+        created_at_ms=now_ms(),
         captured_tz="America/Los_Angeles",
         tz_offset_min=-420,
         modality="text",
