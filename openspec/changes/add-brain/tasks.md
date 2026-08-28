@@ -1,0 +1,51 @@
+## 1. Brain repository access
+
+- [ ] 1.1 Configure the brain path — environment variable, falling back to a sibling directory, with no real path baked into the repository.
+- [ ] 1.2 Wrap the four git operations needed — head commit, porcelain status, add, commit — each scoped with `-C` and none invoked from a request.
+- [ ] 1.3 Read topic files: profile, style guide, and the skills directory, tolerating any of them being absent.
+- [ ] 1.4 Test: reading a brain with no skills succeeds and reports none.
+- [ ] 1.5 Test: an absent or non-git path is reported as unavailable rather than raising.
+
+## 2. The journal
+
+Depends on group 1.
+
+- [ ] 2.1 Write the journal format: one file per local date, entries in capture order, each carrying identifier, instant, policy and content, formatted for someone reading a day in a text editor.
+- [ ] 2.2 Derive journaled identifiers by reading the journal files, with no stored flag.
+- [ ] 2.3 Report the count of captured entries not yet journaled.
+- [ ] 2.4 Test: an entry is written and read back with its identifier, instant and content intact.
+- [ ] 2.5 Test: entries are ordered by capture instant, not by arrival order.
+- [ ] 2.6 Test: an entry captured late one day and received the next files under its capture date, using its own timezone.
+
+## 3. Sync
+
+Depends on group 2.
+
+- [ ] 3.1 Implement sync: append every unjournaled entry, then commit, recording an event against each entry journaled.
+- [ ] 3.2 Make sync idempotent — a second run with no new entries appends nothing and creates no commit.
+- [ ] 3.3 Resolve an interrupted sync: commit an existing uncommitted journal without duplicating entries.
+- [ ] 3.4 Fail loudly with a typed failure when the brain is missing or unwritable, marking nothing as handled.
+- [ ] 3.5 Add a command-line entry point so sync can be invoked by a timer and by hand.
+- [ ] 3.6 Test: sync twice creates one commit and one set of entries.
+- [ ] 3.7 Test: an uncommitted journal from a prior run is committed without duplication.
+- [ ] 3.8 Test: a missing brain produces a typed failure and leaves entries unjournaled.
+- [ ] 3.9 Test: capture succeeds and performs no git work while the brain is unavailable.
+
+## 4. Pinning
+
+Depends on group 1.
+
+- [ ] 4.1 Populate the brain commit on run creation, read at run start.
+- [ ] 4.2 Record no commit rather than a placeholder when the brain cannot be read.
+- [ ] 4.3 Test: a run records the brain's current commit.
+- [ ] 4.4 Test: an eval baseline recorded earlier is scored against its recorded commit, not the current one.
+- [ ] 4.5 Test: an unreadable brain leaves the commit unset rather than inventing one.
+
+## 5. Deployment and gates
+
+- [ ] 5.1 Add a systemd timer that runs sync, alongside the existing user service.
+- [ ] 5.2 Gate: the three already-captured entries appear in the journal, under their own dates, and the brain is committed.
+- [ ] 5.3 Gate: full suite passes on the Spark, transferred with AppleDouble sidecars suppressed.
+- [ ] 5.4 Gate: `openspec validate --strict` for the change and every canonical spec.
+- [ ] 5.5 Gate: no environment details enter the repository — the check script passes.
+- [ ] 5.6 Update the roadmap and the week plan with what shipped and what the eval baseline now depends on.
