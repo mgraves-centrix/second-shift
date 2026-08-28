@@ -185,7 +185,32 @@ it to start unattended after a reboot.
 
 ---
 
-## Day 3 — Sat 29 Aug — 🚩 DOGFOODING STARTS
+## 🚩 Dogfooding began early — 28 Aug
+
+Capture went live a day ahead of plan and the first real entries were captured
+from a phone the same night. One of them sat in the offline queue for **62.7
+seconds** before draining — the first evidence the offline path works outside a
+test, with the capture instant preserved rather than overwritten by the receipt
+instant.
+
+Idea content is not recorded here. It lives in the brain repository, which is
+local-only.
+
+**Note on the git history.** On 28 Aug the history was rewritten with
+`git-filter-repo` to remove environment details — a private address, home paths,
+a username in a unit file, and a tailnet hostname — that had accumulated across
+five files in the day after the repository went public. Commit dates, messages
+and ordering are unchanged; only the object SHAs differ, and one commit was
+pruned because the rewrite made it empty. Anyone holding a clone from before
+that point will not fast-forward.
+
+The tailnet hostname remains in Certificate Transparency logs regardless: Let's
+Encrypt publishes every name it issues for, so it was public before it ever
+reached git. A rename, not a git operation, is the fix if that matters.
+
+---
+
+## Day 3 — Sat 29 Aug — first night run
 
 Wire capture to the brain repo: every entry appends to the dated journal and
 commits. Record the eval baseline's **inputs** — no model exists yet, so this
