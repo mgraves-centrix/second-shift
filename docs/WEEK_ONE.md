@@ -94,7 +94,7 @@ responsive web page. Installability is polish; the logged entry is the gate.
 
 Found by checking rather than assuming, on 2026-08-27.
 
-### 1. Offline capture needs TLS — Spike A blocked on a permission
+### 1. Offline capture needs TLS — Spike A ✅ PASSED, 2026-08-27
 
 Service workers require a secure context — HTTPS, or `localhost`. A phone
 reaching `http://<host>:8000` over the tailnet is neither. Without a service
@@ -110,14 +110,30 @@ network" requirement depends on it.
 rather than one: offline capture now, and the microphone later. The `mkcert`
 fallback in its abort ladder also produces a secure context and remains valid.
 
-**Status 2026-08-27: blocked, not failed.** Tailscale 1.102.2 is installed and
-Serve is available on the Spark, whose tailnet name is
-`<host>.<tailnet>.ts.net`. A static test target that reports
-`isSecureContext` and attempts a service-worker registration is in place at
-`~/spike-a`. `tailscale serve` returns `cert access denied` and passwordless
-sudo is not configured, so the spike cannot proceed without a change only the
-owner can make. `CertDomains` is empty, which suggests HTTPS certificates may
-also need enabling for the tailnet in the admin console.
+**Result: passed on the real device, one day early.** All six checks green on an
+iPhone against `https://<host>.<tailnet>.ts.net` — protocol,
+`isSecureContext`, service worker present, IndexedDB, `getUserMedia`, and the
+one that mattered: **the service worker actually registered**, scope
+`https://<host>.<tailnet>.ts.net/`.
+
+Certificate is Let's Encrypt, valid to 26 Nov 2026, validating with no override.
+
+`getUserMedia` also passed. That was not the question asked, but it answers the
+microphone half of the original day-3/4 spike at the same time — so the Spike A
+slot on days 3-4 is now free.
+
+Cost: about an hour, most of it blocked on a permission. Two preconditions that
+are worth writing down because nothing surfaced them until they failed:
+`sudo tailscale set --operator=$USER` on the box, and HTTPS Certificates
+enabled for the tailnet in the admin console.
+
+The harness is kept at `scripts/spikes/spike-a-secure-context/` rather than
+deleted — it re-answers the question in one page load if TLS ever regresses, or
+when Serve is repointed at the capture API.
+
+**Carried forward:** Serve currently points at the static spike directory. The
+capture API will need `tailscale serve --bg --https=443 http://127.0.0.1:<port>`
+instead, and that port must not be 8000 — a restored Qwen container claims it.
 
 ### 2. The brain repository — done, local only
 
@@ -168,7 +184,14 @@ it. Everything below yields to it.
 
 ---
 
-## Day 3–4 — Sat 29 / Sun 30 — Spike A: Tailscale Serve TLS
+## Day 3–4 — Sat 29 / Sun 30 — Spike A: Tailscale Serve TLS ✅ DONE 27 Aug
+
+Completed early. See "Before day 3" above for the result. This slot is free —
+the obvious use is pulling day-4's vLLM spike forward now that the Spark has
+118 GiB available.
+
+<details><summary>Original plan, kept for the record</summary>
+
 
 Valid public TLS on the tailnet so mobile Safari/Chrome will expose
 `navigator.mediaDevices`.
@@ -178,8 +201,9 @@ Valid public TLS on the tailnet so mobile Safari/Chrome will expose
 
 **Abort criteria** — timebox 1 day. Fall back in order: (1) `mkcert` CA
 installed on the phone, (2) voice capture on desktop only, (3) defer voice
-entirely. Text capture already works, so this spike blocks voice, not the
-dogfooding gate. Do not let it eat the weekend.
+entirely.
+
+</details>
 
 ---
 

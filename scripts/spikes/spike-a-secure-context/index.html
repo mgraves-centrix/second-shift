@@ -1,0 +1,34 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Spike A — secure context</title>
+<style>body{font:16px/1.5 system-ui;margin:2rem;max-width:34rem}
+.r{padding:.6rem .8rem;border-radius:.4rem;margin:.4rem 0}
+.ok{background:#0a3d1f;color:#7ef0a8}.no{background:#4a0f14;color:#ffb3b8}
+code{background:#0003;padding:.1rem .3rem;border-radius:.2rem}</style>
+<h1>Spike A</h1>
+<p>Does this origin produce a secure context on the phone?</p>
+<div id="out">testing…</div>
+<script>
+const out = document.getElementById("out");
+const row = (ok, label) =>
+  `<div class="r ${ok ? "ok" : "no"}">${ok ? "PASS" : "FAIL"} — ${label}</div>`;
+async function run() {
+  let html = "";
+  html += row(location.protocol === "https:", `protocol is <code>${location.protocol}</code>`);
+  html += row(window.isSecureContext === true, "window.isSecureContext");
+  html += row("serviceWorker" in navigator, "navigator.serviceWorker exists");
+  html += row("indexedDB" in window, "IndexedDB available");
+  html += row(!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+              "navigator.mediaDevices.getUserMedia (voice, later)");
+  try {
+    const reg = await navigator.serviceWorker.register("./sw.js");
+    html += row(true, `service worker registered, scope <code>${reg.scope}</code>`);
+  } catch (e) {
+    html += row(false, `service worker registration failed: ${e.message}`);
+  }
+  html += `<p style="opacity:.7">origin <code>${location.origin}</code></p>`;
+  out.innerHTML = html;
+}
+run();
+</script>
