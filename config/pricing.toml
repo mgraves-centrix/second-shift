@@ -18,26 +18,25 @@ prompt_usd_per_mtok = 0.0
 completion_usd_per_mtok = 0.0
 note = "Local inference on owned hardware. Zero marginal token cost by definition; this is what makes a local-only idea visibly free."
 
-[[rate]]
-provider = "token-factory"
-model = "nemotron-3.5-lightning-30b-a3b"
-effective_from = "2026-08-27"
-prompt_usd_per_mtok = 0.0
-completion_usd_per_mtok = 0.0
-note = "PLACEHOLDER - unverified. Replace before the first cloud-assisted run."
+# Lightning and Ultra are DELIBERATELY ABSENT.
+#
+# Only blended figures are published for them — Lightning ~$0.08/Mtok and Ultra
+# ~$1.20/Mtok, each computed over a 7:2:1 cache/input/output ratio. A blended
+# number cannot be split back into input and output rates without knowing the
+# cache-hit price, and a guessed split would produce a cost curve that is wrong
+# in a way nothing surfaces.
+#
+# An absent rate raises MissingRate and fails the call loudly. That is the
+# correct behaviour: the cost curve is a scored measurement, and a plausible
+# wrong number is worse than a stopped run.
+#
+# To add them, read the input and output prices from the Token Factory console
+# (tokenfactory.nebius.com -> organization -> prices) and append entries here.
 
 [[rate]]
 provider = "token-factory"
 model = "nemotron-3-super-120b-a12b"
 effective_from = "2026-08-27"
-prompt_usd_per_mtok = 0.0
-completion_usd_per_mtok = 0.0
-note = "PLACEHOLDER - unverified. Replace before the first cloud-assisted run."
-
-[[rate]]
-provider = "token-factory"
-model = "nemotron-3-ultra-550b-a55b"
-effective_from = "2026-08-27"
-prompt_usd_per_mtok = 0.0
-completion_usd_per_mtok = 0.0
-note = "PLACEHOLDER - unverified. Replace before the first cloud-assisted run."
+prompt_usd_per_mtok = 0.30
+completion_usd_per_mtok = 0.90
+note = "Source: Artificial Analysis provider table, 2026-08-27 — a third-party aggregator, not Nebius directly. Confirm against the Token Factory console and supersede with a new effective_from entry if it differs. Do not edit this entry; history must stay reproducible."

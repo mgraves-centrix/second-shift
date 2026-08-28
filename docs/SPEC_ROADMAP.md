@@ -133,9 +133,13 @@ because a deferred obligation with no home is a dropped one.**
   needs an explicit decision before it is built.
 - Ingest must serialize through the orchestrator's writer, never a second
   connection.
-- **Real per-token rates replacing the placeholders in `config/pricing.toml`.**
-  Every cloud call fails loudly until this lands — deliberate, but it means the
-  first Token Factory call is blocked on it.
+- **Per-token rates for Lightning and Ultra in `config/pricing.toml`.** Super is
+  recorded (input $0.30, output $0.90 per 1M) from a third-party aggregator and
+  still wants confirming against the Token Factory console. Lightning and Ultra
+  publish only *blended* figures — roughly $0.08 and $1.20 per 1M over a 7:2:1
+  cache/input/output ratio — which cannot be split back into input and output
+  rates without the cache-hit price. Both are deliberately absent and fail
+  loudly; read the split from the console and append entries.
 - Resolution of the judge deployment target.
 
 **Decided:** ADR 0004 — build stage fans out to parallel variants, one job each;
