@@ -1,0 +1,15 @@
+# Local model bindings.
+#
+# Model identifiers live here rather than in Python because no model identifier
+# may appear outside the providers package — constitution principle 5, asserted
+# by a source scan in the test suite.
+#
+# `local_reasoner_model` is the identifier the local server reports for itself.
+# For vLLM that is whatever `--served-model-name` was set to at launch, which is
+# why this is configuration and not a constant: the probe cannot know it
+# otherwise, and an endpoint serving something else must be refused by name.
+
+[local]
+reasoner_model = "nemotron-3.5-lightning"
+reasoner_host = "127.0.0.1"
+reasoner_port = 8000
