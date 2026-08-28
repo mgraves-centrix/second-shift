@@ -20,6 +20,29 @@ Concrete bindings for `agents.default_model_local` and
 | Reranker | `nvidia/llama-nemotron-rerank-1b-v2` | ~1.7B, 8192 seq | Optional, week 4+. |
 | TTS | MagpieTTS via NeMo Speech | — | Shares the ASR dependency stack. |
 
+### Verified serving configuration, 2026-08-27
+
+```
+vllm/vllm-openai:v0.27.1   (has a linux/arm64 build)
+nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4
+  --served-model-name nemotron-3.5-lightning
+  --kv-cache-dtype fp8 --enable-prefix-caching
+  --gpu-memory-utilization 0.30 --max-model-len 65536 --max-num-seqs 8
+  --speculative-config '{"method":"mtp","num_speculative_tokens":3}'
+```
+
+48.6 tok/s median at 3 concurrent, 39.8 at 6, using 43 of 121 GiB.
+
+Not from the model card's quick-start, which fails on the version it names:
+`--moe-backend marlin` is refused for this checkpoint's mixed FP8/NVFP4 MoE, and
+`num_speculative_tokens` needs an explicit `method`. See
+`scripts/spikes/spike-b-local-inference/FINDINGS.md`.
+
+**`--gpu-memory-utilization` is a fraction of the whole machine here.** The
+recommended `0.85` leaves 9 GiB free and a 4.6M-token KV cache — no room for ASR
+or the embedder, which is the reason NVFP4 was chosen. `0.30` leaves 77 GiB and
+is faster at 3 concurrent.
+
 ### Why NVFP4 and not BF16
 
 A MoE model must hold **all** parameters resident — the router can call any

@@ -207,7 +207,7 @@ entirely.
 
 ---
 
-## Day 4 — Sun 30 Aug — Spike B: vLLM + Nemotron 3.5 Lightning on the Spark
+## Day 4 — Sun 30 Aug — Spike B ✅ PASSED 27 Aug
 
 **Downgraded from the highest-risk item on the critical path.** NVIDIA publishes
 an official vLLM recipe naming **DGX Spark (GB10)** as a supported target, and
@@ -220,9 +220,41 @@ speculative-decoding configuration*, which is tuning, not porting.
 Serve `nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4` on vLLM ≥ 0.27.1 with
 DSpark speculative decoding.
 
+**Result: passed, three days early.** 9/9 at 3 concurrent (median 48.6 tok/s,
+5.3s) and 6/6 at 6 concurrent (39.8 tok/s, 6.4s). The probe then verified the
+whole chain end to end against the real server: `cuda: available`,
+`local_reasoner: available`, profile `workstation`, `local-only` available.
+`workstation` rather than `spark` is correct — the speech stack is day 6 — and
+profile resolution was written before any of this hardware ran.
+
+Full detail: `scripts/spikes/spike-b-local-inference/FINDINGS.md`.
+
+**Three findings worth carrying:**
+
+1. **The published DGX Spark quick-start does not run on the vLLM version its
+   own model card names.** `--speculative_config.num_speculative_tokens 3` is
+   rejected without a `method`, and `--moe-backend marlin` is refused for this
+   checkpoint's mixed FP8/NVFP4 MoE. Both are first-party instructions for this
+   exact hardware. Budget configuration time for vendor recipes, not only for
+   unproven paths.
+2. **`--gpu-memory-utilization` takes a fraction of the whole machine on unified
+   memory.** The recommended `0.85` consumed 112 of 121 GiB and built a
+   4.6M-token KV cache, leaving no room for ASR or the embedder — which was the
+   entire argument for NVFP4. At `0.30` with a 65k context limit it uses 43 GiB,
+   leaves 77 free, and is *faster* at 3 concurrent.
+3. **The model emits visible chain-of-thought.** Every reply opens "Here's a
+   thinking process:". Agent prompts and the brief renderer both have to account
+   for it.
+
+**Left running** at the tuned configuration, with `--restart no` — it does not
+survive a reboot. A systemd unit is part of the deployment work that
+`add-capture` still lacks.
+
+<details><summary>Original plan, kept for the record</summary>
+
 **Pass gate** — OpenAI-compatible endpoint answers 3 concurrent requests, stable
-over 30 minutes, tokens/sec recorded as a baseline in the failure ledger.
-Resident memory leaves headroom for ASR and the embedder.
+over 30 minutes, tokens/sec recorded. Resident memory leaves headroom for ASR
+and the embedder.
 
 **Abort criteria** — timebox **half a day**, down from 1.5. Fall back in order:
 1. NVFP4 without DSpark speculative decoding — throughput over latency
@@ -232,6 +264,8 @@ Resident memory leaves headroom for ASR and the embedder.
 
 Option 3 materially weakens the Airlock story. If it comes into play, escalate
 rather than absorbing it quietly.
+
+</details>
 
 ### Blocking finding, 2026-08-27: the Spark is not idle
 
