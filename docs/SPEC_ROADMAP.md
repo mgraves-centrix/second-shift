@@ -212,13 +212,46 @@ tree renders before it needs collapsing.
 | Capability | Covers |
 |---|---|
 | `night-pipeline` | The checkpointed stage machine. "No empty mornings" as executable behavior rather than a schema affordance. |
-| `morning-interview` | Briefing from the log delta, then queued questions. The product. |
+| `morning-interview` | Briefing from the log delta, then queued questions. The product. Includes the speech visualization below. |
 | `retrieval` | Local embedding, assembly, policy filtering before egress. Brute-force cosine per ADR 0002. |
 | `research` | Tavily search, extract, crawl. Redaction before any query leaves; credit accounting. |
 | `artifacts` | Briefs, mockups, builds. Variant grouping and critic ranking; outcome capture. |
 | `judge-mode` | The demo instance: cloud profile, synthetic persona, labeled in-UI, "run the night". |
 
 ---
+
+## Speech visualization for the morning interview
+
+Decided 28 Aug: the interview renders live audio, and it splits into two halves
+with very different risk.
+
+**Your speech is buildable now.** `getUserMedia` plus an `AnalyserNode` gives
+real-time frequency and amplitude data with no dependency on anything unproven —
+Spike A already confirmed `getUserMedia` passes on the phone.
+
+**Its speech waits on TTS**, which is still unverified on aarch64. But TTS output
+is audio, and the same `AnalyserNode` reads it through
+`createMediaElementSource`. One component, two sources: the assistant half lights
+up whenever TTS lands, and nothing blocks on it until then.
+
+**What it must show to be worth building.** A bouncing waveform is decoration and
+every demo has one. The version that earns its place visualizes the *turn-taking
+machinery*:
+
+- who holds the turn, and whether the system is listening or thinking
+- **the moment end-of-utterance fires** — Parakeet Realtime EOU decides this in
+  80–160ms, and that decision is the genuinely hard part of push-to-talk
+- the gap between speech ending and a response starting, which is the latency a
+  person actually feels
+
+That makes it evidence of a working system rather than an animation over one, and
+it is the same argument that makes the night scrubber worth building.
+
+**Sequencing.** The input half belongs with `morning-interview`. The output half
+is gated on the TTS spike, and must never block the interview shipping — the
+constitution's text-first principle means every voice interaction has a working
+text equivalent, and a visualization of speech that does not exist is not an
+exception to that.
 
 ## Ordering rule
 
