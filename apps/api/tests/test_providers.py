@@ -136,7 +136,7 @@ class TestExecutorDescriptor:
         executor = InProcessExecutor(recorder, model="jobs")
         with recorder.invocation(agent_id, run_id=run_id) as iid:
             descriptor = recorder.descriptor_for(
-                ingest_url="https://ingest.example.invalid/ingest", credential="tok"
+                ingest_url="https://ingest.example.invalid/telemetry", credential="tok"
             )
             handle = executor.dispatch(JobSpec(kind="build"), telemetry=descriptor)
 

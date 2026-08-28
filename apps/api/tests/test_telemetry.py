@@ -287,7 +287,7 @@ class TestExternalAttribution:
     ):
         with recorder.invocation(agent_id, run_id=run_id) as iid:
             descriptor = recorder.descriptor_for(
-                ingest_url="https://ingest.example.invalid/ingest", credential="token"
+                ingest_url="https://ingest.example.invalid/telemetry", credential="token"
             )
         assert descriptor.dispatching_invocation_id == iid
         assert descriptor.run_id == run_id
