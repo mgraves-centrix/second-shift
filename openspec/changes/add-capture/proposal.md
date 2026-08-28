@@ -62,10 +62,9 @@ journal append (day 3), and any night behaviour.
 - `telemetry`: events may attach to an entry, not only to a run or an
   invocation.
 
-`privacy-airlock` may also gain a requirement — that what a capture surface was
-*offered* is recorded, not only what it chose. That depends on the second open
-question below, so the delta is written once the question is answered rather
-than assumed now.
+- `privacy-airlock`: what a capture surface was *offered* is recorded, not only
+  what it chose — so a choice forced by an unavailable option is distinguishable
+  from a free one.
 
 ## Constitution Compliance
 

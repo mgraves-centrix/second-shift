@@ -4,9 +4,10 @@ Blocks everything. This is the last migration that runs against empty tables;
 after day-3 dogfooding it would alter the only copy of a week of captured ideas.
 
 - [ ] 1.1 Write `db/migrations/0002_capture.sql` adding `events.entry_id` as a nullable foreign key to `entries`, with an index on `(entry_id, ts_ms)` so an entry's history is retrievable without scanning.
-- [ ] 1.2 Add the capability-offer column to `entries` if the clarification resolved in favour of recording what the capture surface was offered.
+- [ ] 1.2 Add `entries.offered_capability_json` holding the capability report shown at capture, and `entries.received_at_ms` holding the server receipt instant.
 - [ ] 1.3 Test: migration applies to a fresh database and to one already at version 1, and `PRAGMA integrity_check` returns ok in both cases.
 - [ ] 1.4 Test: an event naming an entry survives a round trip and is retrievable by entry.
+- [ ] 1.5 Test: an entry stores both instants independently, and a capture instant ahead of server time is preserved rather than rejected or clamped.
 
 ## 2. Repository and recorder corrections
 
@@ -33,15 +34,16 @@ Depends on group 2.
 - [ ] 3.2 Request and response models: identifier, capture instant, IANA zone, UTC offset, policy, text, optional location and capture profile. Reject anything asserting synthetic status.
 - [ ] 3.3 `POST /entries` writing through the recorder-owned path, returning the stored entry on replay without creating a second row or recording a failure.
 - [ ] 3.4 Record a capture event against the entry, including one for a replay whose content diverges from what is stored.
-- [ ] 3.5 `GET /capabilities` serving the capability report, with unavailable policies present and marked with their finding.
-- [ ] 3.6 Derive a title from content deterministically, with no model call.
-- [ ] 3.7 Read home coordinates from `config/location.toml`, allowing a per-request override.
-- [ ] 3.8 Test: an entry captured at one instant and submitted much later stores the capture instant, not the receipt instant.
-- [ ] 3.9 Test: submitting the same entry twice yields one row, two successes, and no failure row.
-- [ ] 3.10 Test: a replayed identifier with altered text keeps the stored version and records the divergence as an event on that entry.
-- [ ] 3.11 Test: `local-only` is accepted and stored intact on a profile that cannot honor it, and the entry is then quarantined rather than rewritten.
-- [ ] 3.12 Test: `GET /capabilities` on a degraded profile returns `local-only` marked unavailable with the specific probe finding, not a generic message.
-- [ ] 3.13 Test: a request asserting synthetic status is ignored and the server's determination is recorded.
+- [ ] 3.5 Persist the capability report served to the surface onto the entry, so an unavailable-at-capture policy is identifiable afterwards.
+- [ ] 3.6 `GET /capabilities` serving the capability report, with unavailable policies present and marked with their finding.
+- [ ] 3.7 Derive a title from content deterministically, with no model call.
+- [ ] 3.8 Read home coordinates from `config/location.toml`, allowing a per-request override.
+- [ ] 3.9 Test: an entry captured at one instant and submitted much later stores the capture instant, not the receipt instant.
+- [ ] 3.10 Test: submitting the same entry twice yields one row, two successes, and no failure row.
+- [ ] 3.11 Test: a replayed identifier with altered text keeps the stored version and records the divergence as an event on that entry.
+- [ ] 3.12 Test: `local-only` is accepted and stored intact on a profile that cannot honor it, and the entry is then quarantined rather than rewritten.
+- [ ] 3.13 Test: `GET /capabilities` on a degraded profile returns `local-only` marked unavailable with the specific probe finding, not a generic message.
+- [ ] 3.14 Test: a request asserting synthetic status is ignored and the server's determination is recorded.
 
 ## 4. PWA
 
@@ -52,11 +54,12 @@ Depends on group 3. Installability is polish; the logged entry is the gate.
 - [ ] 4.3 Generate the identifier and capture instant client-side, and write to IndexedDB before any network attempt.
 - [ ] 4.4 Drain the queue on reconnect, replaying complete records unchanged.
 - [ ] 4.5 Capture the device IANA zone and its offset at the moment of capture.
-- [ ] 4.6 Implement the pending-entry treatment the clarification settled, read-only.
+- [ ] 4.6 Show a persistent count of entries awaiting sync, with no per-item rendering and no per-item action.
 - [ ] 4.7 Manifest and service worker for installability.
 - [ ] 4.8 Test: capture with the network disabled queues locally and reports success.
 - [ ] 4.9 Test: restoring connectivity drains the queue and the stored capture instant is the original one.
 - [ ] 4.10 Test: an unavailable policy renders disabled with its reason and cannot be submitted.
+- [ ] 4.11 Test: two offline captures show a count of two, the count clears on drain, and no per-item control is rendered.
 
 ## 5. Day 2 pass gates
 

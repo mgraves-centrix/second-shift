@@ -30,6 +30,49 @@ it MUST agree with the recorded capture instant.
 - **WHEN** an entry is captured during a repeated wall-clock hour at a daylight-saving transition
 - **THEN** the recorded offset distinguishes which of the two instants occurred, without needing to re-derive it later
 
+### Requirement: Client and server instants are both recorded
+
+The system SHALL record the server's receipt instant alongside the client's
+capture instant. The client's instant is authoritative and MUST NOT be rejected,
+clamped or corrected, however implausible.
+
+A disagreement between the two is preserved rather than resolved, so a device
+with a wrong clock is diagnosable after the fact instead of silently corrupting
+the record.
+
+#### Scenario: Implausible future timestamp
+- **WHEN** an entry arrives whose capture instant is ahead of server time
+- **THEN** it is stored unchanged, the receipt instant is recorded beside it, and the entry is not rejected
+
+#### Scenario: Legitimately old timestamp
+- **WHEN** a three-day-old queued entry drains
+- **THEN** its capture instant is preserved exactly and is not treated as an error
+
+#### Scenario: Skew is diagnosable
+- **WHEN** a device's clock is wrong by a known amount
+- **THEN** the difference between the two recorded instants makes that visible without inspecting anything outside the row
+
+### Requirement: Entries awaiting sync are visible as a count only
+
+The capture surface SHALL show a persistent count of entries captured locally
+and not yet acknowledged, so that a user has no reason to re-submit.
+
+It MUST NOT render pending entries individually. There is deliberately no
+per-item surface, because a per-item surface is what a retry, edit or delete
+control would attach to — and per `NOT_BUILDING.md` that is task management.
+
+#### Scenario: Entries waiting to sync
+- **WHEN** two entries are captured with no connectivity
+- **THEN** the surface shows that two are waiting, without listing them
+
+#### Scenario: Count clears on drain
+- **WHEN** connectivity returns and the queue drains
+- **THEN** the count returns to zero without user action
+
+#### Scenario: No per-item controls exist
+- **WHEN** the pending indicator is displayed
+- **THEN** it offers no action against any individual entry
+
 ### Requirement: Capture succeeds without a network
 
 The capture surface SHALL accept and durably queue an entry with no network
