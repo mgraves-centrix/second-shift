@@ -13,7 +13,7 @@ Every captured entry SHALL be appended to a dated journal file in the brain, in
 capture order, recording at least its identifier, capture instant, policy and
 content.
 
-The journal is organised by the entry's own local date, derived from the
+The journal is organized by the entry's own local date, derived from the
 timezone captured with it — not the server's date at sync time.
 
 #### Scenario: An entry is journaled
