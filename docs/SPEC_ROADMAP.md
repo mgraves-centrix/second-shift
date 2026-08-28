@@ -95,7 +95,9 @@ edited belief file *is* the learning claim, visible.
 
 **Open:** commit granularity (per entry, per stage, or per night); what the
 topic files contain on day one, before any night has run, so that week 1 is a
-real baseline rather than an empty one.
+real baseline rather than an empty one; and whether the brain repository is
+GitHub-private or local-only — the code repository is public, and the brain
+holds captured ideas and a personal profile.
 
 ### 3. `evals` — day 3, subject to the blocking issue above
 

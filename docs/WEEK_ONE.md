@@ -90,6 +90,50 @@ responsive web page. Installability is polish; the logged entry is the gate.
 
 ---
 
+## Before day 3 — four things that do not exist yet
+
+Found by checking rather than assuming, on 2026-08-27.
+
+### 1. Offline capture needs TLS, so Spike A moves earlier
+
+Service workers require a secure context — HTTPS, or `localhost`. A phone
+reaching `http://<host>:8000` over the tailnet is neither. Without a service
+worker there is no cached app shell, so **the app cannot load with no network,
+and therefore cannot capture offline at all.** IndexedDB works over plain HTTP,
+but only once the page has loaded, which is exactly what fails.
+
+The earlier claim that "text capture needs no HTTPS" was true only about the
+microphone. It is wrong about the PWA, and `capture`'s "succeeds without a
+network" requirement depends on it.
+
+**Spike A moves to day 2, alongside the PWA work.** It now blocks two things
+rather than one: offline capture now, and the microphone later. The `mkcert`
+fallback in its abort ladder also produces a secure context and remains valid.
+
+### 2. The brain repository does not exist
+
+ADR 0001 specifies a sibling repository. Nothing has created it, locally or on
+GitHub, and day 3 requires committing entries to it.
+
+**It must be private.** The code repository went public on 2026-08-27; the brain
+holds captured ideas and a personal profile. Decide before day 3 whether it is
+GitHub-private or local-only with its own backup — publishing it by accident is
+not a recoverable mistake.
+
+### 3. The five eval prompts and the rubric do not exist
+
+Day 3's gate requires them fixed and committed. They measure getting better at
+being *you*, so they need your judgment rather than a plausible draft.
+
+### 4. Nothing runs the API persistently
+
+`deploy/` does not exist and `add-capture` has no task that serves the app.
+"Every idea from today forward, no exceptions" needs a service that is up when
+an idea arrives and survives a reboot — a systemd unit on the Spark, bound
+through Tailscale Serve. Capture builds the application; nothing yet runs it.
+
+---
+
 ## Day 3 — Sat 29 Aug — 🚩 DOGFOODING STARTS
 
 Wire capture to the brain repo: every entry appends to the dated journal and
