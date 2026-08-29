@@ -1,0 +1,99 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Scrubber render budget</title>
+<style>
+  body{font:14px/1.5 system-ui;margin:1.5rem;background:#0b0d10;color:#e6eaef}
+  #dom,#cv{position:relative;height:260px;border:1px solid #232a32;border-radius:.4rem;
+           overflow:hidden;background:#14181d;margin:.5rem 0}
+  .ev{position:absolute;height:6px;border-radius:2px;background:#7ef0a8}
+  .ev[data-sev="warn"]{background:#f0c97e}.ev[data-sev="error"]{background:#ff8b93}
+  pre{background:#14181d;padding:.8rem;border-radius:.4rem;white-space:pre-wrap}
+</style>
+<h1>Scrubber render budget</h1>
+<p>Real generated night. Both renderers draw the same events at the same zoom,
+scrubbed across the full span at 20x.</p>
+<h2>DOM</h2><div id="dom"></div>
+<h2>Canvas</h2><div id="cv"><canvas id="c" style="width:100%;height:260px"></canvas></div>
+<pre id="out">running…</pre>
+<script type="module">
+const out = document.getElementById("out");
+const events = await (await fetch("./night.json")).json();
+const t0 = Math.min(...events.map(e => e.ts_ms));
+const t1 = Math.max(...events.map(e => e.ts_ms + (e.duration_ms ?? 0)));
+const lanes = [...new Set(events.map(e => e.lane))].sort();
+const laneY = Object.fromEntries(lanes.map((l, i) => [l, i]));
+
+// One screenful is a window over the night, as a real scrubber shows.
+const WINDOW = (t1 - t0) / 6;
+const FRAMES = 120;
+
+function stats(times) {
+  const s = [...times].sort((a, b) => a - b);
+  const p = q => s[Math.min(s.length - 1, Math.floor(s.length * q))];
+  return { mean: s.reduce((a, b) => a + b, 0) / s.length, p50: p(0.5), p95: p(0.95), max: s.at(-1) };
+}
+
+function benchDom() {
+  const host = document.getElementById("dom");
+  const w = host.clientWidth, laneH = 260 / lanes.length;
+  const nodes = events.map(e => {
+    const d = document.createElement("div");
+    d.className = "ev";
+    d.dataset.sev = e.severity;
+    host.appendChild(d);
+    return [d, e];
+  });
+  const times = [];
+  for (let f = 0; f < FRAMES; f++) {
+    const start = t0 + (t1 - t0 - WINDOW) * (f / (FRAMES - 1));
+    const a = performance.now();
+    for (const [d, e] of nodes) {
+      const x = ((e.ts_ms - start) / WINDOW) * w;
+      if (x < -50 || x > w + 50) { d.style.display = "none"; continue; }
+      d.style.display = "";
+      d.style.transform = `translate(${x}px, ${laneY[e.lane] * laneH + 6}px)`;
+      d.style.width = Math.max(2, ((e.duration_ms ?? 0) / WINDOW) * w) + "px";
+    }
+    host.offsetHeight; // force layout, so the cost is measured not deferred
+    times.push(performance.now() - a);
+  }
+  return stats(times);
+}
+
+function benchCanvas() {
+  const c = document.getElementById("c");
+  const dpr = devicePixelRatio || 1;
+  const w = c.clientWidth, h = 260;
+  c.width = w * dpr; c.height = h * dpr;
+  const ctx = c.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const laneH = h / lanes.length;
+  const colour = { info: "#7ef0a8", debug: "#7ef0a8", warn: "#f0c97e", error: "#ff8b93" };
+  const times = [];
+  for (let f = 0; f < FRAMES; f++) {
+    const start = t0 + (t1 - t0 - WINDOW) * (f / (FRAMES - 1));
+    const a = performance.now();
+    ctx.clearRect(0, 0, w, h);
+    for (const e of events) {
+      const x = ((e.ts_ms - start) / WINDOW) * w;
+      if (x < -50 || x > w + 50) continue;
+      ctx.fillStyle = colour[e.severity] ?? "#7ef0a8";
+      ctx.fillRect(x, laneY[e.lane] * laneH + 6, Math.max(2, ((e.duration_ms ?? 0) / WINDOW) * w), 6);
+    }
+    times.push(performance.now() - a);
+  }
+  return stats(times);
+}
+
+const dom = benchDom();
+const canvas = benchCanvas();
+const fmt = s => `mean ${s.mean.toFixed(2)}ms  p50 ${s.p50.toFixed(2)}  p95 ${s.p95.toFixed(2)}  max ${s.max.toFixed(2)}`;
+out.textContent =
+  `events ${events.length}, lanes ${lanes.length}, frames ${FRAMES}\n` +
+  `budget for 60fps: 16.7ms per frame\n\n` +
+  `DOM     ${fmt(dom)}\n` +
+  `canvas  ${fmt(canvas)}\n\n` +
+  `DOM within budget:    ${dom.p95 < 16.7}\n` +
+  `canvas within budget: ${canvas.p95 < 16.7}`;
+window.__result = { dom, canvas, events: events.length, lanes: lanes.length };
+</script>
