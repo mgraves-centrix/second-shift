@@ -133,10 +133,41 @@ Also: `deploy.sh` does `rm -rf` on the deployed tree every time, so any writable
 configuration living inside it is destroyed on the next deploy and silently
 reverts to the tracked default.
 
-## Open Questions
+## Resolved Decisions
 
-[NEEDS CLARIFICATION: How are the existing environment variable names migrated? Keeping every old name working as an alias is safest for the running deployment but leaves nine legacy names documented forever, which is most of the sprawl this change exists to remove. Renaming cleanly requires re-installing the systemd units on the Spark by hand — `deploy.sh` does not touch them — and getting that wrong silently repoints the database and brain to defaults while real captures are arriving. A third option is aliases now with a removal date recorded in the roadmap.]
+Settled 2026-08-30.
 
-[NEEDS CLARIFICATION: Is there a secrets layer, and where does it sit in precedence? `.gitignore` already reserves `.env`, `.env.local` and `.env.*.local`, so one was anticipated; `Recorder.descriptor_for` already takes a credential; and the next capability in the queue needs Nebius credentials. If `.env` is loaded, does it outrank the process environment or yield to it? A `.env` that outranks `Environment=` in a unit file can repoint the running deployment's database from a file nobody remembers editing.]
+**Clean rename, and the units are reinstalled by hand.** One name per setting,
+no legacy surface carried forward.
 
-[NEEDS CLARIFICATION: Is configuration a startup snapshot or re-read at use? Today it is both by accident — `home_location()` re-reads TOML on every capture, while pricing is loaded once, so editing `pricing.toml` to fix a missing rate has no effect until the API restarts and nothing says so. A snapshot is predictable and makes `config show` truthful; re-reading lets a rate be added without dropping captures during a restart. Whichever is chosen, the other files' headers need to say which they are.]
+The risk this accepts is specific: `deploy.sh` never touches
+`/etc/systemd/system` or `~/.config/systemd`, so shipping renamed code without
+reinstalling would silently drop the database and brain paths to defaults —
+against a live deployment holding real captured ideas.
+
+That failure is made impossible rather than documented. Settings that must be
+explicit are declared as such, and the system **refuses to start** when one of
+them has fallen back to a default. A missed unit reinstall then presents as a
+service that will not come up, which is recoverable in a minute, instead of a
+service that comes up pointing at an empty database, which is not.
+
+**Deferred, deliberately.** No credential exists anywhere in this project yet,
+and `nebius-executor` is the first thing that needs one. Designing a precedence
+rule for a layer with nothing in it would be guessing at requirements the
+consumer has not stated.
+
+Recorded so it is not forgotten: `.gitignore` already reserves `.env`,
+`.env.local` and `.env.*.local`, and `Recorder.descriptor_for` already takes a
+credential. When it lands, the question to answer first is whether `.env`
+outranks the process environment — a `.env` that beats `Environment=` in a unit
+file can repoint a running deployment from a file nobody remembers editing.
+
+**Re-read at use.** A rate added to fix a failing call takes effect without a
+restart, which matters because that file is edited precisely when something has
+just stopped working.
+
+Two consequences are accepted and designed around. A resolved-configuration
+readout is true only at the instant it printed, so it says so rather than
+implying permanence. And capture must not pay a TOML parse per request: reads
+are cached against the file's modification time, so an unchanged file costs a
+stat and a changed one is picked up on the next read.

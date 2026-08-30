@@ -3,9 +3,9 @@
 Settings as one declared surface: where each value comes from, what happens when
 it is wrong, and when that is discovered.
 
-Requirements dependent on the three open questions — name migration, a secrets
-layer, and snapshot-versus-reload — are deliberately absent and land once those
-are answered.
+Name migration and read timing are settled below. A secrets layer is deferred
+until something needs a credential, and is deliberately absent rather than
+guessed at.
 
 ## ADDED Requirements
 
@@ -137,3 +137,41 @@ configuration value may disable, weaken or bypass them.
 #### Scenario: No setting weakens the airlock
 - **WHEN** the configuration surface is inspected
 - **THEN** it exposes no setting that disables or relaxes policy enforcement or redaction
+
+### Requirement: A setting that must be explicit refuses to default
+
+Settings whose silent default would point the system at the wrong data SHALL be
+declared as requiring an explicit value. Where one is absent, the system MUST
+refuse to start and name the setting.
+
+#### Scenario: A required setting is unset
+- **WHEN** the database location is not set anywhere
+- **THEN** the system refuses to start and names that setting, rather than starting against a default location
+
+#### Scenario: A missed deployment step is loud
+- **WHEN** renamed settings are shipped without the service configuration being updated
+- **THEN** the service fails to start, rather than starting successfully against empty defaults
+
+#### Scenario: Optional settings still default
+- **WHEN** a setting not declared as required is absent
+- **THEN** its declared default is used and startup proceeds
+
+### Requirement: Configuration is re-read at use, without re-parsing every time
+
+Values SHALL reflect the current contents of their file without requiring a
+restart.
+
+Reading MUST NOT re-parse an unchanged file on every access, so a request path
+does not pay a parse per call.
+
+#### Scenario: A file edited while running
+- **WHEN** a rate is added to the pricing file while the system is running
+- **THEN** the next call that needs it uses the new value, with no restart
+
+#### Scenario: An unchanged file is not re-parsed
+- **WHEN** a value is read repeatedly and its file has not changed
+- **THEN** the file is not parsed again
+
+#### Scenario: A readout states its own freshness
+- **WHEN** resolved configuration is inspected
+- **THEN** it is presented as true at the moment it was produced, rather than as a permanent state
