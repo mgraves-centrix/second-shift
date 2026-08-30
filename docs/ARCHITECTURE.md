@@ -161,3 +161,4 @@ README.
 | No empty mornings | `run_stages` rows commit independently; the morning brief is a query over whatever reached `complete`. |
 | Text-first | Every voice path has a text sibling route. TTS is never on a critical path. |
 | One codebase, two deployments | Compute profiles. The judge instance is a profile, not a fork. |
+| One origin | The always-on machine serves the API and the exported PWA together. A development machine is `127.0.0.1` only — a second origin means a second database, and a capture written to the wrong one. (ADR 0009) |
