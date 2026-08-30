@@ -77,8 +77,11 @@ def build_context(
     )
 
 
-def _capability_payload(report: CapabilityReport) -> CapabilityResponse:
+def _capability_payload(
+    report: CapabilityReport, *, is_synthetic: bool = False
+) -> CapabilityResponse:
     return CapabilityResponse(
+        is_synthetic=is_synthetic,
         profile=str(report.profile),
         degraded=report.degraded,
         degradation_reason=report.degradation_reason,
@@ -118,7 +121,7 @@ def create_app(context: Context) -> FastAPI:
     @app.get("/capabilities", response_model=CapabilityResponse)
     def capabilities(ctx: Context = Depends(get_context)) -> CapabilityResponse:
         """Every policy with its availability and reason. None are omitted."""
-        return _capability_payload(ctx.report)
+        return _capability_payload(ctx.report, is_synthetic=ctx.is_synthetic)
 
     @app.post("/entries", response_model=EntryResponse)
     def capture(
@@ -171,7 +174,9 @@ def create_app(context: Context) -> FastAPI:
                 lat=request.lat if request.lat is not None else home.lat,
                 lon=request.lon if request.lon is not None else home.lon,
                 offered_capability_json=json.dumps(
-                    _capability_payload(ctx.report).model_dump()
+                    _capability_payload(
+                        ctx.report, is_synthetic=ctx.is_synthetic
+                    ).model_dump()
                 ),
                 entry_id=request.id,
                 is_synthetic=ctx.is_synthetic,

@@ -28,34 +28,40 @@ against four rows today and against a week of them by Friday.
 
 ## 2. API surface
 
-- [ ] 2.1 Add the read routes, registered **before** the static mount so they are not swallowed by the fallback.
-- [ ] 2.2 Add the deployment label to the capability response, so a demonstration can say it is one.
-- [ ] 2.3 Test: routes return the documented columns and reject an unknown run.
-- [ ] 2.4 Test: a route added after the static mount would be unreachable — asserted so the ordering cannot silently regress.
-- [ ] 2.5 Test: a synthetic deployment reports itself as a demonstration.
+- [x] 2.1 Add the read routes, registered **before** the static mount so they are not swallowed by the fallback.
+- [x] 2.2 Add the deployment label to the capability response, so a demonstration can say it is one.
+- [x] 2.3 Test: routes return the documented columns and reject an unknown run.
+- [x] 2.4 Test: a route added after the static mount would be unreachable — asserted so the ordering cannot silently regress.
+- [x] 2.5 Test: a synthetic deployment reports itself as a demonstration.
 
 ## 3. The timeline
 
-- [ ] 3.1 A query-string night route, because static export cannot enumerate run ids.
-- [ ] 3.2 Render lanes from the roster, with sub-row packing so overlapping work stays visible.
-- [ ] 3.3 Render bars and ticks distinguishably, with a minimum bar width when zoomed out.
-- [ ] 3.4 Render events carrying no invocation, since they are the run's skeleton.
-- [ ] 3.5 Render the evening's captures in a gutter before the axis, not scrubable and visually distinct from run work.
-- [ ] 3.6 Render a run still in flight as a correct partial.
-- [ ] 3.7 Axis labels in the entry's recorded capture offset, not the viewer's.
-- [ ] 3.8 Playhead exposing an absolute instant and the night's location.
-- [ ] 3.9 Slider semantics, keyboard scrubbing, an announced moment, and a text-equivalent event reading.
-- [ ] 3.10 Honor reduced-motion by disabling automatic playback while keeping scrubbing.
-- [ ] 3.11 Position playback from wall-clock time rather than accumulated frames, so backgrounding does not cause a jump.
-- [ ] 3.12 Label generated rows and generated cost as generated.
+- [x] 3.1 A query-string night route, because static export cannot enumerate run ids.
+- [x] 3.2 Render lanes from the roster, with sub-row packing so overlapping work stays visible.
+- [x] 3.3 Render bars and ticks distinguishably, with a minimum bar width when zoomed out.
+- [x] 3.4 Render events carrying no invocation, since they are the run's skeleton.
+- [x] 3.5 Render the evening's captures in a gutter before the axis, not scrubable and visually distinct from run work.
+- [x] 3.6 Render a run still in flight as a correct partial.
+- [x] 3.7 Axis labels in the entry's recorded capture offset, not the viewer's.
+- [x] 3.8 Playhead exposing an absolute instant and the night's location.
+- [x] 3.9 Slider semantics, keyboard scrubbing, an announced moment, and a text-equivalent event reading.
+- [x] 3.10 Honor reduced-motion by disabling automatic playback while keeping scrubbing.
+      (The media query is followed, not read once, so turning the preference on
+      mid-session stops playback. Not exercised in a browser: the pane cannot
+      emulate the preference.)
+- [x] 3.11 Position playback from wall-clock time rather than accumulated frames, so backgrounding does not cause a jump.
+- [x] 3.12 Label generated rows and generated cost as generated.
 
 ## 4. Verification
 
-- [ ] 4.1 Test: hover reports the call that produced the event, exactly.
-- [ ] 4.2 Test: scrubbing to a moment shows the events at that moment and not others.
-- [ ] 4.3 Test: a dense night renders without any payload being parsed.
-- [ ] 4.4 Test: keyboard scrubbing moves the playhead and announces the moment.
-- [ ] 4.5 Test: frame time at 20x asserted against the measured budget.
-- [ ] 4.6 Test: the capture PWA still builds, typechecks and passes its tests.
-- [ ] 4.7 Look at it in a browser at several points in the night, and report what was seen rather than what was built.
-- [ ] 4.8 Gates: full suite, typecheck, both check scripts, strict validation.
+- [x] 4.1 Test: hover reports the call that produced the event, exactly.
+- [x] 4.2 Test: scrubbing to a moment shows the events at that moment and not others.
+- [x] 4.3 Test: a dense night renders without any payload being parsed.
+- [x] 4.4 Test: keyboard scrubbing moves the playhead and announces the moment.
+      (Verified by hand in a browser — arrow keys moved the playhead to 02:16:34
+      and `aria-valuetext` read "02:16:34 local, 11 events". The announcement
+      text is unit-tested; the wiring is not, for want of a DOM test stack.)
+- [x] 4.5 Test: frame time at 20x asserted against the measured budget.
+- [x] 4.6 Test: the capture PWA still builds, typechecks and passes its tests.
+- [x] 4.7 Look at it in a browser at several points in the night, and report what was seen rather than what was built.
+- [x] 4.8 Gates: full suite, typecheck, both check scripts, strict validation.

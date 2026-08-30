@@ -493,3 +493,39 @@ class TestRunsWithoutANight:
     def test_the_limit_is_bounded(self, client, night):
         assert client.get("/runs?limit=0").status_code == 422
         assert client.get("/runs?limit=100000").status_code == 422
+
+
+class TestDeploymentDeclaresItself:
+    """A demonstration must be able to say that it is one.
+
+    The judge deployment serves a generated persona. Nothing about a dense,
+    plausible night distinguishes it from a real one by eye, so the deployment
+    says so itself and the view can label it — otherwise seeded work reads as
+    evidence of real use.
+    """
+
+    def test_a_synthetic_deployment_reports_itself(self, client):
+        assert client.get("/capabilities").json()["is_synthetic"] is True
+
+    def test_a_real_deployment_does_not(self, repo, recorder):
+        probe = ProbeResult(
+            {
+                name: Capability(name, False, "absent in this test")
+                for name in (CUDA, LOCAL_REASONER, SPEECH_STACK)
+            }
+        )
+        resolved = resolve_profile(env={}, probe_result=probe)
+        real = Context(
+            repo=repo,
+            recorder=recorder,
+            profile=resolved,
+            report=build_report(resolved),
+            is_synthetic=False,
+        )
+
+        assert TestClient(create_app(real)).get("/capabilities").json()["is_synthetic"] is False
+
+    def test_generated_runs_are_marked_on_the_run_itself(self, client, night):
+        # The deployment flag alone is not enough: a real deployment can hold a
+        # seeded night, so each run carries its own provenance.
+        assert client.get(f"/runs/{night.run_id}").json()["is_synthetic"] is True

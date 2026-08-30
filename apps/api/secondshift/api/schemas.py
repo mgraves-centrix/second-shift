@@ -75,3 +75,11 @@ class CapabilityResponse(BaseModel):
     degraded: bool
     degradation_reason: str | None = None
     policies: list[PolicyAvailabilityResponse]
+
+    #: Whether this deployment serves a generated persona.
+    #:
+    #: Server-derived and never accepted from a request. A dense, plausible night
+    #: is indistinguishable from a real one by eye, so the deployment says which
+    #: it is and every surface can label it — otherwise seeded work is read as
+    #: evidence of real use, which is the one claim a demonstration must not make.
+    is_synthetic: bool = False
