@@ -30,7 +30,7 @@ baseline.
 
 ---
 
-### 1. Vague by design — tests interrogation directly
+### 1. Vague by design — tests interrogation directly {#repeat-mistake}
 
 > "Something that helps me notice when I'm about to repeat a mistake I've
 > already made once."
@@ -40,7 +40,7 @@ with what interruption cost. A naive system builds a generic reminder. A learned
 one asks whether this means the failure ledger, code review, or something about
 how you spend a weekend.
 
-### 2. The trap — should be pushed back on, not built
+### 2. The trap — should be pushed back on, not built {#every-metric-dashboard}
 
 > "A dashboard showing every metric about my projects in one place."
 
@@ -49,7 +49,7 @@ that has learned anything should ask which decision the dashboard would change,
 and probably argue for one number instead of forty. If it cheerfully builds a
 dashboard, it has learned nothing.
 
-### 3. Depends on knowing you — tests the profile
+### 3. Depends on knowing you — tests the profile {#readme-in-my-voice}
 
 > "Draft the README for whatever I'm working on right now, in my voice."
 
@@ -57,7 +57,7 @@ Week 1 it cannot know your voice and should say so. Week 8 the style guide has
 been revised against real accepted and rejected artifacts. This is the most
 direct measure of the profile improving, and the easiest to score honestly.
 
-### 4. Research-dependent — tests Tavily and synthesis
+### 4. Research-dependent — tests Tavily and synthesis {#agent-memory-systems}
 
 > "What are people doing about the fact that agent memory systems all seem to
 > either forget everything or remember too much?"
@@ -66,7 +66,7 @@ Requires actual search, and the quality difference is stark: a naive answer list
 tools, a good one identifies the axis they differ on and where the real
 disagreement is.
 
-### 5. Scope boundary — should be narrowed, not refused outright
+### 5. Scope boundary — should be narrowed, not refused outright {#small-follow-ups}
 
 > "Help me stop losing track of the small follow-ups that come out of
 > conversations."
@@ -75,7 +75,7 @@ This is task management with a nicer name — `NOT_BUILDING.md` excludes it. But
 refusing flatly is wrong too: capturing a follow-up *as an idea* is exactly what
 the product does. Tests whether the boundary is understood or merely enforced.
 
-### 6. Technical with a genuine trade-off
+### 6. Technical with a genuine trade-off {#cheaper-nights}
 
 > "I want the night runs to cost less without getting worse. Where's the
 > waste?"
@@ -85,7 +85,7 @@ completion-heavy stages) and a lazy one (use a smaller model). Improves sharply
 once telemetry has weeks of real data — which makes it a good measure of the
 system using its own instrumentation.
 
-### 7. Deliberately small — tests proportionality
+### 7. Deliberately small — tests proportionality {#file-naming}
 
 > "A better way to name the files this thing produces."
 
@@ -93,7 +93,7 @@ Small, real, and a trap for over-engineering. A system that returns a taxonomy
 with a migration plan has failed. One that proposes a convention and moves on
 has understood the scale.
 
-### 8. Personal workflow — tests observation over assumption
+### 8. Personal workflow — tests observation over assumption {#context-switching}
 
 > "I keep context-switching between the Spark and my laptop and losing my place.
 > Fix that."
@@ -102,7 +102,7 @@ The right answer depends on what actually happens, which the system can only
 know by having watched. Week 1 gives generic tooling advice; week 8 should cite
 something it has observed about how the two machines get used.
 
-### 9. Ambiguous scope, two readings — tests clarifying over guessing
+### 9. Ambiguous scope, two readings — tests clarifying over guessing {#shorter-briefing}
 
 > "Make the morning briefing shorter."
 
@@ -110,7 +110,7 @@ Shorter how — fewer items, less detail per item, or a tighter voice? Those are
 three different products. A good interviewer asks. A bad one picks and is right
 a third of the time.
 
-### 10. Long-horizon judgement — tests memory over recall
+### 10. Long-horizon judgement — tests memory over recall {#been-avoiding}
 
 > "What have I been avoiding?"
 

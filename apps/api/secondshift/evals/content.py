@@ -16,9 +16,15 @@ from pathlib import Path
 #: Candidate prompts are written as `### <n>. <label>` followed by a blockquote
 #: holding the prompt itself. The blockquote is the prompt; the prose around it
 #: is the argument for including it, which is for a human and not for the runner.
+#:
+#: A heading may end with `{#slug}` to name the prompt explicitly. It should:
+#: derived slugs come from the whole heading, and these headings explain why a
+#: prompt was chosen rather than what it asks — so a derived slug labels eight
+#: weeks of charts with an argument instead of a name.
 _CANDIDATE = re.compile(
     r"^###\s+(\d+)\.\s+(.+?)\s*$\n(.*?)(?=^###\s+\d+\.|\Z)", re.M | re.S
 )
+_EXPLICIT_SLUG = re.compile(r"\s*\{#([a-z0-9-]+)\}\s*$")
 _QUOTE_LINE = re.compile(r"^>\s?(.*)$", re.M)
 
 
@@ -57,8 +63,14 @@ def load_prompts(path: str | Path) -> list[PromptCandidate]:
         quoted = "\n".join(_QUOTE_LINE.findall(body)).strip()
         if not quoted:
             continue
+        explicit = _EXPLICIT_SLUG.search(label)
+        clean = _EXPLICIT_SLUG.sub("", label).strip()
         found.append(
-            PromptCandidate(slug=_slugify(label), label=label.strip(), prompt=quoted)
+            PromptCandidate(
+                slug=explicit.group(1) if explicit else _slugify(clean),
+                label=clean,
+                prompt=quoted,
+            )
         )
     return found
 

@@ -301,3 +301,31 @@ class TestFailureHandling:
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
         assert runner.summarize(run_id).complete is False
+
+
+class TestExplicitSlugs:
+    """A slug names the prompt. Derived ones name the argument for choosing it."""
+
+    def test_an_explicit_slug_is_used(self, tmp_path):
+        path = tmp_path / "c.md"
+        path.write_text("### 1. Vague by design — tests interrogation {#repeat-mistake}\n\n> the prompt\n")
+        found = load_prompts(path)
+        assert [c.slug for c in found] == ["repeat-mistake"]
+
+    def test_the_marker_is_stripped_from_the_label(self, tmp_path):
+        path = tmp_path / "c.md"
+        path.write_text("### 1. Vague by design {#repeat-mistake}\n\n> the prompt\n")
+        assert load_prompts(path)[0].label == "Vague by design"
+
+    def test_a_heading_without_one_still_derives(self, tmp_path):
+        path = tmp_path / "c.md"
+        path.write_text("### 1. Some Label Here\n\n> the prompt\n")
+        assert load_prompts(path)[0].slug == "some-label-here"
+
+    def test_the_shipped_candidates_all_name_themselves(self):
+        found = load_prompts(REPO_ROOT / "config" / "evals" / "candidates.md")
+        slugs = {c.slug for c in found}
+        assert len(slugs) == 10
+        # Every slug names what the prompt asks, not why it was chosen.
+        assert "readme-in-my-voice" in slugs
+        assert not any("tests-" in s for s in slugs)
