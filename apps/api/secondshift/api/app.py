@@ -1,7 +1,9 @@
-"""The capture API.
+"""The capture API, and the night view's reads.
 
-Two routes. `GET /capabilities` tells the surface which policies it may offer and
-why any are unavailable; `POST /entries` records a captured idea.
+`GET /capabilities` tells the surface which policies it may offer and why any
+are unavailable; `POST /entries` records a captured idea. The night's read
+routes are built elsewhere and included here, because they share this app's
+origin and its one connection but nothing else with capture.
 
 Everything about an entry is decided by the client before it is sent — the
 identifier, the instant, the timezone, the policy. The server records what it
@@ -27,6 +29,7 @@ from ..db.repository import Repository
 from ..telemetry.pricing import PricingTable
 from ..telemetry.recorder import Recorder
 from .location import home_location
+from .routes.night import night_router
 from .schemas import (
     CapabilityResponse,
     CaptureRequest,
@@ -187,6 +190,14 @@ def create_app(context: Context) -> FastAPI:
         )
         response.status_code = status.HTTP_201_CREATED
         return _entry_response(ctx.repo.get_entry(entry_id), duplicate=False)
+
+    def get_repo() -> Repository:
+        return context.repo
+
+    # Included above the mount, never below it. The mount answers every path,
+    # so a route added after it is dead on arrival and looks like a 404 on a
+    # route that plainly exists in the source.
+    app.include_router(night_router(get_repo))
 
     # Mounted last so every API route is matched first.
     if WEB_EXPORT.is_dir():
