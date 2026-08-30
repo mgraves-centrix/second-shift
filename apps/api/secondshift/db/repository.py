@@ -372,6 +372,7 @@ class Repository:
         run_id: str | None = None,
         agent_invocation_id: str | None = None,
         entry_id: str | None = None,
+        model_call_id: str | None = None,
         severity: str = "info",
         duration_ms: int | None = None,
         payload_json: str | None = None,
@@ -380,13 +381,14 @@ class Repository:
     ) -> int:
         ts = ts_ms if ts_ms is not None else now_ms()
         cursor = self._conn.execute(
-            "INSERT INTO events (run_id, agent_invocation_id, entry_id, ts_ms, lane, "
-            "kind, label, severity, duration_ms, payload_json, is_synthetic) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO events (run_id, agent_invocation_id, entry_id, model_call_id, "
+            "ts_ms, lane, kind, label, severity, duration_ms, payload_json, is_synthetic) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 run_id,
                 agent_invocation_id,
                 entry_id,
+                model_call_id,
                 ts,
                 lane,
                 kind,
@@ -745,6 +747,19 @@ class Repository:
             (entry_id,),
         ).fetchall()
 
+    def model_call_for_event(self, event_id: int) -> sqlite3.Row | None:
+        """The call an event names, or None where it names none.
+
+        Exact by construction. Correlating on invocation and instant would be
+        wrong for any invocation that made two calls in one millisecond, and
+        wrong silently — which is worse than reporting nothing.
+        """
+        return self._conn.execute(
+            "SELECT m.* FROM events e JOIN model_calls m ON m.id = e.model_call_id "
+            "WHERE e.id = ?",
+            (event_id,),
+        ).fetchone()
+
     def failure_ledger(self) -> list[sqlite3.Row]:
         """Recurrence derived from signatures, never a stored counter."""
         return self._conn.execute(
@@ -755,6 +770,7 @@ class Repository:
         """Scalar columns only — the scrubber never parses JSON to draw a frame."""
         return self._conn.execute(
             "SELECT id, ts_ms, lane, kind, label, severity, duration_ms, "
-            "agent_invocation_id FROM events WHERE run_id = ? ORDER BY ts_ms, id",
+            "agent_invocation_id, model_call_id, is_synthetic "
+            "FROM events WHERE run_id = ? ORDER BY ts_ms, id",
             (run_id,),
         ).fetchall()

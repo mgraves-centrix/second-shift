@@ -744,8 +744,7 @@ class _Generator:
         latency = self._rng.randrange(700, 24_000)
         prompt_rate, completion_rate = _RATES_USD_PER_MTOK[provider]
 
-        self._model_calls.append(
-            self._repo.insert_model_call(
+        call_id = self._repo.insert_model_call(
                 call_id=self._mint(ts_ms),
                 provider=provider,
                 compute_profile=self._profile,
@@ -771,14 +770,15 @@ class _Generator:
                 run_id=self._run_id,
                 ts_ms=ts_ms,
                 is_synthetic=True,
-            )
         )
+        self._model_calls.append(call_id)
         self._event(
             ts_ms=ts_ms,
             lane=role,
             kind="model_call",
             label=f"{model} on {provider}",
             invocation_id=invocation_id,
+            model_call_id=call_id,
             duration_ms=latency,
             payload={"provider": provider, "tokens": prompt_tokens + completion_tokens},
         )
@@ -920,11 +920,13 @@ class _Generator:
         label: str,
         invocation_id: str | None = None,
         entry_id: str | None = None,
+        model_call_id: str | None = None,
         severity: str = "info",
         duration_ms: int | None = None,
         payload: dict[str, object] | None = None,
     ) -> None:
         self._repo.insert_event(
+            model_call_id=model_call_id,
             lane=lane,
             kind=kind,
             label=label,

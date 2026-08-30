@@ -10,6 +10,7 @@ import pytest
 from secondshift.db import migrate
 from secondshift.db.connection import now_ms
 from secondshift.db.ids import new_ulid
+from secondshift.db.repository import Repository
 
 TZ = dict(captured_tz="America/Los_Angeles", tz_offset_min=-420)
 
@@ -29,7 +30,7 @@ def _entry(repo, *, text="an idea", when=None, synthetic=False, status="queued",
     )
 
 
-class TestMigration0002:
+class TestCaptureMigrations:
     def test_applies_to_a_database_already_at_version_one(self, db):
         conn = db("stepwise.db")
         first = [m for m in migrate.discover() if m.version == 1]
@@ -43,7 +44,10 @@ class TestMigration0002:
         conn.execute(
             "INSERT INTO schema_version VALUES (1, 'initial', ?)", (now_ms(),)
         )
-        assert migrate.migrate(conn, directory) == [2]
+        # Derived from what is on disk: adding a migration must not fail this
+        # test, only a migration that does not apply from version one.
+        expected = [m.version for m in migrate.discover() if m.version > 1]
+        assert migrate.migrate(conn, directory) == expected
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
 
     def test_event_can_name_an_entry_and_be_read_back(self, repo):
@@ -204,3 +208,68 @@ class TestWriterLock:
 
     def test_unlocked_primitive_is_documented_as_such(self, repo):
         assert "NOT LOCKED" in (repo.insert_entry.__doc__ or "")
+
+
+class TestEventModelCallLink:
+    """Migration 0003. Hover must be exact, not probable."""
+
+    def test_migration_applies_to_a_populated_database(self, db):
+        """The first migration to meet real captured ideas."""
+        conn = db("populated.db")
+        migrate.migrate(conn)
+        entry = Repository(conn).insert_entry(
+            created_at_ms=now_ms(), modality="text", default_policy="cloud-assisted",
+            status="queued", capture_profile="spark", raw_text="an idea", **TZ,
+        )
+        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert Repository(conn).get_entry(entry) is not None
+
+    def test_an_event_names_the_call_that_produced_it(self, repo, run_id):
+        call = repo.insert_model_call(
+            provider="local-vllm", compute_profile="spark", model="m",
+            policy="local-only", estimated_cost_usd=0.0, run_id=run_id,
+            prompt_tokens=100, completion_tokens=20, total_tokens=120,
+        )
+        event = repo.insert_event(
+            lane="researcher", kind="model_call", label="a call",
+            run_id=run_id, model_call_id=call,
+        )
+        assert repo.model_call_for_event(event)["id"] == call
+
+    def test_two_calls_in_one_instant_resolve_separately(self, repo, run_id):
+        """The case that made correlation by timestamp wrong."""
+        instant = now_ms()
+        events = []
+        for tokens in (100, 900):
+            call = repo.insert_model_call(
+                provider="local-vllm", compute_profile="spark", model="m",
+                policy="local-only", estimated_cost_usd=0.0, run_id=run_id,
+                prompt_tokens=tokens, total_tokens=tokens, ts_ms=instant,
+            )
+            events.append(
+                repo.insert_event(
+                    lane="researcher", kind="model_call", label="a call",
+                    run_id=run_id, model_call_id=call, ts_ms=instant,
+                )
+            )
+        resolved = [repo.model_call_for_event(e)["prompt_tokens"] for e in events]
+        assert sorted(resolved) == [100, 900]
+
+    def test_an_event_with_no_call_reports_none(self, repo, run_id):
+        event = repo.insert_event(
+            lane="system", kind="stage_start", label="brief began", run_id=run_id
+        )
+        assert repo.model_call_for_event(event) is None
+
+    def test_the_timeline_carries_the_link_and_the_flag(self, repo, run_id):
+        call = repo.insert_model_call(
+            provider="local-vllm", compute_profile="spark", model="m",
+            policy="local-only", estimated_cost_usd=0.0, run_id=run_id,
+        )
+        repo.insert_event(
+            lane="researcher", kind="model_call", label="a call",
+            run_id=run_id, model_call_id=call,
+        )
+        row = repo.timeline(run_id)[0]
+        assert row["model_call_id"] == call
+        assert "is_synthetic" in row.keys()

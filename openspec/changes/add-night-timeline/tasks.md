@@ -3,16 +3,16 @@
 The first migration against a database holding real captured ideas. It runs
 against four rows today and against a week of them by Friday.
 
-- [ ] 0.1 Add `events.model_call_id` as a nullable foreign key, with an index supporting lookup from an event.
-- [ ] 0.2 Record the link wherever a model call produces an event, so the column is populated going forward rather than only for newly generated nights.
-- [ ] 0.3 Populate it in the night generator, so a seeded night exercises hover.
-- [ ] 0.4 Test: the migration applies to a fresh database and to one already at version 2, with integrity intact.
-- [ ] 0.5 Test: two calls sharing one instant resolve to their own events, not to whichever is found first.
-- [ ] 0.6 Test: an event with no call behind it reports none rather than the nearest.
+- [x] 0.1 Add `events.model_call_id` as a nullable foreign key, with an index supporting lookup from an event.
+- [x] 0.2 Record the link wherever a model call produces an event, so the column is populated going forward rather than only for newly generated nights.
+- [x] 0.3 Populate it in the night generator, so a seeded night exercises hover.
+- [x] 0.4 Test: the migration applies to a fresh database and to one already at version 2, with integrity intact.
+- [x] 0.5 Test: two calls sharing one instant resolve to their own events, not to whichever is found first.
+- [x] 0.6 Test: an event with no call behind it reports none rather than the nearest.
 
 ## 1. Repository reads
 
-- [ ] 1.1 `timeline` accepts a time window and a page cursor on `(ts_ms, id)`, and carries the generated flag in its projection.
+- [x] 1.1 `timeline` accepts a time window and a page cursor on `(ts_ms, id)`, and carries the generated flag in its projection.
 - [ ] 1.2 `invocation_tree` joins the agent roster so each invocation reports its role — the column that decides its lane, and which the current query cannot return.
 - [ ] 1.3 Add a lane roster derived from the whole run rather than from a window.
 - [ ] 1.4 Add run listing and run detail, joining the entry for its capture offset and location.
