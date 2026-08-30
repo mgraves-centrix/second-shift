@@ -1,0 +1,229 @@
+/* The night view.
+ *
+ * Scoped rather than added to globals.css: the capture screen is a phone-first
+ * column taking real ideas, and this is a dense wide instrument. Sharing a
+ * stylesheet means one surface's spacing quietly changes the other's.
+ *
+ * Colors come from the tokens the shell already defines. Only what this view
+ * introduces — lane bands, severity, the playhead — is declared here.
+ */
+
+.page {
+  --lane-h: 1.5rem;
+  --label-w: 9.5rem;
+  --sev-debug: var(--disabled);
+  --sev-info: #6f8fbf;
+  --sev-warn: var(--warn);
+  --sev-error: #e2796b;
+  --stage-band: #1d2530;
+  --playhead: var(--accent);
+
+  max-width: none;
+  margin: 0;
+  padding: 1rem 1.25rem 2rem;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.title { font-size: 1.05rem; font-weight: 600; margin: 0; }
+.subtitle { color: var(--muted); font-size: 0.85rem; margin: 0; }
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-left: auto;
+  font-size: 0.75rem;
+}
+
+.fact {
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  padding: 0.15rem 0.45rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Generated evidence is labeled wherever it is shown. A demonstration must be
+ * able to say what it is looking at rather than present seeded work as real. */
+.synthetic {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.scroller { overflow-x: auto; padding-top: 0.75rem; }
+
+.grid {
+  display: grid;
+  grid-template-columns: var(--label-w) 1fr;
+  align-items: stretch;
+  min-width: 45rem;
+}
+
+.rowLabel {
+  padding-right: 0.6rem;
+  border-right: 1px solid var(--line);
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: right;
+  line-height: var(--lane-h);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowLabel em {
+  display: block;
+  font-style: normal;
+  font-size: 0.65rem;
+  color: var(--disabled);
+}
+
+.track {
+  position: relative;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+.stages { position: relative; height: 1.1rem; margin-bottom: 0.25rem; }
+
+.stage {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--stage-band);
+  border-left: 1px solid var(--line);
+  font-size: 0.62rem;
+  color: var(--muted);
+  padding-left: 0.3rem;
+  line-height: 1.1rem;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* A stage still running has no end. It is shown open rather than squared off,
+ * because a night that stopped mid-stage is the case this system exists for. */
+.stage[data-open="true"] {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--stage-band) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+.captures { position: relative; height: 0.9rem; }
+
+.capture {
+  position: absolute;
+  top: 0.15rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-left: -0.27rem;
+  transform: rotate(45deg);
+  background: var(--accent);
+  border-radius: 1px;
+}
+
+.mark {
+  position: absolute;
+  border-radius: 1px;
+  background: var(--sev-info);
+  cursor: pointer;
+  padding: 0;
+  border: 0;
+}
+
+.mark[data-severity="debug"] { background: var(--sev-debug); }
+.mark[data-severity="warn"] { background: var(--sev-warn); }
+.mark[data-severity="error"] { background: var(--sev-error); }
+
+/* A tick is an instant; a bar has extent. The distinction has to survive without
+ * reading a label, so it is carried by shape rather than by color alone. */
+.mark[data-bar="false"] { border-radius: 50%; }
+
+.mark:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  z-index: 3;
+}
+
+.mark[data-selected="true"] {
+  outline: 1px solid var(--text);
+  outline-offset: 1px;
+  z-index: 2;
+}
+
+.axis {
+  position: relative;
+  height: 1.4rem;
+  margin-top: 0.4rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.axisTick { position: absolute; top: 0.2rem; transform: translateX(-50%); white-space: nowrap; }
+
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--playhead);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.scrubRow { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }
+
+.scrub { flex: 1; accent-color: var(--accent); }
+
+.moment {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: var(--accent);
+  min-width: 9rem;
+}
+
+.detail {
+  margin-top: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--panel);
+  padding: 0.75rem 0.9rem;
+  font-size: 0.8rem;
+}
+
+.detail dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.2rem 0.9rem; margin: 0.5rem 0 0; }
+.detail dt { color: var(--muted); }
+.detail dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+.empty { color: var(--muted); padding: 2rem 0; }
+.error { color: var(--sev-error); padding: 2rem 0; }
+
+/* The same night as a list. Not a fallback — a timeline is a picture, and a
+ * picture alone leaves the view unusable for anyone who cannot see it. */
+.equivalent { margin-top: 1.5rem; font-size: 0.8rem; }
+.equivalent summary { cursor: pointer; color: var(--muted); }
+.equivalent ol { max-height: 22rem; overflow-y: auto; margin: 0.5rem 0 0; padding-left: 1.25rem; }
+.equivalent li { margin-bottom: 0.15rem; font-variant-numeric: tabular-nums; }
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark, .playhead { transition: none !important; }
+}
