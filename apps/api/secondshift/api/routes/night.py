@@ -150,9 +150,23 @@ def night_router(get_repo: Callable[[], Repository]) -> APIRouter:
 
     @router.get("/runs", response_model=list[RunSummary])
     def runs(
-        night_of: str, repo: Repository = Depends(get_repo)
+        night_of: str | None = None,
+        limit: int = Query(default=50, ge=1, le=500),
+        repo: Repository = Depends(get_repo),
     ) -> list[RunSummary]:
-        return [_summary(r) for r in repo.runs_for_night(night_of)]
+        """Runs for a night, or the most recent runs when no night is named.
+
+        The night is optional because the view opens before anyone has chosen a
+        date. Requiring one means the first request a fresh client can make is
+        one it has no way to construct.
+
+        Ordering differs by intent: a named night reads forward in time, because
+        it is being read as a sequence, while an unnamed request is answering
+        "what happened last" and reads newest first.
+        """
+        if night_of is not None:
+            return [_summary(r) for r in repo.runs_for_night(night_of)]
+        return [_summary(r) for r in repo.recent_runs(limit)]
 
     @router.get("/runs/{run_id}", response_model=RunDetail)
     def run(run_id: str, repo: Repository = Depends(get_repo)) -> RunDetail:

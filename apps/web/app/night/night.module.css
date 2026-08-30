@@ -61,29 +61,35 @@
 .scroller { overflow-x: auto; padding-top: 0.75rem; }
 
 .grid {
+  position: relative;
   display: grid;
-  grid-template-columns: var(--label-w) 1fr;
+  grid-template-columns: 152px var(--gutter-w, 90px) 1fr;
   align-items: stretch;
   min-width: 45rem;
 }
 
+/* Centered by layout rather than by line-height: a label carrying a second line
+ * makes line-height centering push that line clear of its own lane, which is
+ * how the roster ended up reading against the wrong tracks. */
 .rowLabel {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   padding-right: 0.6rem;
   border-right: 1px solid var(--line);
   font-size: 0.72rem;
+  line-height: 1.2;
   color: var(--muted);
   text-align: right;
-  line-height: var(--lane-h);
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .rowLabel em {
-  display: block;
   font-style: normal;
   font-size: 0.65rem;
   color: var(--disabled);
+  margin-left: 0.35rem;
 }
 
 .track {
@@ -117,7 +123,20 @@
   );
 }
 
-.captures { position: relative; height: 0.9rem; }
+/* The evening before the run, compressed into its own strip.
+ *
+ * Captures land hours before the work begins — nearly five on a real night — so
+ * they get a separate zone rather than a share of the axis. The separation is
+ * also the point: what someone typed is not what the run did, and the playhead
+ * never enters here. */
+.gutter {
+  position: relative;
+  height: 1.1rem;
+  margin-bottom: 0.25rem;
+  border-right: 1px dashed var(--line);
+}
+
+.gutterCell { border-right: 1px dashed var(--line); }
 
 .capture {
   position: absolute;
@@ -130,8 +149,14 @@
   border-radius: 1px;
 }
 
+/* The shell styles the bare `button` element for the capture form — full width,
+ * with a top margin. Both reach every mark here: the margin offsets absolutely
+ * positioned marks, which drew each one a full row below its own lane while
+ * still looking like a timeline, because everything shifted together. Anything
+ * this page styles as a button neutralizes that inheritance explicitly. */
 .mark {
   position: absolute;
+  margin: 0;
   border-radius: 1px;
   background: var(--sev-info);
   cursor: pointer;
@@ -177,13 +202,14 @@
   bottom: 0;
   width: 1px;
   background: var(--playhead);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 55%, transparent);
   pointer-events: none;
   z-index: 4;
 }
 
 .scrubRow { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }
 
-.scrub { flex: 1; accent-color: var(--accent); }
+.scrub { flex: 1 1 auto; min-width: 12rem; accent-color: var(--accent); }
 
 .moment {
   font-variant-numeric: tabular-nums;
@@ -227,3 +253,19 @@
 @media (prefers-reduced-motion: reduce) {
   .mark, .playhead { transition: none !important; }
 }
+
+.transport {
+  width: auto;
+  margin: 0;
+  flex: 0 0 auto;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.transport:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

@@ -13,11 +13,15 @@ import test from "node:test";
 import {
   MIN_BAR_PX,
   MIN_SPAN_MS,
+  atEnd,
   axisTicks,
+  boundStages,
+  captureExtent,
   eventsAt,
   extentOf,
   packLane,
   playheadAt,
+  positionAt,
   rowCount,
   scaleFor,
   spokenClock,
@@ -219,4 +223,112 @@ test("events are placed in time order regardless of arrival order", () => {
 
   assert.deepEqual(placed.map((p) => p.event.id), [2, 9]);
   assert.ok(placed[0].x < placed[1].x);
+});
+
+test("playback position comes from elapsed time, not from frames delivered", () => {
+  // A backgrounded tab is throttled to roughly one frame a second. A counter
+  // that adds per frame runs slow and the playhead stops meaning the time it
+  // claims; anchoring to a monotonic clock costs smoothness instead.
+  const extent = { start_ms: T0, end_ms: T0 + 3_600_000 };
+  const anchor = { wall_ms: 1000, playhead_ms: T0, rate: 20 };
+
+  // Ten real seconds at 20x is 200 night-seconds, however many frames arrived.
+  assert.equal(positionAt(anchor, 11_000, extent), T0 + 200_000);
+});
+
+test("playback stops at the end of the night rather than running past it", () => {
+  const extent = { start_ms: T0, end_ms: T0 + 3_600_000 };
+  const anchor = { wall_ms: 0, playhead_ms: T0, rate: 1000 };
+
+  assert.equal(positionAt(anchor, 60_000, extent), extent.end_ms);
+  assert.equal(atEnd(positionAt(anchor, 60_000, extent), extent), true);
+});
+
+test("a clock reading before the anchor does not move the playhead backward", () => {
+  const extent = { start_ms: T0, end_ms: T0 + 3_600_000 };
+  const anchor = { wall_ms: 5000, playhead_ms: T0 + 60_000, rate: 20 };
+
+  assert.equal(positionAt(anchor, 4000, extent), T0 + 60_000);
+});
+
+test("a completed stage is bounded by the next one, not by the end of the night", () => {
+  // No stage records an end. Bounding each by the axis draws six bands all
+  // running to morning, stacked on each other and reading as stripes.
+  const extent = { start_ms: T0, end_ms: T0 + 3_600_000 };
+  const bound = boundStages(
+    [
+      { stage: "brief", seq: 1, status: "complete", started_at_ms: T0, ended_at_ms: null },
+      { stage: "build", seq: 2, status: "complete", started_at_ms: T0 + 600_000, ended_at_ms: null },
+      { stage: "distill", seq: 3, status: "running", started_at_ms: T0 + 1_800_000, ended_at_ms: null },
+    ],
+    extent,
+  );
+
+  assert.deepEqual(bound.map((b) => [b.span.start_ms - T0, b.span.end_ms - T0]), [
+    [0, 600_000],
+    [600_000, 1_800_000],
+    [1_800_000, 3_600_000],
+  ]);
+});
+
+test("only the final stage is reported as still open", () => {
+  const extent = { start_ms: T0, end_ms: T0 + 3_600_000 };
+  const bound = boundStages(
+    [
+      { stage: "brief", seq: 1, status: "complete", started_at_ms: T0, ended_at_ms: null },
+      { stage: "distill", seq: 2, status: "running", started_at_ms: T0 + 600_000, ended_at_ms: null },
+    ],
+    extent,
+  );
+
+  assert.deepEqual(bound.map((b) => b.open), [false, true]);
+});
+
+test("stage bands are ordered by sequence, not by arrival", () => {
+  const extent = { start_ms: T0, end_ms: T0 + 3_600_000 };
+  const bound = boundStages(
+    [
+      { stage: "build", seq: 2, status: "complete", started_at_ms: T0 + 600_000, ended_at_ms: null },
+      { stage: "brief", seq: 1, status: "complete", started_at_ms: T0, ended_at_ms: null },
+    ],
+    extent,
+  );
+
+  assert.deepEqual(bound.map((b) => b.stage.stage), ["brief", "build"]);
+});
+
+test("a stage that never started contributes no band", () => {
+  const extent = { start_ms: T0, end_ms: T0 + 3_600_000 };
+  const bound = boundStages(
+    [
+      { stage: "brief", seq: 1, status: "complete", started_at_ms: T0, ended_at_ms: null },
+      { stage: "publish", seq: 2, status: "pending", started_at_ms: null, ended_at_ms: null },
+    ],
+    extent,
+  );
+
+  assert.equal(bound.length, 1);
+  assert.equal(bound[0].span.end_ms, extent.end_ms);
+});
+
+test("the capture gutter spans the evening before the run, not the run itself", () => {
+  // Captures land hours before the work starts. Folded into the main axis they
+  // would halve the resolution of the night to make room for an empty evening.
+  const captures = [
+    { id: "a", created_at_ms: T0 - 17_000_000, title: null, policy: "local-only" },
+    { id: "b", created_at_ms: T0 - 1_000_000, title: null, policy: "local-only" },
+  ];
+
+  assert.deepEqual(captureExtent(captures, T0), {
+    start_ms: T0 - 17_000_000,
+    end_ms: T0,
+  });
+});
+
+test("a night with nothing captured beforehand has no gutter", () => {
+  assert.equal(captureExtent([], T0), null);
+  assert.equal(
+    captureExtent([{ id: "a", created_at_ms: T0 + 5000, title: null, policy: "local-only" }], T0),
+    null,
+  );
 });

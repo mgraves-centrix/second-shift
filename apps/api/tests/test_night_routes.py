@@ -109,8 +109,10 @@ class TestRunList:
         assert response.status_code == 200
         assert response.json() == []
 
-    def test_the_night_is_required(self, client):
-        assert client.get("/runs").status_code == 422
+    def test_an_absent_night_is_a_request_for_recent_runs(self, client):
+        # Previously a 422. The view opens before anyone has named a date, so
+        # requiring one made the entry point unreachable.
+        assert client.get("/runs").status_code == 200
 
 
 class TestRunDetail:
@@ -463,3 +465,31 @@ class TestMountOrdering:
         assert client.get(f"/runs/{night.run_id}").status_code == 200
         assert client.get(f"/runs/{night.run_id}/timeline").status_code == 200
         assert client.get(f"/runs/{UNKNOWN_RUN}").status_code == 404
+
+
+class TestRunsWithoutANight:
+    """The first request a fresh client can make.
+
+    The view opens before anyone has named a date, so a required `night_of`
+    makes the entry point unreachable — which is how it was found: the timeline
+    asked for runs, got a validation error, and rendered nothing.
+    """
+
+    def test_no_night_returns_the_most_recent_runs_first(self, client, night):
+        response = client.get("/runs")
+        assert response.status_code == 200
+
+        runs = response.json()
+        assert runs, "a seeded night must be discoverable without naming its date"
+        starts = [r["started_at_ms"] for r in runs]
+        assert starts == sorted(starts, reverse=True)
+
+    def test_a_named_night_still_reads_forward_in_time(self, client, night):
+        night = client.get("/runs").json()[0]["night_of"]
+
+        starts = [r["started_at_ms"] for r in client.get(f"/runs?night_of={night}").json()]
+        assert starts == sorted(starts)
+
+    def test_the_limit_is_bounded(self, client, night):
+        assert client.get("/runs?limit=0").status_code == 422
+        assert client.get("/runs?limit=100000").status_code == 422

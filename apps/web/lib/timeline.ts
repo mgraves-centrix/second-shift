@@ -310,3 +310,83 @@ export const fetchEvent = (eventId: number, signal?: AbortSignal) =>
     payload_json: string | null;
     model_call: Record<string, unknown> | null;
   }>(`/events/${eventId}`, signal);
+
+export interface PlaybackAnchor {
+  /** Reading of a monotonic clock when playback started. */
+  wall_ms: number;
+  /** Where the playhead sat at that moment. */
+  playhead_ms: number;
+  /** Night-milliseconds per real millisecond. */
+  rate: number;
+}
+
+/**
+ * Where the playhead belongs right now.
+ *
+ * Anchored to elapsed wall-clock time rather than accumulated per frame. A frame
+ * counter desynchronizes from reality whenever frames are not delivered — a
+ * backgrounded tab throttles them to roughly one a second — so playback silently
+ * runs slow and the position stops meaning the time it claims. Recomputing from
+ * a monotonic clock makes a dropped frame cost smoothness rather than accuracy.
+ *
+ * Playback stops at the end of the night rather than running past it.
+ */
+export function positionAt(anchor: PlaybackAnchor, now_wall_ms: number, extent: Extent): number {
+  const elapsed = Math.max(0, now_wall_ms - anchor.wall_ms);
+  return Math.min(extent.end_ms, anchor.playhead_ms + elapsed * anchor.rate);
+}
+
+/** Whether playback has reached the end of the night. */
+export const atEnd = (playhead_ms: number, extent: Extent) => playhead_ms >= extent.end_ms;
+
+export interface BoundStage {
+  stage: Stage;
+  span: Extent;
+  /** True only when the stage has genuinely not finished. */
+  open: boolean;
+}
+
+/**
+ * Stage bands, bounded by their successors.
+ *
+ * A completed stage records no end — only its start is written — so bounding
+ * each stage by the axis end draws every one of them running to morning, six
+ * bands stacked on top of each other reading as stripes rather than as a
+ * sequence. Stages are sequential and do not overlap, so the next stage's start
+ * is the previous one's end.
+ *
+ * Only a stage with no successor is genuinely open, and only then when the run
+ * itself has not ended.
+ */
+export function boundStages(stages: Stage[], extent: Extent): BoundStage[] {
+  const ordered = [...stages].sort((a, b) => a.seq - b.seq);
+
+  return ordered.flatMap((stage, i) => {
+    if (stage.started_at_ms == null) return [];
+    const next = ordered.slice(i + 1).find((s) => s.started_at_ms != null);
+    const end = stage.ended_at_ms ?? next?.started_at_ms ?? extent.end_ms;
+    return [{
+      stage,
+      span: { start_ms: stage.started_at_ms, end_ms: end },
+      open: stage.ended_at_ms == null && next === undefined,
+    }];
+  });
+}
+
+/**
+ * The span of the evening before the run, for the capture gutter.
+ *
+ * Captures happen hours before the work starts — nearly five, on a real night —
+ * so folding them into the main axis would halve the resolution of the run to
+ * make room for an empty evening. They get their own compressed strip instead,
+ * which is also what keeps them visibly not part of the run.
+ *
+ * Returns null when nothing was captured before the run.
+ */
+export function captureExtent(captures: Capture[], runStart_ms: number): Extent | null {
+  const before = captures.filter((c) => c.created_at_ms < runStart_ms);
+  if (before.length === 0) return null;
+
+  const earliest = Math.min(...before.map((c) => c.created_at_ms));
+  return { start_ms: earliest, end_ms: runStart_ms };
+}

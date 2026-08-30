@@ -739,6 +739,19 @@ class Repository:
             (night_of,),
         ).fetchall()
 
+    def recent_runs(self, limit: int = 50) -> list[sqlite3.Row]:
+        """The most recent runs, newest first.
+
+        Distinct from `runs_for_night`, which answers about a date someone
+        already knows. This answers the question the night view opens with —
+        what happened last — because being asked to name a date before seeing
+        anything is friction on the one screen meant to be glanced at.
+        """
+        return self._conn.execute(
+            "SELECT * FROM runs ORDER BY started_at_ms DESC, id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+
     def timeline_extent(self, run_id: str) -> tuple[int, int] | None:
         """The span the axis must cover.
 
