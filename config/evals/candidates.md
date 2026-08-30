@@ -1,8 +1,15 @@
 # Eval prompt candidates
 
-Ten candidates. **Five get selected** and become the held-out set — run weekly,
-scored against a fixed rubric, never used during development. The other five stay
-here as reserves.
+Ten candidates. **Six were selected** on 2026-08-30 and became the held-out set —
+run weekly, scored against a fixed rubric, never used during development. The
+other four stay here as reserves.
+
+Selected: `readme-in-my-voice`, `agent-memory-systems`, `file-naming`,
+`shorter-briefing`, `been-avoiding`, `every-metric-dashboard`.
+
+Six rather than five because the first five spanned categories well but none of
+them was a trap — nothing tested whether the system argues against a bad idea,
+which is a different capability from clarifying an ambiguous one.
 
 ## What makes an eval prompt good here
 
@@ -22,11 +29,12 @@ does not look like real usage measures the wrong thing.
 
 ## Selection guidance
 
-Take five that span the categories, not the five you like most. Suggested shape:
-one vague, one trap, one research-dependent, one taste-dependent, one technical.
+Settled. The chosen six span taste, research, proportionality, ambiguity,
+long-horizon memory, and pushback.
 
-Mark your picks and I will fix them, hash the rubric, and record the day-3
-baseline.
+Two of them — `readme-in-my-voice` and `been-avoiding` — should honestly answer
+"I do not know yet" in week one. The rubric scores that as correct, which is what
+makes the week-eight delta legible rather than a jump in fluency.
 
 ---
 

@@ -687,12 +687,131 @@ class Repository:
         ).fetchone()
 
     def invocation_tree(self, run_id: str) -> list[sqlite3.Row]:
-        """Every invocation for a run, ordered so parents precede children."""
+        """Every invocation for a run, ordered so parents precede children.
+
+        Joined to the agent roster for `role`, which is the column that decides
+        an invocation's lane. `agent_invocations` does not carry it — role lives
+        on `agents` — so selecting the table alone cannot answer the one question
+        a timeline needs to ask of it.
+        """
         return self._conn.execute(
-            "SELECT * FROM agent_invocations WHERE run_id = ? "
-            "ORDER BY depth, started_at_ms, id",
+            "SELECT i.*, a.role AS role, a.name AS agent_name, a.version AS agent_version "
+            "FROM agent_invocations i JOIN agents a ON a.id = i.agent_id "
+            "WHERE i.run_id = ? ORDER BY i.depth, i.started_at_ms, i.id",
             (run_id,),
         ).fetchall()
+
+    def lane_roster(self, run_id: str) -> list[str]:
+        """Every lane the run uses, from the run as a whole.
+
+        Derived from the whole run rather than from a loaded window: two agent
+        roles take a single invocation each across an entire night, so a roster
+        built from whatever is on screen gains and loses lanes while scrubbing
+        and reflows everything below them.
+        """
+        return [
+            r["lane"]
+            for r in self._conn.execute(
+                "SELECT DISTINCT lane FROM events WHERE run_id = ? ORDER BY lane",
+                (run_id,),
+            )
+        ]
+
+    def run_detail(self, run_id: str) -> sqlite3.Row | None:
+        """A run with the framing its timeline needs.
+
+        Joins the entry for the capture offset and location. `runs` carries only
+        `night_of`, a bare local date, so the axis cannot be labeled from the run
+        alone — and the offset must be the one stored at capture rather than one
+        resolved from the zone name later, which is wrong for half the year.
+        """
+        return self._conn.execute(
+            "SELECT r.*, e.captured_tz AS captured_tz, e.tz_offset_min AS tz_offset_min, "
+            "e.lat AS lat, e.lon AS lon, e.title AS entry_title, "
+            "e.created_at_ms AS entry_created_at_ms "
+            "FROM runs r JOIN entries e ON e.id = r.entry_id WHERE r.id = ?",
+            (run_id,),
+        ).fetchone()
+
+    def runs_for_night(self, night_of: str) -> list[sqlite3.Row]:
+        return self._conn.execute(
+            "SELECT * FROM runs WHERE night_of = ? ORDER BY started_at_ms, id",
+            (night_of,),
+        ).fetchall()
+
+    def timeline_extent(self, run_id: str) -> tuple[int, int] | None:
+        """The span the axis must cover.
+
+        The end includes each bar's duration. Work near the end of a night runs
+        past the last recorded instant — by over an hour in a generated night —
+        and an axis computed from timestamps alone clips it.
+        """
+        row = self._conn.execute(
+            "SELECT MIN(ts_ms) AS lo, MAX(ts_ms + COALESCE(duration_ms, 0)) AS hi "
+            "FROM events WHERE run_id = ?",
+            (run_id,),
+        ).fetchone()
+        return None if row["lo"] is None else (row["lo"], row["hi"])
+
+    def captures_before_run(self, run_id: str) -> list[sqlite3.Row]:
+        """The evening's captures, for the gutter beside the axis.
+
+        Capture events carry no run, so they are invisible to a run's timeline.
+        They are shown beside it rather than within it: the ideas that caused the
+        night belong on screen, but the hours in which nothing ran do not belong
+        in the scrubable span.
+        """
+        return self._conn.execute(
+            "SELECT e.* FROM entries e JOIN runs r ON r.entry_id = e.id "
+            "WHERE r.id = ? AND e.created_at_ms <= r.started_at_ms "
+            "UNION "
+            "SELECT e2.* FROM entries e2 WHERE e2.created_at_ms <= "
+            "(SELECT started_at_ms FROM runs WHERE id = ?) "
+            "AND e2.created_at_ms >= (SELECT started_at_ms - 86400000 FROM runs WHERE id = ?) "
+            "ORDER BY created_at_ms",
+            (run_id, run_id, run_id),
+        ).fetchall()
+
+    def run_stages(self, run_id: str) -> list[sqlite3.Row]:
+        """Stage bands, including one still running."""
+        return self._conn.execute(
+            "SELECT * FROM run_stages WHERE run_id = ? ORDER BY seq",
+            (run_id,),
+        ).fetchall()
+
+    def timeline_buckets(self, run_id: str, *, bucket_ms: int) -> list[sqlite3.Row]:
+        """Aggregated events for a zoomed-out view.
+
+        A bucket keeps the strongest severity present, never an average or the
+        most common: one error among forty routine rows must survive being
+        zoomed out, or the view hides exactly what someone is looking for.
+        """
+        return self._conn.execute(
+            "SELECT lane, (ts_ms / ?) * ? AS bucket_start_ms, COUNT(*) AS count, "
+            "MAX(CASE severity WHEN 'error' THEN 3 WHEN 'warn' THEN 2 "
+            "WHEN 'info' THEN 1 ELSE 0 END) AS severity_rank "
+            "FROM events WHERE run_id = ? GROUP BY lane, bucket_start_ms "
+            "ORDER BY bucket_start_ms, lane",
+            (bucket_ms, bucket_ms, run_id),
+        ).fetchall()
+
+    def run_spend(self, run_id: str) -> sqlite3.Row:
+        """What a run cost, summed from recorded calls.
+
+        Not from `run_cost`: every rollup view filters synthetic rows, so a
+        wholly synthetic deployment — which is what the judge instance is —
+        renders blank from them, on the exact instance that exists to be looked
+        at.
+        """
+        return self._conn.execute(
+            "SELECT COALESCE(SUM(estimated_cost_usd), 0) AS spend_usd, "
+            "COALESCE(SUM(total_tokens), 0) AS total_tokens, COUNT(*) AS calls, "
+            "COALESCE(SUM(CASE WHEN provider IN ('token-factory','nebius-job') "
+            "THEN total_tokens END), 0) AS cloud_tokens, "
+            "MAX(is_synthetic) AS any_synthetic "
+            "FROM model_calls WHERE run_id = ?",
+            (run_id,),
+        ).fetchone()
 
     def model_calls_for_run(self, run_id: str) -> list[sqlite3.Row]:
         return self._conn.execute(
@@ -766,11 +885,39 @@ class Repository:
             "SELECT * FROM failure_ledger ORDER BY recurrence_count DESC, last_seen_ms DESC"
         ).fetchall()
 
-    def timeline(self, run_id: str) -> list[sqlite3.Row]:
+    def timeline(
+        self,
+        run_id: str,
+        *,
+        from_ms: int | None = None,
+        to_ms: int | None = None,
+        limit: int | None = None,
+        after: tuple[int, int] | None = None,
+    ) -> list[sqlite3.Row]:
         """Scalar columns only — the scrubber never parses JSON to draw a frame."""
-        return self._conn.execute(
+        clauses = ["run_id = ?"]
+        params: list[object] = [run_id]
+        if from_ms is not None:
+            # A bar starting before the window but running into it is inside it.
+            clauses.append("ts_ms + COALESCE(duration_ms, 0) >= ?")
+            params.append(from_ms)
+        if to_ms is not None:
+            clauses.append("ts_ms <= ?")
+            params.append(to_ms)
+        if after is not None:
+            # Paging on (ts_ms, id), never id alone: the integer key is not
+            # monotonic in time. Depth-first spawning places a child's events at
+            # earlier instants than its siblings, and a real night carries
+            # hundreds of such inversions.
+            clauses.append("(ts_ms > ? OR (ts_ms = ? AND id > ?))")
+            params.extend([after[0], after[0], after[1]])
+
+        sql = (
             "SELECT id, ts_ms, lane, kind, label, severity, duration_ms, "
-            "agent_invocation_id, model_call_id, is_synthetic "
-            "FROM events WHERE run_id = ? ORDER BY ts_ms, id",
-            (run_id,),
-        ).fetchall()
+            "agent_invocation_id, model_call_id, is_synthetic FROM events "
+            f"WHERE {' AND '.join(clauses)} ORDER BY ts_ms, id"
+        )
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(limit)
+        return self._conn.execute(sql, tuple(params)).fetchall()

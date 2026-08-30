@@ -13,18 +13,18 @@ against four rows today and against a week of them by Friday.
 ## 1. Repository reads
 
 - [x] 1.1 `timeline` accepts a time window and a page cursor on `(ts_ms, id)`, and carries the generated flag in its projection.
-- [ ] 1.2 `invocation_tree` joins the agent roster so each invocation reports its role — the column that decides its lane, and which the current query cannot return.
-- [ ] 1.3 Add a lane roster derived from the whole run rather than from a window.
-- [ ] 1.4 Add run listing and run detail, joining the entry for its capture offset and location.
-- [ ] 1.5 Add a read for the entries captured before a run, for the gutter beside the axis.
-- [ ] 1.6 Add stage reads for the band overlay, including a stage still running.
-- [ ] 1.7 Add a bucketed read for zoomed-out display, carrying the strongest severity per bucket.
-- [ ] 1.8 Add a night cost summed from recorded model calls rather than from views that exclude generated rows.
-- [ ] 1.9 Test: ordering survives identifier inversions, verified against a generated night.
-- [ ] 1.10 Test: paging returns every event once, including events sharing a timestamp.
-- [ ] 1.11 Test: the axis extent covers bars that end after the last recorded instant.
-- [ ] 1.12 Test: the lane roster is unchanged by which window is loaded.
-- [ ] 1.13 Test: a bucket containing one error reports as an error.
+- [x] 1.2 `invocation_tree` joins the agent roster so each invocation reports its role — the column that decides its lane, and which the current query cannot return.
+- [x] 1.3 Add a lane roster derived from the whole run rather than from a window.
+- [x] 1.4 Add run listing and run detail, joining the entry for its capture offset and location.
+- [x] 1.5 Add a read for the entries captured before a run, for the gutter beside the axis.
+- [x] 1.6 Add stage reads for the band overlay, including a stage still running.
+- [x] 1.7 Add a bucketed read for zoomed-out display, carrying the strongest severity per bucket.
+- [x] 1.8 Add a night cost summed from recorded model calls rather than from views that exclude generated rows.
+- [x] 1.9 Test: ordering survives identifier inversions, verified against a generated night.
+- [x] 1.10 Test: paging returns every event once, including events sharing a timestamp.
+- [x] 1.11 Test: the axis extent covers bars that end after the last recorded instant.
+- [x] 1.12 Test: the lane roster is unchanged by which window is loaded.
+- [x] 1.13 Test: a bucket containing one error reports as an error.
 
 ## 2. API surface
 
