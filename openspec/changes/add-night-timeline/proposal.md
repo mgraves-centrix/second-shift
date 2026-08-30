@@ -104,8 +104,29 @@ enumerate arbitrary run ids.
 **Risk:** `apps/web` is shared with the capture PWA, which is taking real ideas
 right now. Breaking it costs captures.
 
-## Open Questions
+## Resolved Decisions
 
-[NEEDS CLARIFICATION: How does an event reach the model call behind it? `events` carries no `model_call_id`, so the headline feature — hover showing model, tokens and cost — has no supported path. Parsing `payload_json` is forbidden by the telemetry spec and does not carry the fields anyway. Joining on `(agent_invocation_id, ts_ms)` works only by accident: the generator writes both rows at the same instant, and the real night already has 16 timestamps carrying more than one event, so the join is not unique. The options are a migration adding `events.model_call_id` — cheap now, and the first migration against a database holding real captured ideas — or a server-side detail route that does the join and accepts being approximate.]
+Settled 2026-08-30.
 
-[NEEDS CLARIFICATION: Where does the night's axis start, and are pre-run capture events shown? Capture events carry `run_id IS NULL`, so `timeline(run_id)` excludes them entirely — the evening's captures are invisible in the run view. Starting the axis at the run's own start is simpler and matches "one night's work". Starting it at the first capture of the evening shows the ideas that caused the night, which is arguably the story, but it means the timeline spans a period during which nothing was running and it needs a second query.]
+**Migration 0003 adds `events.model_call_id`.** An explicit foreign key, so
+hover is exact rather than probable: this event, this model, these tokens, this
+cost.
+
+The alternative — joining on invocation and timestamp — is wrong today and gets
+no better. The real night already carries 16 timestamps with more than one
+event, so some hover cards would show a different call than the one clicked and
+nothing would say so. A timeline that is *usually* right about cost is worse
+than one that does not claim to know, because nobody can tell which cards to
+distrust.
+
+It is the first migration against a database holding real captured ideas. There
+are four. It is as cheap now as it will ever be.
+
+**The axis covers the run; the evening's captures appear as markers in a gutter
+before it.** The timeline stays dense — no hours of nothing — while the ideas
+that caused the night remain visible, which is the product thesis rendered
+rather than described.
+
+Capture events carry no run id, so they come from a second query keyed on the
+run's entry. The gutter is not part of the scrubable axis: dragging into it does
+nothing, because there is no night there to scrub.

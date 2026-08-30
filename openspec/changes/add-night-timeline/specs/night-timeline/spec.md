@@ -4,8 +4,8 @@ One night, readable as game film: a scrubable timeline of what ran, when, in
 which lane, and what it cost — read-only, and honest about a night that is not
 finished.
 
-Requirements dependent on the two open questions — how an event reaches its model
-call, and where the axis starts — are deliberately absent.
+Both open questions are settled: an event links to its model call explicitly,
+and the axis covers the run with the evening's captures shown beside it.
 
 ## ADDED Requirements
 
@@ -187,3 +187,39 @@ with the night's location where one is recorded.
 #### Scenario: The instant is absolute
 - **WHEN** the playhead is read by another component
 - **THEN** it reports an absolute time and the capture offset, not a fraction of the axis
+
+### Requirement: An event carries a link to the work behind it
+
+An event produced by a model call SHALL record which call it was, so the call's
+model, tokens, latency and cost are reachable exactly rather than inferred.
+
+Correlation by invocation and timestamp MUST NOT be used: more than one call can
+share an instant, so it identifies the wrong call without any indication.
+
+#### Scenario: Hover reports the call that produced the event
+- **WHEN** an event produced by a model call is inspected
+- **THEN** the model, token counts, latency and cost reported are those of that call
+
+#### Scenario: Two calls in one millisecond
+- **WHEN** one invocation produces two model calls at the same instant
+- **THEN** each event resolves to its own call rather than to whichever is found first
+
+#### Scenario: An event with no call behind it
+- **WHEN** an event that was not produced by a model call is inspected
+- **THEN** it reports no call, rather than the nearest one
+
+### Requirement: The captures that caused the night are visible
+
+The view SHALL show the entries captured before the run, distinct from the run's
+own span.
+
+The scrubable axis MUST remain the run itself, so the timeline is not mostly
+empty time.
+
+#### Scenario: The evening's captures
+- **WHEN** a night is displayed for a run whose entry was captured earlier that evening
+- **THEN** that capture is shown before the run's span, identifiable as a capture rather than as run work
+
+#### Scenario: Scrubbing does not enter the gutter
+- **WHEN** the playhead is dragged toward the earliest point
+- **THEN** it stops at the run's start, because there is no night before it to scrub
