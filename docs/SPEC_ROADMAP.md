@@ -3,13 +3,17 @@
 What gets specified next, in the order the work unblocks. One OpenSpec change
 per capability unless noted.
 
-Shipped: `persistence`, `telemetry`, `compute-profiles`, `privacy-airlock`
-(`2026-08-27-add-foundations`, and `2026-08-27-fix-probe-model-identity`).
-`capture` implemented and deployed; archiving pending the on-phone gates.
+Shipped, in the order they landed: `persistence`, `telemetry`,
+`compute-profiles`, `privacy-airlock` (`2026-08-27-add-foundations`, and
+`2026-08-27-fix-probe-model-identity`), then `capture`, `brain`, `evals` and
+`synthetic-seed`. Eight canonical capabilities across six archived changes, all
+under `openspec/changes/archive/`.
 
 Each entry lists what is **already decided** — so the proposal has material to
 draw on rather than re-deriving it — and what is **still open**, which becomes
-`[NEEDS CLARIFICATION]` markers rather than assumptions.
+`[NEEDS CLARIFICATION]` markers rather than assumptions. Headings are marked
+shipped as they land; an entry still carrying an **Open** line is one nobody has
+answered yet.
 
 ---
 
@@ -63,7 +67,7 @@ whole point, and it is the one thing that can silently go wrong.
 
 ## Week one
 
-### 1. `capture` — day 2, critical path
+### 1. `capture` — shipped 28 Aug
 
 Entries from the PWA to a logged row. Everything downstream waits on it, and
 day-3 dogfooding starts the memory clock that cannot be restarted.
@@ -76,9 +80,11 @@ their specific reason (never hidden); offline-tolerant queue.
 replay deduplicated on the client-generated ULID; titles derived rather than
 entered.
 
-**Open:** what the capture surface shows while an entry is queued offline and
-not yet acknowledged by the server — silence risks a re-tap and a duplicate the
-idempotency key then swallows invisibly.
+**Resolved and shipped.** The surface shows a persistent *count* of entries
+captured and not yet acknowledged, and nothing per-item. A count is enough to
+stop a re-tap; a list is not, because a per-item surface is what a retry, edit
+or delete control attaches to, and `NOT_BUILDING.md` excludes task management.
+The count clears on drain without user action.
 
 ### 2. `brain` — shipped 28 Aug
 
@@ -108,7 +114,7 @@ topic files there, or clone and push back.
 their subject rather than for the code. The seeded profile is explicitly a
 sketch asking to be corrected.
 
-### 3. `evals` — day 3, subject to the blocking issue above
+### 3. `evals` — shipped 28 Aug
 
 The measurement spine. Run 1 must exist early or the week-8 comparison has no
 left-hand side.
@@ -116,8 +122,22 @@ left-hand side.
 **Decided:** schema exists; judge model and rubric SHA are pinned per run;
 repeated sampling gives variance rather than a point estimate.
 
-**Open:** the five held-out prompts; the rubric itself; and the sequencing
-question above.
+**Shipped: the machinery, deliberately without the content.** The runner, the
+scoring path, repeated sampling, and the `eval_runs` / `eval_results` writes,
+with the prompts left as data so choosing them is data entry rather than a code
+change. Rubric v1 is committed at `config/evals/rubric.md` and hashed by content
+rather than by the commit that touched it. The sequencing question above is
+resolved.
+
+**Which five are held out is database state, not repository state.** The ten
+candidates live in `config/evals/candidates.md`; the selection is
+`eval_prompts.active`, set by `python -m secondshift.evals activate <slug>` and
+read back by `python -m secondshift.evals status`. It lives beside the database
+on the always-on machine, so **a clone cannot show it** — do not read an
+unmarked `candidates.md` as an unmade decision.
+
+**Still open:** scoring, which needs a judge and a generating provider — that is
+`local-inference` and `nebius-executor`, not this capability.
 
 ### 4. `local-inference` — day 4
 
@@ -128,8 +148,21 @@ existing interface.
 speculative decoding; the base class already owns telemetry, so this
 implements `_do_complete` only.
 
-**Open:** quantization and speculative-decoding configuration under sustained
-load; whether reasoner, ASR and embedder stay co-resident on 128GB.
+**Resolved by Spike B, 27 Aug** — the configuration question, not the
+capability. NVFP4 at `--gpu-memory-utilization 0.30` with a 65k context limit
+holds 43 GiB and leaves 77 free, and is *faster* at 3 concurrent than the
+recommended 0.85, which consumed 112 of 121 GiB and left no room for ASR or the
+embedder. Co-residency is therefore answered for the reasoner; MagpieTTS adds
+1.85 GiB on top (Spike C), and ASR is unmeasured. Full detail in
+`scripts/spikes/spike-b-local-inference/FINDINGS.md`.
+
+**Still open — and this is now the whole capability.** A verified vLLM server is
+not an implemented `Reasoner`: the registry still binds `EchoReasoner` on every
+profile, so nothing in the system can actually reason. Two things carry over
+from the spike into the implementation — the served model emits visible
+chain-of-thought, which agent prompts and the brief renderer must account for,
+and the server was left running with `--restart no` and has no systemd unit, so
+it does not survive a reboot.
 
 ### 5. `nebius-executor` — day 5
 
@@ -144,13 +177,14 @@ because a deferred obligation with no home is a dropped one.**
   needs an explicit decision before it is built.
 - Ingest must serialize through the orchestrator's writer, never a second
   connection.
-- **Per-token rates for Lightning and Ultra in `config/pricing.toml`.** Super is
-  recorded (input $0.30, output $0.90 per 1M) from a third-party aggregator and
-  still wants confirming against the Token Factory console. Lightning and Ultra
-  publish only *blended* figures — roughly $0.08 and $1.20 per 1M over a 7:2:1
-  cache/input/output ratio — which cannot be split back into input and output
-  rates without the cache-hit price. Both are deliberately absent and fail
-  loudly; read the split from the console and append entries.
+- ~~Per-token rates for Lightning and Ultra in `config/pricing.toml`.~~
+  **Resolved 27 Aug, hours after this entry was written.** Lightning, Super and
+  Ultra were all read from the Token Factory console for `eu-north1`, standard
+  and Batch, and are in `config/pricing.toml`. That supersedes both problems
+  this bullet described: the blended figures never had to be split, and Super no
+  longer rests on a third-party aggregator. The Batch rows are exactly half of
+  standard, matching the tariff structure recorded below. A rate that is missing
+  still fails loudly — none is missing today.
 - Resolution of the judge deployment target.
 
 **Decided:** ADR 0004 — build stage fans out to parallel variants, one job each;
@@ -193,14 +227,24 @@ This needs confirming for Nemotron specifically before it is built on, and it
 changes what `Executor` and the cloud `Reasoner` look like — a batch submission
 is submit-then-poll, not request-response.
 
-### 6. `synthetic-seed` — day 6
+### 6. `synthetic-seed` — shipped 28 Aug
 
 The night generator. Unblocks all frontend work and seeds the judge instance.
 
 **Decided:** every row carries `is_synthetic = 1`; rollup views already exclude
 it; a full night is roughly six hours and 400+ events across lanes.
 
-**Open:** how realistic the generated content must be to be worth screenshotting.
+**Shipped and measured.** `python -m secondshift_seed --seed 42` writes one
+run of 1,223 events over 7.3 hours across 7 lanes, 182 invocations at depth 3,
+362 model calls with costs and latencies, and 6 failures. 1,019 events carry
+`duration_ms` and render as bars; the rest are ticks. Every row is
+`is_synthetic = 1` and the rollup views exclude them. Deterministic by seed, so
+a screenshot is reproducible.
+
+**Still open:** how realistic the generated *content* must be to be worth
+screenshotting. The shape is dense enough to build against; whether the prose
+inside an artifact survives a judge reading it closely is unanswered, and is a
+question for `night-timeline` to raise once something renders it.
 
 ### 7. `night-timeline` — day 7
 

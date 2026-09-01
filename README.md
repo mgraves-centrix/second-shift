@@ -17,16 +17,29 @@ Built for the Nebius x NVIDIA Global AI Hackathon, Personal AI track.
 
 ## Status
 
-Day one. Nothing works yet. This README describes the target, not the present.
+Week one, as of 1 Sep 2026. Capture works end to end and is taking real ideas
+daily; everything downstream of it is still ahead. The rest of this README
+describes the target — this table describes the present.
 
 | Milestone | State |
 |---|---|
 | Repo scaffold | done |
-| Capture path (PWA → ASR → logged entry) | not started |
+| Persistence, telemetry, compute profiles, Privacy Airlock | done |
+| Capture path (PWA → logged entry, text) | done — in daily use |
+| Capture path (voice → ASR) | not started; text-first, so it gates nothing |
+| The brain — plaintext memory under git | done — receiving every entry |
+| Eval harness — pinned rubric, pinned brain state, repeated sampling | done; scoring waits on a judge |
+| Synthetic night generator | done — 1,200+ events, every row `is_synthetic = 1` |
+| Local reasoning on the Spark | vLLM serving verified; not yet behind the `Reasoner` interface |
+| Nebius Token Factory + Serverless Jobs | not started |
 | Night orchestrator | not started |
 | Morning interview | not started |
 | Night scrubber UI | not started |
 | Judge demo instance | not started |
+
+Eight capabilities have shipped across six OpenSpec changes. Their specifications
+are in `openspec/specs/`; the changes that built them, with their task lists, are
+in `openspec/changes/archive/`.
 
 ---
 
@@ -111,7 +124,38 @@ being me" becomes a measurable trend instead of an assertion.
 
 ## Getting started
 
-Not yet. Setup instructions land once the capture path works.
+Python 3.12 and Node 20+. Every command runs from the repository root.
+
+```bash
+python3.12 -m venv apps/api/.venv
+apps/api/.venv/bin/pip install -c apps/api/constraints.txt -e "apps/api[dev]"
+apps/api/.venv/bin/pip install -e packages/seed
+npm --prefix apps/web install
+```
+
+The suites and the two source checks:
+
+```bash
+apps/api/.venv/bin/python -m pytest apps/api/tests -q
+npm --prefix apps/web run test && npm --prefix apps/web run typecheck
+scripts/check-no-environment.sh && scripts/check-american-english.sh
+```
+
+To see a night without a GPU, credentials or a network, generate a synthetic one
+and point the API at it:
+
+```bash
+apps/api/.venv/bin/python -m secondshift_seed --seed 42 --db /tmp/night.db
+SECOND_SHIFT_DB=/tmp/night.db SECOND_SHIFT_PROFILE=cloud \
+  apps/api/.venv/bin/uvicorn secondshift.api.main:app --port 8080
+npm --prefix apps/web run dev
+```
+
+Every row it writes carries `is_synthetic = 1`, and the rollup views exclude
+them, so a generated night can never be mistaken for a real one.
+
+Never run `uv run` on the DGX Spark: it re-resolves the environment for the
+wrong architecture and destroys it. Use the virtual environment above.
 
 ---
 
