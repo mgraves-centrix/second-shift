@@ -40,6 +40,10 @@ ENV_PRICING = "SECOND_SHIFT_PRICING"
 ENV_SYNTHETIC = "SECOND_SHIFT_SYNTHETIC"
 ENV_RUBRIC_OVERWRITE = "SECOND_SHIFT_RUBRIC_OVERWRITE"
 ENV_ARTIFACTS = "SECOND_SHIFT_ARTIFACTS"
+#: Not a `SECOND_SHIFT_*` name — Tavily's own convention, and the CLI reads it
+#: too. Registered here anyway: a resolved view that omits a credential the
+#: system depends on is a view with a hole where the important part goes.
+ENV_TAVILY_KEY = "TAVILY_API_KEY"
 
 _MODELS_CONFIG = Path(__file__).resolve().parents[3] / "config" / "models.toml"
 
@@ -575,6 +579,11 @@ SETTINGS: tuple[Setting, ...] = (
         "where produced artifacts land on disk",
         required=True,
     ),
+    Setting(
+        ENV_TAVILY_KEY,
+        "providers.tavily.TavilyProvider",
+        "search credential; absent means the research stage is skipped",
+    ),
     Setting(ENV_SYNTHETIC, "api.main", "mark written rows as synthetic"),
     Setting(
         ENV_RUBRIC_OVERWRITE,
@@ -652,6 +661,13 @@ def resolve_all(env: dict[str, str] | None = None) -> list[Resolved]:
         ),
         _path_setting(ENV_PRICING, environment, default_pricing_path()),
         _path_setting(ENV_ARTIFACTS, environment, default_artifact_root()),
+        Resolved(
+            setting=by_name(ENV_TAVILY_KEY),
+            value=environment.get(ENV_TAVILY_KEY, ""),
+            origin=Origin.ENVIRONMENT
+            if environment.get(ENV_TAVILY_KEY)
+            else Origin.DEFAULT,
+        ),
         _synthetic_row(environment),
         Resolved(
             setting=by_name(ENV_RUBRIC_OVERWRITE),

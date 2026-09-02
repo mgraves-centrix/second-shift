@@ -33,9 +33,14 @@ BUILD = "build"
 CRITIQUE = "critique"
 DISTILL = "distill"
 
-#: Recorded when a stage is skipped rather than attempted. `research` is skipped
-#: every night today: the provider is `research`'s capability, not this one's,
-#: and a stage that was never attempted is not a stage that failed.
+#: Recorded when a stage is skipped rather than attempted. A stage that was
+#: never attempted is not a stage that failed, and the morning should be able to
+#: tell them apart.
+#:
+#: `research` carried this as a permanent `unavailable` until the capability
+#: shipped on 2 Sep. It is now decided per run by whether a credential is
+#: configured, so the skip is a fact about this deployment rather than about
+#: the codebase — `night.research` records which of its three reasons applied.
 NO_RESEARCH_PROVIDER = "no research provider is configured"
 
 
@@ -72,12 +77,13 @@ class Stage:
 #: reads it rather than trusting this tuple.
 STAGES: tuple[Stage, ...] = (
     Stage(BRIEF, 1, "researcher", lambda done: True, artifact_kind="brief"),
+    # No longer permanently unavailable: `night.research` decides per run, and
+    # a `local-only` run refuses before a query is ever constructed.
     Stage(
         RESEARCH,
         2,
         "researcher",
         lambda done: BRIEF in done,
-        unavailable=NO_RESEARCH_PROVIDER,
         artifact_kind="research_digest",
     ),
     Stage(MOCKUPS, 3, "architect", lambda done: BRIEF in done, artifact_kind="mockup"),

@@ -23,6 +23,7 @@ from ..airlock.policy import resolve_policy
 from ..artifacts.store import VARIANT_KINDS, ArtifactWriteFailed, write_artifact
 from ..artifacts.variants import RankingRefused, parse_ordering, rank_group, write_variants
 from ..brain.repo import BrainRepo, BrainUnavailable
+from .research import run_research
 from ..db.connection import now_ms
 from ..db.repository import Repository
 from ..providers.registry import Providers
@@ -169,6 +170,24 @@ def _run_stage(
         status=RUNNING,
         started_at_ms=now_ms(),
     )
+    # Research is a tool call, not a model call, so it runs before the agent
+    # rather than through it: the searching is the stage's work, and the
+    # researcher's turn is what reads the results.
+    if stage.name == "research":
+        return _run_research_stage(
+            repo,
+            recorder,
+            stage_id,
+            stage,
+            entry_text=entry_text,
+            policy=policy,
+            run_id=run_id,
+            entry_id=entry_id,
+            night_of=night_of,
+            invocation_id=None,
+            artifact_root=artifact_root,
+        )
+
     context = _context_for(stage, results)
     if stage.name == "brief":
         # An absent index is stated, never silently absorbed. A brief written
@@ -230,6 +249,63 @@ def _run_stage(
         text=turn.text,
         artifacts=tuple(landed),
         variant_group=group,
+    )
+
+
+def _run_research_stage(
+    repo: Repository,
+    recorder: Recorder,
+    stage_id: str,
+    stage: Stage,
+    *,
+    entry_text: str,
+    policy: str,
+    run_id: str,
+    entry_id: str,
+    night_of: str,
+    invocation_id: str | None,
+    artifact_root: Path | None,
+) -> StageResult:
+    """The one stage that talks outward. Skips are reasons, not failures.
+
+    A skip here is `skipped`, never `failed`: no credential and a `local-only`
+    policy are both facts about the deployment rather than something that broke,
+    and a morning that reported them as failures would be reporting a defect
+    that does not exist. A quota refusal *is* a failure, and a typed one.
+    """
+    try:
+        outcome = run_research(recorder, policy=policy, entry_text=entry_text)
+    except Exception as exc:  # noqa: BLE001 - classified and recorded, not swallowed
+        recorder.record_failure(exc, scope="night.research")
+        repo.complete_run_stage(stage_id, status=FAILED)
+        return StageResult(stage.name, FAILED, reason=str(exc) or type(exc).__name__)
+
+    if not outcome.searched:
+        repo.complete_run_stage(stage_id, status=SKIPPED)
+        return StageResult(stage.name, SKIPPED, reason=outcome.reason)
+
+    # The digest lands like any other stage's output. `produced_by_invocation_id`
+    # is null here and correctly so: a search is a tool call, not an agent
+    # invocation, and claiming one would point at a row that does not exist.
+    try:
+        landed, _ = _write_output(
+            repo,
+            stage,
+            outcome.digest,
+            run_id=run_id,
+            entry_id=entry_id,
+            night_of=night_of,
+            invocation_id=invocation_id,
+            root=artifact_root,
+        )
+    except ArtifactWriteFailed as exc:
+        recorder.record_failure(exc, scope="night.research.artifact")
+        repo.complete_run_stage(stage_id, status=FAILED)
+        return StageResult(stage.name, FAILED, reason=str(exc))
+
+    repo.complete_run_stage(stage_id, status=COMPLETE)
+    return StageResult(
+        stage.name, COMPLETE, text=outcome.digest, artifacts=tuple(landed)
     )
 
 

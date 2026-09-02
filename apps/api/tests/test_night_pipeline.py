@@ -25,9 +25,9 @@ from secondshift.agents.roster import discover, register
 from secondshift.db.connection import connect, now_ms
 from secondshift.db.repository import Repository
 from secondshift.night.run import NightResult, run_entry
+from secondshift.night.research import NO_CREDENTIAL
 from secondshift.night.stages import (
     BY_NAME,
-    NO_RESEARCH_PROVIDER,
     STAGES,
     assert_matches_schema,
 )
@@ -243,7 +243,11 @@ class TestBlocking:
 
         by_stage = {s.stage: s for s in result.stages}
         assert by_stage["research"].status == "skipped"
-        assert by_stage["research"].reason == NO_RESEARCH_PROVIDER
+        # The reason now comes from the real path rather than a constant: with
+        # no credential configured, `night.research` says so. It stopped being
+        # `NO_RESEARCH_PROVIDER` when `research` shipped on 2 Sep — the skip is
+        # a fact about this deployment, not about the codebase.
+        assert by_stage["research"].reason == NO_CREDENTIAL
         assert by_stage["mockups"].status == "complete"
         assert by_stage["build"].status == "complete"
 

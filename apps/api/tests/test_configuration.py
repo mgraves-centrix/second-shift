@@ -44,6 +44,17 @@ SCANNED = (PACKAGE, REPO_ROOT / "deploy", REPO_ROOT / "scripts")
 _VARIABLE = re.compile(r"SECOND_SHIFT_[A-Z_]+")
 
 
+def _is_read_in_tree(name: str) -> bool:
+    """Does any source file in the scanned roots mention this variable?"""
+    for root in SCANNED:
+        for path in root.rglob("*"):
+            if path.suffix not in {".py", ".sh"} or "__pycache__" in path.parts:
+                continue
+            if name in path.read_text():
+                return True
+    return False
+
+
 def _variables_in_tree() -> set[str]:
     found: set[str] = set()
     for root in SCANNED:
@@ -70,10 +81,28 @@ class TestTheRegistryCannotFallBehind:
         )
 
     def test_the_registry_names_nothing_the_tree_does_not_read(self):
-        """The other direction. A setting nobody reads is a setting that lies."""
-        registered = {s.name for s in SETTINGS}
+        """The other direction. A setting nobody reads is a setting that lies.
 
-        assert not registered - _variables_in_tree()
+        Checked name by name rather than against the `SECOND_SHIFT_*` scan,
+        because the registry is not limited to that prefix: `TAVILY_API_KEY` is
+        Tavily's own convention and the CLI reads it too. Scanning by prefix
+        made these two tests disagree the moment a credential was registered,
+        which is the enumeration working — the invariant is "every registered
+        setting is read somewhere", not "every setting starts with the same
+        eight characters".
+        """
+        unread = [s.name for s in SETTINGS if not _is_read_in_tree(s.name)]
+
+        assert not unread, f"registered but read nowhere: {unread}"
+
+    def test_a_credential_outside_the_prefix_is_still_registered(self):
+        """The gap the prefix scan cannot see, pinned so it stays closed.
+
+        `test_every_variable_read_anywhere_is_registered` scans for
+        `SECOND_SHIFT_*`. A credential read under a vendor's own name would slip
+        past it, so the one that exists is asserted by name.
+        """
+        assert any(s.name == "TAVILY_API_KEY" for s in SETTINGS)
 
     def test_the_scan_actually_finds_something(self):
         """A vacuous scan would pass forever, which is how this decayed before."""
