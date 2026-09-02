@@ -38,6 +38,11 @@ transcripts/
 # they test was not.
 /brain/
 
+# Claude Code local settings — permission rules and overrides for one machine,
+# not for everyone who clones a public repository. The shared conventions belong
+# in .claude/settings.json; anything session- or host-specific belongs here.
+.claude/settings.local.json
+
 # OS
 .DS_Store
 
