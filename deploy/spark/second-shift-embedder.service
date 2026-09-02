@@ -13,11 +13,21 @@
 # remote call — it is the only way embedding happens.
 #
 # --gpu-memory-utilization is a fraction of the WHOLE machine on unified memory,
-# the same trap documented on the reasoner unit. The reasoner is pinned at 0.30
-# and holds 43 of 121 GiB; 0.10 here leaves both resident with room to spare.
-# Spike B measured the reasoner ALONE, so the co-residency figure this unit
-# produces is the number that closes that spike's open question — measure it
-# with both up rather than trusting this comment.
+# the same trap documented on the reasoner unit. Measured with both servers up
+# on 2026-09-02, which closes the co-residency question Spike B left open by
+# measuring the reasoner alone: reasoner 4.98 GiB RSS, embedder 3.56 GiB, and
+# 69 of 121 GiB still available.
+#
+# --runner pooling, not `--task embed`. The published examples for this model
+# use `--task`, which vLLM 0.27.1 does not accept at all — the container exits
+# with "unrecognized arguments" before it loads anything. This unit shipped
+# that flag once and the Spark caught it.
+#
+# --trust-remote-code executes code from the model repository. It is required:
+# without it vLLM refuses this checkpoint outright. It is also a real
+# supply-chain surface, accepted here because the repository is NVIDIA's own
+# and the binding is already an accepted decision (ADR 0006), but it deserves
+# to be a conscious choice rather than a flag nobody read.
 
 [Unit]
 Description=Second Shift local embedder (vLLM)
@@ -40,7 +50,7 @@ ExecStart=/usr/bin/docker run --rm --name second-shift-embedder \
     vllm/vllm-openai:v0.27.1 \
     nvidia/llama-nemotron-embed-vl-1b-v2 \
     --served-model-name nvidia/llama-nemotron-embed-vl-1b-v2 \
-    --task embed \
+    --runner pooling --trust-remote-code \
     --host 0.0.0.0 --port 8000 \
     --gpu-memory-utilization 0.10 \
     --max-model-len 8192

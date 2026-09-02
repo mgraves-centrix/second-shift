@@ -78,6 +78,51 @@ class TestTheReasonerUnit:
         assert '"method":"mtp"' in exec_start
 
 
+class TestTheEmbedderUnit:
+    """The flags here were wrong when this unit was first written.
+
+    It shipped `--task embed`, which vLLM 0.27.1 rejects outright — the
+    container exits before loading anything. Only running it on the machine
+    found that, which is the argument for these checks: a unit file is prose
+    until something executes it, and the suite is the cheapest place to notice
+    a flag that no longer exists.
+    """
+
+    @pytest.fixture
+    def unit(self) -> Path:
+        return UNITS / "second-shift-embedder.service"
+
+    def test_it_parses(self, unit):
+        assert _service(unit)["ExecStart"]
+
+    def test_it_publishes_the_configured_port(self, unit):
+        settings = config.local_embedder_settings()
+        assert f":{settings.port}:8000" in _service(unit)["ExecStart"]
+
+    def test_it_serves_the_configured_name(self, unit):
+        settings = config.local_embedder_settings()
+        assert f"--served-model-name {settings.model}" in _service(unit)["ExecStart"]
+
+    def test_it_does_not_use_the_flag_vllm_removed(self, unit):
+        """`--task` is not a vLLM 0.27.1 argument. `--runner` replaced it."""
+        exec_start = _service(unit)["ExecStart"]
+        assert "--task" not in exec_start
+        assert "--runner pooling" in exec_start
+
+    def test_it_carries_the_flag_the_checkpoint_requires(self, unit):
+        """This model will not load without it, and that is worth stating.
+
+        `--trust-remote-code` runs code from the model repository. It is here
+        deliberately, not by accident, and a test naming it means removing it
+        is also deliberate.
+        """
+        assert "--trust-remote-code" in _service(unit)["ExecStart"]
+
+    def test_it_does_not_claim_the_reasoner_s_port(self, unit):
+        reasoner_port = config.local_reasoner_settings().port
+        assert f":{reasoner_port}:" not in _service(unit)["ExecStart"]
+
+
 def test_the_units_are_installable():
     """Each names where it is wanted, or `systemctl enable` has nothing to do."""
     for unit in REASONER_UNITS:

@@ -85,15 +85,24 @@
 
 ## 5. Spark verification
 
-- [ ] 5.1 Deploy the embedder unit to the Spark alongside the running
+Run 2026-09-02 against the live machine. Results: rebuild 40ms steady-state over
+the real 6-document corpus (65ms cold); index 48.0 KiB measured, matching the
+proposal's predicted 48 KB exactly; 4.70 MiB projected at week-8 scale.
+Co-residency: reasoner 4.98 GiB RSS, embedder 3.56 GiB, 69 of 121 GiB still
+available with both up — which closes the question Spike B left open by
+measuring the reasoner alone. The unit shipped `--task embed`, which vLLM
+0.27.1 rejects; corrected to `--runner pooling --trust-remote-code` and guarded
+by a test that goes red on the old flag.
+
+- [x] 5.1 Deploy the embedder unit to the Spark alongside the running
   reasoner. Embed the real corpus (today: 4 entries, `profile.md`,
   `style-guide.md`) with the real model and report wall-clock rebuild time.
-- [ ] 5.2 Report resident memory with **both** servers running — this closes
+- [x] 5.2 Report resident memory with **both** servers running — this closes
   Spike B's open co-residency question, which measured the reasoner alone.
-- [ ] 5.3 Run the full suite on the Spark
+- [x] 5.3 Run the full suite on the Spark
   (`COPYFILE_DISABLE=1` transfer, `python -m venv`, pinned constraints,
   **never `uv run`**) and confirm it passes on 3.12/aarch64, not only on the
   local dev interpreter.
-- [ ] 5.4 Clean up whatever was created on the Spark for this verification
+- [x] 5.4 Clean up whatever was created on the Spark for this verification
   and confirm capture still works (`/health`, `/capabilities`, brain
   `--status`) before ending the session.
