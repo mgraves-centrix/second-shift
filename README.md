@@ -28,7 +28,7 @@ describes the target — this table describes the present.
 | Capture path (PWA → logged entry, text) | done — in daily use |
 | Capture path (voice → ASR) | not started; text-first, so it gates nothing |
 | The brain — plaintext memory under git | done — receiving every entry |
-| Eval harness — pinned rubric, pinned brain state, repeated sampling | done; scoring waits on a judge |
+| Eval harness — pinned rubric, pinned brain state, repeated sampling | done — week-1 baseline recorded; scoring waits on a judge |
 | Synthetic night generator | done — 1,200+ events, every row `is_synthetic = 1` |
 | Local reasoning on the Spark | vLLM serving verified; not yet behind the `Reasoner` interface |
 | Nebius Token Factory + Serverless Jobs | not started |

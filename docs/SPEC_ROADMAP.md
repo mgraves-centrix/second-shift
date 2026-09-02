@@ -136,8 +136,44 @@ read back by `python -m secondshift.evals status`. It lives beside the database
 on the always-on machine, so **a clone cannot show it** — do not read an
 unmarked `candidates.md` as an unmade decision.
 
+**The week-1 baseline exists.** Confirmed on the always-on machine, 2 Sep: five
+prompts active, one `eval_runs` row awaiting scoring. The day-3 gate is met and
+the clock that could not be restarted was started on time.
+
 **Still open:** scoring, which needs a judge and a generating provider — that is
 `local-inference` and `nebius-executor`, not this capability.
+
+**Blocking scoring — the rubric on the machine is not the rubric in this
+repository.** `status` there reports `4a7c2e91b3d0`. `config/evals/rubric.md` has
+exactly one version in the whole history, at `a4fb4da`, and it hashes to
+`b4decd6fe774`. No committed version has ever hashed to what the machine reports,
+so this is not a checkout sitting behind — it is a copy of the file that git has
+never seen.
+
+Two values are involved and only one is known. `status` hashes the file **on disk
+at the moment it runs**; the pinned value is `eval_runs.rubric_sha` on the
+baseline row, and nothing has printed it yet.
+
+- If the baseline pinned `4a7c2e91b3d0`, week 1 is pinned to a rubric absent from
+  a public repository whose entire argument is that the measurement is
+  reproducible from it.
+- If it pinned `b4decd6fe774`, the baseline is sound and the file drifted
+  afterward — still fatal at scoring time, because `score` reads the file on disk
+  and would grade week 1 against a rubric the baseline never used.
+
+Either way it is resolved before a judge runs, not after. Reconcile with:
+
+```bash
+sqlite3 <db> 'SELECT id, week_of, rubric_sha, brain_sha FROM eval_runs;'
+sha256sum config/evals/rubric.md
+git status --short config/evals/rubric.md   # in the working copy that ran status
+```
+
+An uncommitted local edit is the most likely cause and the easiest to miss. Note
+that `deploy.sh` wipes and re-extracts the remote tree, so an edit made only on
+the machine is destroyed by the next deploy — which would change the rubric out
+from under a pinned baseline with nothing surfacing it. The rubric's own opening
+line is the rule here: never edit in place; supersede with `rubric-v2.md`.
 
 ### 4. `local-inference` — day 4
 
