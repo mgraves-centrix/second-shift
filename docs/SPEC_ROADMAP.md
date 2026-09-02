@@ -532,6 +532,35 @@ is mapped explicitly and checked against the `artifacts.kind` CHECK, because the
 two lists overlap in five of six places and differ in one (`research` produces a
 `research_digest`).
 
+**A drift audit on 2 Sep found four defects in what had just shipped, three of
+them mine.**
+
+1. **A docstring in `night/run.py` asserted that the builder and architect
+   prompts ask for a `## Variant N` heading. They do not** — both end "Answer in
+   plain prose" and neither mentions variants. So **a fan-out produces exactly
+   one variant today**: the splitter is correct and its input never exercises
+   it. That was a false statement in shipped code, and it hid a real limit.
+2. **Mockups landed as `index.html` while the architect produces prose.** A
+   prose plan in a `.html` file fails the requirement the layout exists to
+   satisfy — "a file you can open in the tool that edits that kind of file" —
+   and opens in a browser as one unstyled paragraph. Both variant kinds are
+   markdown now, in one line that changes when a prompt asks for HTML.
+3. **`artifacts_for_run` shipped with no test**, including its null-rank
+   ordering — where a null must sort as "the critic did not order this" rather
+   than as "last", or an unranked group reads as a ranked one whose best is
+   arbitrary.
+4. **Changing the mockup extension broke no test**, which is how the second one
+   was found: nothing asserted what the files were. It does now, and the
+   mutation was run.
+
+**What this means for the fan-out, stated rather than left to be discovered:**
+the variant machinery is real and unexercised. Making it fire needs a `v2`
+builder prompt that asks for the format — **the subject's call**, because a
+prompt change resets `prompt_sha` and with it that role's eight-week curve. The
+same is true of the critic: it is told to "rank every variant" and nothing tells
+it the numbering `parse_ordering` reads, which is why the ordering came back
+empty below.
+
 **The night that ran, and why its output is worthless.** Two entries, one night,
 no collision, every row carrying its invocation, every `variant_rank` NULL — and
 the ledger says why:

@@ -36,6 +36,20 @@ _FILENAMES: dict[str, str] = {
 #: Kinds produced as parallel variants rather than as one file.
 VARIANT_KINDS = frozenset({"mockup", "build"})
 
+#: The file each variant kind lands as. **Markdown, both of them**, because that
+#: is what the agents actually produce: the architect's prompt ends "Answer in
+#: plain prose" and the builder's does the same, and neither mentions HTML.
+#:
+#: This said `index.html` for mockups until the drift audit. A prose plan in a
+#: `.html` file fails the requirement it was written to satisfy — "a file you can
+#: open in the tool that edits that kind of file" — and would have opened in a
+#: browser as one unstyled paragraph. When a `v2` architect prompt asks for
+#: HTML, this is the one line that changes.
+_VARIANT_FILENAMES: dict[str, str] = {
+    "mockup": "mockup.md",
+    "build": "build.md",
+}
+
 
 class ArtifactWriteFailed(RuntimeError):
     """The file could not be written, so no row was recorded."""
@@ -85,8 +99,7 @@ def relative_path(
     if kind in VARIANT_KINDS:
         if variant_index is None:
             raise ValueError(f"{kind} is a variant kind and needs a variant_index")
-        suffix = "index.html" if kind == "mockup" else "build.md"
-        return f"{base}/{kind}/{variant_index}/{suffix}"
+        return f"{base}/{kind}/{variant_index}/{_VARIANT_FILENAMES[kind]}"
     if variant_index is not None:
         raise ValueError(f"{kind} is not a variant kind but was given an index")
     try:

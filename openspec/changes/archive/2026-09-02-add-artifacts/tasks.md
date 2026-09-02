@@ -129,3 +129,25 @@ column with the generation order. **The brief's content is the entry text echoed
 back**, because the reasoner is a placeholder — a pipeline that produces
 unreadable artifacts is a finding, and this is one. Nothing here can be said
 about whether a real critic's ranking is trustworthy until the Spark returns.
+
+
+## Corrected 2 Sep by a drift audit, after archiving
+
+Four defects in what this change shipped. Left here rather than edited above,
+because what was believed at archive time is part of the record.
+
+- **`_variant_bodies`' docstring claimed the builder and architect prompts ask
+  for a `## Variant N` heading. Neither does** — both end "Answer in plain
+  prose". A fan-out therefore produces exactly one variant, and task 2.1's
+  "one `variant_group`, enumerated `variant_index`" is true of a group of one.
+  The machinery is correct; the input never exercises it.
+- **Task 4.2 said "`build` and `mockups` write variants" and they do — as
+  `.md`, not `.html`.** Mockups landed as `index.html` while the architect
+  produces prose. Corrected.
+- **`artifacts_for_run` was written for this change and never tested**, ordering
+  included.
+- **Nothing asserted the file extensions**, which is how the second was found:
+  changing `.html` to `.md` broke no test.
+
+Making the fan-out real needs a `v2` builder prompt, which is the subject's
+call — a prompt change resets `prompt_sha` and that role's eight-week curve.

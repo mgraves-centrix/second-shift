@@ -492,3 +492,142 @@ class TestOutcomes:
         rank_group(repo, produced.group, [1, 0])
 
         assert list(repo.connection.execute("SELECT * FROM outcomes")) == []
+
+
+class TestTheFilesAreWhatTheyClaimToBe:
+    """Found by drift audit: mockups landed as `index.html` while the architect
+    produces prose, and changing the extension broke no test — nothing asserted
+    it. A prose plan in a `.html` file fails the requirement the layout exists
+    to satisfy and opens in a browser as one unstyled paragraph."""
+
+    def test_a_mockup_lands_as_markdown_because_that_is_what_is_produced(self):
+        path = relative_path(
+            night_of="2026-09-02", run_id="R", kind="mockup", variant_index=0
+        )
+
+        assert path.endswith(".md"), (
+            "the architect's prompt ends 'Answer in plain prose' — a mockup is "
+            "markdown until a v2 prompt asks for HTML"
+        )
+
+    def test_a_build_lands_as_markdown_for_the_same_reason(self):
+        path = relative_path(
+            night_of="2026-09-02", run_id="R", kind="build", variant_index=0
+        )
+
+        assert path.endswith(".md")
+
+    def test_every_single_kind_lands_as_markdown(self):
+        for kind in ("brief", "research_digest", "critique", "summary"):
+            assert relative_path(night_of="N", run_id="R", kind=kind).endswith(".md")
+
+
+class TestReadingBackWhatARunProduced:
+    """`artifacts_for_run` shipped untested. Its ordering is the non-trivial
+    part: a null rank must sort as "the critic did not order this", never as
+    "last", or an unranked group reads as a ranked one whose best is arbitrary."""
+
+    def test_ranked_variants_come_back_in_rank_order(self, repo, run, tmp_path):
+        entry, run_id = run
+        produced = write_variants(
+            repo,
+            run_id=run_id,
+            entry_id=entry,
+            night_of="2026-09-02",
+            stage="build",
+            kind="build",
+            contents=["a", "b", "c"],
+            root=tmp_path,
+        )
+        rank_group(repo, produced.group, [2, 0, 1])
+
+        rows = [r for r in repo.artifacts_for_run(run_id) if r["variant_group"]]
+
+        assert [r["variant_index"] for r in rows] == [2, 0, 1]
+        assert [r["variant_rank"] for r in rows] == [1, 2, 3]
+
+    def test_an_unranked_group_comes_back_in_index_order(self, repo, run, tmp_path):
+        entry, run_id = run
+        write_variants(
+            repo,
+            run_id=run_id,
+            entry_id=entry,
+            night_of="2026-09-02",
+            stage="build",
+            kind="build",
+            contents=["a", "b", "c"],
+            root=tmp_path,
+        )
+
+        rows = [r for r in repo.artifacts_for_run(run_id) if r["variant_group"]]
+
+        assert [r["variant_index"] for r in rows] == [0, 1, 2]
+        assert all(r["variant_rank"] is None for r in rows)
+
+    def test_a_partly_ranked_run_does_not_interleave_groups(
+        self, repo, run, write, tmp_path
+    ):
+        """Single artifacts and variant groups must not shuffle together."""
+        entry, run_id = run
+        write()
+        write_variants(
+            repo,
+            run_id=run_id,
+            entry_id=entry,
+            night_of="2026-09-02",
+            stage="build",
+            kind="build",
+            contents=["a", "b"],
+            root=tmp_path,
+        )
+
+        rows = repo.artifacts_for_run(run_id)
+        groups = [r["variant_group"] for r in rows]
+        # Every grouped row is contiguous with its own group.
+        assert groups == sorted(groups, key=lambda g: (g is not None, g or ""))
+
+
+class TestSplittingACompletionIntoVariants:
+    """The splitter, and the fact it never fires today.
+
+    Found by drift audit: `_variant_bodies` splits on `## Variant N`, and **no
+    shipped prompt asks for that heading**. The architect and builder both end
+    "Answer in plain prose." So a fan-out produces exactly one variant, the
+    machinery is correct, and the input never exercises it. These tests pin both
+    halves so the day a `v2` prompt changes it, the change is visible.
+    """
+
+    def test_a_completion_with_headings_splits(self):
+        from secondshift.night.run import _variant_bodies
+
+        bodies = _variant_bodies(
+            "## Variant 1\n\nFirst approach.\n\n## Variant 2\n\nSecond approach.\n"
+        )
+
+        assert bodies == ["First approach.", "Second approach."]
+
+    def test_prose_with_no_heading_is_one_variant_not_zero(self):
+        """A model that ignored a format still produced something worth
+        keeping. Dropping it would lose real work to a formatting miss."""
+        from secondshift.night.run import _variant_bodies
+
+        assert _variant_bodies("A single plan, in prose.") == ["A single plan, in prose."]
+
+    def test_no_shipped_prompt_asks_for_the_heading_this_splits_on(self):
+        """The finding itself, pinned. This is expected to FAIL the day a
+        prompt starts asking for the format — which is the point: that day the
+        fan-out becomes real, and somebody should notice rather than discover
+        it from a variant count."""
+        from pathlib import Path as P
+
+        from secondshift.agents.roster import discover
+
+        asks = [
+            name
+            for name, prompt in discover().items()
+            if "variant 1" in prompt.path.read_text().lower()
+        ]
+        assert asks == [], (
+            f"{asks} now ask for the variant heading — the fan-out is real, so "
+            "update the docstrings that say it produces one variant"
+        )

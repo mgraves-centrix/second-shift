@@ -287,10 +287,22 @@ def _write_output(
 def _variant_bodies(text: str) -> list[str]:
     """Split one completion into the variants it proposed.
 
-    Split on a top-level `## Variant N` heading, which is what the builder and
-    architect prompts ask for. A completion with no such heading is one variant,
-    not zero: a model that ignored the format still produced something worth
-    keeping, and dropping it would lose real work to a formatting miss.
+    Splits on a top-level `## Variant N` heading. **No shipped prompt asks for
+    that heading**, which was found by re-reading them after this shipped: the
+    architect and builder both end with "Answer in plain prose," and neither
+    mentions variants at all. An earlier version of this docstring claimed they
+    did. They do not.
+
+    The consequence, stated plainly rather than left to be discovered: **a
+    fan-out produces exactly one variant today.** The machinery is correct and
+    the input never exercises it. Making it real means a `v2` builder prompt
+    that asks for the format — which is the subject's call, because a prompt
+    change resets `prompt_sha` and with it that role's eight-week curve.
+
+    A completion with no heading is one variant, not zero: a model that ignored
+    a format still produced something worth keeping, and dropping it would lose
+    real work to a formatting miss. That is why the current state degrades to
+    one rather than to nothing.
     """
     parts = _VARIANT_SPLIT.split(text)
     bodies = [p.strip() for p in parts if p.strip()]
