@@ -16,35 +16,47 @@ at once only if the set of files they write is disjoint. Everything below is
 grouped by that rule, not by how interesting it is.
 
 ```
-   CONFIGURATION ──┐
+   API_LAYER ──────┐   (run early: it de-collides five later sessions)
+   CONFIGURATION ──┤
                    ├──> NIGHT_PIPELINE ──> ARTIFACTS ──┐
    AGENTS ─────────┘         │                         ├──> JUDGE_MODE ──> SUBMISSION
-                             ├──> RESEARCH ────────────┤
-   RETRIEVAL ────────────────┘                         │
-                                                       │
+                             ├──> RESEARCH ────────────┤                      ^
+   RETRIEVAL ────────────────┘                         │                      │
+                                                       │       EVAL_SCORING ──┘
    FRONTEND ──> MORNING_INTERVIEW ─────────────────────┘
 
-   TEST_HARNESS      any time, owns files nothing else touches
-   NEBIUS_EXECUTOR   blocked on credentials, not on code
+   TEST_HARNESS    OPERATIONS    ASR    NEBIUS_EXECUTOR
+   any time        needs the     needs  blocked on
+                   machine       Spark  credentials
 ```
 
 | # | Prompt | Owns | Runs after | Parallel with |
 |---|---|---|---|---|
-| 1 | `CONFIGURATION.md` | `config.py`, `config/*.toml` | — | AGENTS, RETRIEVAL, FRONTEND, TEST_HARNESS |
-| 2 | `AGENTS.md` | `secondshift/agents/` | — | CONFIGURATION, RETRIEVAL, FRONTEND, TEST_HARNESS |
-| 3 | `RETRIEVAL.md` | `secondshift/retrieval/`, `providers/embed*` | — | 1, 2, 8, 9 |
-| 4 | `NIGHT_PIPELINE.md` | `secondshift/night/`, `repository.close_run` | 1, 2 | 9, 10 |
-| 5 | `RESEARCH.md` | `secondshift/research/`, `providers/tavily*` | 3, 4 | 6 |
+| 0 | `API_LAYER.md` | `api/routes/`, `api/app.py` | — | 1, 2, 3, 8, 10 |
+| 1 | `CONFIGURATION.md` | `config.py`, `config/*.toml` | — | 0, 2, 3, 8, 10 |
+| 2 | `AGENTS.md` | `secondshift/agents/` | — | 0, 1, 3, 8, 10 |
+| 3 | `RETRIEVAL.md` | `retrieval/`, `providers/embed*` | — | 0, 1, 2, 8, 9 |
+| 4 | `NIGHT_PIPELINE.md` | `night/`, `repository.close_run` | 1, 2 | 9, 10 |
+| 5 | `RESEARCH.md` | `research/`, `providers/tavily*` | 3, 4 | 6 |
 | 6 | `ARTIFACTS.md` | `secondshift/artifacts/` | 4 | 5 |
 | 7 | `NEBIUS_EXECUTOR.md` | `providers/nebius*`, ingest route | credentials | anything |
-| 8 | `FRONTEND.md` | `apps/web/components/`, `app/globals.css` | — | 1, 2, 3, 10 |
-| 9 | `MORNING_INTERVIEW.md` | `apps/web/app/morning/`, `secondshift/morning/` | 8 | 4, 10 |
+| 8 | `FRONTEND.md` | `components/`, `app/globals.css` | — | 0, 1, 2, 3, 10 |
+| 9 | `MORNING_INTERVIEW.md` | `app/morning/`, `secondshift/morning/` | 8 | 4, 10 |
 | 10 | `TEST_HARNESS.md` | `.github/`, `scripts/gates/` | — | everything |
-| 11 | `JUDGE_MODE.md` | `deploy/judge/` | 4, 6, 9 | — |
-| 12 | `SUBMISSION.md` | `docs/NEBIUS_USAGE.md`, the write-up | 11 | — |
+| 11 | `JUDGE_MODE.md` | `deploy/judge/` | 4, 6, 9 | 12 |
+| 12 | `EVAL_SCORING.md` | `eval_runs` rows, the curve | a judge | 11 |
+| 13 | `SUBMISSION.md` | `docs/NEBIUS_USAGE.md`, the write-up | 11, 12 | — |
+| — | `OPERATIONS.md` | `deploy/`, the machine | — | everything |
+| — | `ASR.md` | `providers/asr*`, spike E | — | everything |
 
-**Two sessions must never both be in `apps/web/app/` or in `secondshift/night/`.**
-That is the whole collision surface; everything else is naturally disjoint.
+**Three collision surfaces, not two.** Two sessions must never both be in
+`apps/web/app/`, in `secondshift/night/`, or in **`api/app.py`** — which is a
+single 368-line file that five of these sessions need to add routes to.
+
+That third one was missed when this index was first written, and it is the reason
+`API_LAYER.md` exists and should run early: it splits the file into
+`api/routes/` as `docs/ARCHITECTURE.md` already specifies, after which adding a
+route touches one new file and the five sessions stop queueing behind each other.
 
 ---
 
@@ -68,7 +80,7 @@ and the registry binds it, but no agent calls it, because there are no agents.
 
 ---
 
-## The four gaps nobody had a plan for
+## The gaps nobody had a plan for
 
 Found 2 Sep. Each is now a prompt above.
 
@@ -81,6 +93,15 @@ Found 2 Sep. Each is now a prompt above.
    outcome and no end time. `night-timeline` reads around it.
 4. **`docs/NEBIUS_USAGE.md` does not exist.** `ARCHITECTURE.md` calls it "evidence
    doc for the judging criterion." It was a day-7 deliverable and did not happen.
+5. **The API layer had no owner**, and `api/routes/` — specified in
+   `ARCHITECTURE.md`'s own directory tree — does not exist.
+6. **Nothing produced a week-8 eval score.** `SUBMISSION.md` declares a
+   dependency on it. The submission's centerpiece had no owner at all.
+7. **Nobody owned the machine.** Four prompts mention deploying; none owns the
+   reboot story, the backups, or a recovery procedure anyone has executed.
+8. **ASR was deferred to "its own session"** by `MORNING_INTERVIEW.md`, and that
+   session did not exist. It gates nothing — principle 4 — but the last unrun
+   spike had no home.
 
 ---
 

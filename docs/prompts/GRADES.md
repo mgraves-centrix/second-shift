@@ -4,7 +4,7 @@ Run `python3 scripts/grade-prompts.py` rather than trusting this file. A grade
 that was claimed instead of computed is not a grade.
 
 ```
-all 12 prompts at 12/12
+all 16 prompts at 12/12
 ```
 
 ## What the score does and does not prove
@@ -26,6 +26,26 @@ a wrong number in.
 Treat 12/12 as *this prompt has the parts a good prompt has*. Whether it is a
 good prompt is a question for the session that uses it, and the report format is
 what surfaces the answer.
+
+## The set was incomplete, which no grade would have caught
+
+The first twelve prompts all scored 12/12 and the set was still missing four
+layers. A rubric measures whether a prompt is well made; it says nothing about
+whether the right prompts exist.
+
+`API_LAYER.md`, `EVAL_SCORING.md`, `OPERATIONS.md` and `ASR.md` were added after
+review. Two of those gaps were structural rather than merely absent:
+
+- **The index named two collision surfaces and there were three.**
+  `api/app.py` is a single 368-line file that five sessions need to add routes
+  to, so those five would have serialized on it. Naming the surface wrongly is
+  worse than not naming it, because the sequencing table looked authoritative.
+- **`SUBMISSION.md` declared a dependency on a week-8 eval run that nothing
+  produced.** The submission's centerpiece — the comparison the whole thesis
+  rests on — had no owner, and the dependency was written down in a way that read
+  as satisfied.
+
+Both were found by being asked "is anything missing?", not by grading.
 
 ## First-pass failures, and what fixed them
 
