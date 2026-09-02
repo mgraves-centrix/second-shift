@@ -73,9 +73,11 @@ redaction. Each has its own capability.
 No violations. Principle 2 is the one to re-check at every implementation step:
 it is the easiest to erode by convenience once a remote provider exists at all.
 
-## Open questions
+## Questions that blocked this change
 
-These are decisions, not gaps in the writing. Each is asked where it blocks.
+These were decisions, not gaps in the writing, and each was asked where it
+blocked. All three resolved on 2 Sep through `/openspec:clarify`. The reasoning
+that made each a question is kept above its answer rather than replaced by it.
 
 **The judge deployment target.** ADR 0004 recorded it as an open risk — whether
 Nebius Serverless Endpoints can host a web application rather than only serving
@@ -86,7 +88,20 @@ exist when the risk was written: dedicated endpoints bill by GPU hour (H100
 $4.05, L40S $2.00), which is rentable for a demo window rather than requiring a
 serverless application target at all.
 
-[NEEDS CLARIFICATION: Does the judge instance run on a Nebius Serverless Endpoint, an hourly dedicated endpoint, or a container/VM target — and is a demo-window rental acceptable, given it bills per GPU hour rather than per token?]
+**Resolved: a CPU container or VM target, with models called per token.** The
+judge instance is a web application — the static export and the API process on
+the `cloud` profile — and Serverless Endpoints and dedicated endpoints both
+serve models rather than applications. Renting an H100 at $4.05/hr to host a
+process with no GPU work in it pays GPU rates for a web server.
+
+The two questions the marker ran together are therefore separated: the app runs
+on the cheapest CPU target, and the models it calls are Token Factory per-token.
+The demo-window rental is rejected as the default and kept only as a latency
+contingency for a known demo slot — judges arrive unpredictably across a
+multi-day window, and an hourly endpoint bills for the idle between them.
+
+This closes ADR 0004's open risk in the direction that ADR named as its own
+fallback. It is recorded as a superseding ADR rather than by editing 0004.
 
 **How a job reaches the machine that holds the brain.** Ingest is inbound: a
 Nebius job must reach the orchestrator. Joining the job to the tailnet is the
@@ -96,14 +111,46 @@ captured idea and the brain. This is a security decision about the machine, not
 an implementation detail, and the roadmap already says it needs deciding before
 it is built.
 
-[NEEDS CLARIFICATION: Does a Serverless Job join the tailnet to reach the ingest route, or is a public authenticated endpoint accepted — and if the tailnet, what carries the credential into the job, given a job is ephemeral and its environment is visible in the Nebius console?]
+**Resolved: neither. The job reports nothing and the orchestrator collects.**
+The third option this design records is taken, and it dissolves the question
+rather than answering it. With no inbound path there is no endpoint to secure,
+and no credential to place inside an ephemeral job whose environment is visible
+in the Nebius console.
+
+`Executor.dispatch` / `await_result` is already submit-then-poll, so the poller
+exists. The job writes telemetry to its own output; `await_result` collects it
+and calls `ingest_external` locally, holding the recorder's lock — which was
+already settled. The attack surface of the machine holding the brain and every
+captured idea is unchanged by this capability, which is what Principle 2 asks of
+it.
+
+The cost is that a job's telemetry lands at completion rather than during the
+run. Nothing watches a 2am fan-out live.
 
 **Reporting telemetry twice.** A job that reports, is retried, and reports again
 must not double-count. `ingest_external` has no idempotency key today: it
 validates the parent and writes. Duplicated rows inflate exactly the numbers the
 submission rests on, and silently.
 
-[NEEDS CLARIFICATION: Is a job's telemetry report idempotent by the job's own id, by a client-generated key per batch, or is ingest at-most-once with retries dropped — and which of those the recorder enforces rather than trusting?]
+**Resolved: a client-generated key per row, enforced by the recorder.** The job
+generates its local ids once, when it records the work rather than when it
+reports it, so a retry reports the same ids. `ingest_external` already takes
+those local ids and returns the mapping to recorded ids; a
+`UNIQUE (dispatching_invocation_id, local_id)` constraint makes a second report
+a conflict, and the conflict returns the id already recorded instead of
+inserting.
+
+This is the path `capture` already uses: `entries.id` is a client-generated ULID
+as primary key, and replay returns what is stored.
+
+Keying on the job's own id was rejected because one job reports many invocations
+and model calls, so it would dedupe whole reports or nothing. At-most-once with
+retries dropped was rejected because a dropped report is a night whose costs are
+under-counted silently, and cost per accepted artifact is a scored measurement.
+
+The recorder enforces this rather than trusting the caller, for the reason
+`UnknownDispatcher` exists: nothing about a report that arrived over the wire is
+taken on faith.
 
 ## Decisions taken without a marker
 

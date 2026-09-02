@@ -63,9 +63,10 @@ contributes nothing to the timeline until it finishes. Whether that matters
 depends on whether the night scrubber is expected to show remote work in
 progress — which `night-timeline` has not yet said.
 
-The proposal's security marker asks the first-versus-second question because that
-is how the roadmap framed it. This design records that the third option changes
-the question, and should be answered alongside it.
+The proposal's security marker asked the first-versus-second question because
+that is how the roadmap framed it. This design recorded that the third option
+changes the question — and the third option is the one taken. The proposal
+carries the resolution.
 
 ## Batch, and why it changes the interface rather than a flag
 
@@ -86,7 +87,25 @@ honestly synchronous and put every polled thing behind one interface.
 
 That is the cleaner decomposition, and it rests on an unverified premise.
 
-[NEEDS CLARIFICATION: Does Token Factory offer a Batch variant for Nemotron 3.5 Lightning and Nemotron 3 Super specifically — the pricing extract covered eleven other models and inferred the tariff — and if so, is a batch reasoning turn modeled as an `Executor` job rather than a `Reasoner` call?]
+**Resolved: Batch is unavailable, and the modeling is settled regardless.**
+
+Read against the account on 2 Sep. `us-central1` serves no `/v1/files` or
+`/v1/batches` routes at all — nginx 404, not an API error. On the unregioned
+`api.tokenfactory.nebius.com`, where both routes exist, `POST /v1/batches`
+returns 403 *"Creating new batch job is temporarily unavailable"*. It rejects
+before validating models, so whether Lightning and Super carry Batch variants is
+still unknown; what is known is that no batch job can be created today. Night
+reasoning therefore runs through `Reasoner` on the standard API, and the 50%
+saving the tariff implies stays hypothetical rather than something to design
+against.
+
+The decomposition does not wait on that. **When a batch turn becomes possible it
+is an `Executor` job, not a `Reasoner` call.** `Reasoner` stays honestly
+synchronous, everything that polls sits behind the one interface already shaped
+for it, and the rejected third shape — a `_do_complete` that blocks on a poll
+and reports itself synchronous — leaks a provider specific past the interface
+Principle 5 exists to keep it behind. Enabling batch later is then a binding
+change, not a redesign.
 
 ## Alternatives considered and rejected
 
