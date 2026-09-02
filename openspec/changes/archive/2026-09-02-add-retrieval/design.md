@@ -21,6 +21,13 @@ This implements ADR 0002 (brute-force cosine, no vector database) rather than
 superseding it — nothing here reopens the mechanism ADR 0002 settled, only the
 two questions it left to this capability.
 
+> **Corrected 2026-09-02 by [ADR 0011](../../../../docs/decisions/0011-embeddings-are-not-persisted.md).**
+> The paragraph above is wrong and is left as written because it is the record of
+> what was believed while this shipped. ADR 0002's Decision section says
+> "Embeddings are stored as `BLOB`s in SQLite"; this change forbids persisting
+> them. That is a supersession, and asserting otherwise here is what kept it from
+> being noticed.
+
 ## Goals / Non-Goals
 
 **Goals:**

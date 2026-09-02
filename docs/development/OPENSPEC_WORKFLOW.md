@@ -34,8 +34,8 @@ moving.
 **On "hard gates":** enhanced-openspec describes these as blocks the AI cannot
 bypass. In both 0.18 and here they are prompt-level instructions, not mechanical
 enforcement. The one genuinely mechanical gate in this project is the Privacy
-Airlock, which is a `CHECK` constraint in `schema.sql` — the database refuses
-the write.
+Airlock, which is a `CHECK` constraint in `db/migrations/0001_initial.sql` —
+the database refuses the write.
 
 ## Lifecycle
 

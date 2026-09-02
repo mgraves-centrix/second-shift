@@ -2,8 +2,10 @@
 
 The index is derived and disposable. `entries` and the brain are the sources of
 truth; this package holds vectors over them in memory and rebuilds from scratch
-rather than persisting anything, so deleting it loses nothing (ADR 0002, and
-principle 1 — the index is an index, never the other way round).
+rather than persisting anything, so deleting it loses nothing (ADR 0011, and
+principle 1 — the index is an index, never the other way round). ADR 0002 said
+the opposite and 0011 supersedes that clause; 0002 still governs the search
+mechanism — brute-force cosine, no vector database.
 
 Assembly is where the Privacy Airlock stops being policy and becomes mechanism.
 `assemble_context` filters by policy *before* it returns, so a `local-only`

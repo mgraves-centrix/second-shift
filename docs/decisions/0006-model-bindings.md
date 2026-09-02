@@ -83,6 +83,11 @@ the schedule as slack.
 reranking, TTS. That is a stronger answer to the Technological Implementation
 criterion than a single Nemotron call bolted onto a generic stack.
 
-**Open:** license terms for Super and Ultra as served by Token Factory, and
-Token Factory per-token pricing. Pricing is read from config, never hardcoded —
-the cost curve is a scored artifact.
+**Open:** license terms for Super and Ultra as served by Token Factory.
+
+~~Token Factory per-token pricing.~~ **Resolved 2026-08-27**, hours after this
+ADR was written: all six rates — Lightning, Super and Ultra, each standard and
+Batch — were read from the console and are in `config/pricing.toml` with their
+effective dates. Pricing is read from config, never hardcoded; the cost curve is
+a scored artifact. Note the region caveat recorded in `docs/SPEC_ROADMAP.md`:
+those rates were read for `eu-north1`, and the account is on `us-central1`.

@@ -94,7 +94,7 @@ requirement, and closes the gap `docs/SPEC_ROADMAP.md` names under
 | 3. No empty mornings | Not applicable | Retrieval is not a night stage with commit semantics; a caller that cannot get context should degrade to none rather than block, which is a design note here, not a constitution obligation. |
 | 4. Text-first | Not applicable | No voice surface. |
 | 5. One codebase, two deployments | **Implements** | The embedder is a served vLLM endpoint reached only through the `Embedder` interface, the same shape as the reasoner. No provider SDK or model identifier appears outside `providers/` — `TestNoProviderLeakage`'s source scan already enforces this and will fail the build otherwise. |
-| 6. Scope boundary | Compliant | Nothing in `NOT_BUILDING.md`. No reranker, no chunking framework, no research — each deferred to its own capability. |
+| 6. Scope boundary | ~~Compliant~~ **False — see `NOT_BUILDING.md`** | ~~Nothing in `NOT_BUILDING.md`.~~ Wrong: "Vector search over the brain" is listed there under *Deferred, not excluded*, with the condition "only when keyword + recency retrieval demonstrably falls over." That condition was never evaluated — keyword + recency retrieval does not exist. Not a constitution violation (principle 6 enumerates the *Excluded* table), but the check was answered wrongly and the deferral gate was skipped. Left as written; annotated 2026-09-02. No reranker, no chunking framework, no research — each deferred to its own capability. |
 | 7. Telemetry from line one | **Implements** | `Embedder`'s base class already records an `events` row per call; this change does not bypass it. No new table means no new `is_synthetic` surface to guard. |
 
 No violations.
@@ -103,6 +103,8 @@ No violations.
 
 **Where the index lives: in memory, rebuilt at startup and on demand — not a
 table, not a file.** `ADR 0002` settled the search mechanism but not this.
+(**Wrong — corrected by ADR 0011.** 0002 settled storage too, in its Decision
+section, and this overturns it. Left as written; see 0011.)
 Measured against the real corpus rather than assumed:
 
 - A table means a migration, append-only semantics for a value that is 100%

@@ -64,8 +64,9 @@ regex. `NIGHT_SCRUBBER.md` stays excluded; nothing about it changed.
 
 ## First-pass failures, and what fixed them
 
-Every prompt was graded before commit. Six failed. The fixes are listed because a
-grade with no named weakness behind it is a claim, not a finding.
+Every prompt was graded before commit. Seven failed — the table below is the
+count. The fixes are listed because a grade with no named weakness behind it is
+a claim, not a finding, and for a while this line said six against seven rows.
 
 | Prompt | First pass | Missing | Fix |
 |---|---|---|---|

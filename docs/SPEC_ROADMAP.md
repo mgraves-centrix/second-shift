@@ -6,9 +6,14 @@ per capability unless noted.
 Shipped, in the order they landed: `persistence`, `telemetry`,
 `compute-profiles`, `privacy-airlock` (`2026-08-27-add-foundations`, and
 `2026-08-27-fix-probe-model-identity`), then `capture`, `brain`, `evals`,
-`synthetic-seed`, `local-inference` and `night-timeline`. Ten canonical
-capabilities across nine archived changes, all under
-`openspec/changes/archive/`.
+`synthetic-seed`, `local-inference`, `night-timeline`, `retrieval` and
+`agents`.
+
+**Do not trust that list to be current — run `openspec list --specs`.** It said
+"ten capabilities across nine changes" while its own body said twelve, because
+the header was written once and the body was appended to. The count and the
+archive are both derivable in a second; a number typed here is a number that
+goes stale the next time something ships.
 
 Each entry lists what is **already decided** — so the proposal has material to
 draw on rather than re-deriving it — and what is **still open**, which becomes
@@ -218,11 +223,13 @@ would have changed the rubric out from under a pinned baseline with nothing
 surfacing it. The rubric's own opening line is the rule: never edit in place;
 supersede with `rubric-v2.md`.
 
-**Still open, and a decision rather than an implementation:** which value the
-baseline actually pinned, and if it is `4a7c2e91b3d0`, whether to re-record week
-1 under the committed rubric. That needs the machine, and the re-record question
-belongs to the person being measured. The brain is days old, so re-recording is
-cheap now and never again.
+~~**Still open:** which value the baseline actually pinned, and whether to
+re-record week 1.~~ **Closed by the paragraphs above, which this line survived
+by being written before them.** There was never a competing hash: the rubric on
+the machine is byte-identical to the committed one, `4a7c2e91b3d0` matches no
+file anywhere, and the baseline recorded on 2 Sep pins `b4decd6fe774`. Nothing
+is left to decide, and a reader arriving here first would have re-opened a
+question the same document already answered twice.
 
 ### 4. `local-inference` — shipped 2 Sep
 
@@ -298,14 +305,23 @@ development window, and nothing is stubbed: a stub executor returning plausible
 job results would be indistinguishable in `model_calls` from the real fan-out
 that is the whole evidence for the Nebius argument.
 
-**Open, as four clarification markers.** The judge deployment target, which is
-submission-blocking and closes an open risk in ADR 0004. How a job reaches the
-machine that holds the brain — the design records a third option the roadmap did
-not consider, in which the job reports nothing and the poller collects its
-telemetry, so no inbound path exists at all. Idempotency when a job reports
-twice. And whether Token Factory offers a Batch variant for Lightning and Super
-specifically, which decides whether a batch reasoning turn is a `Reasoner` call
-or an `Executor` job.
+**All four markers resolved 2 Sep**, and none by assumption.
+
+- *The judge deployment target* — a Serverless AI Endpoint on a no-GPU
+  container VM. ADR 0009, which closes ADR 0004's open risk in the opposite
+  direction to the one it anticipated: Endpoints host arbitrary containers.
+- *How a job reaches the machine holding the brain* — it does not. The job
+  reports nothing and `await_result` collects its telemetry, so no inbound path
+  exists to secure and no credential sits inside an ephemeral job.
+- *Idempotency on a double report* — a client-generated key per row, enforced
+  by `UNIQUE (dispatching_invocation_id, local_id)` in the recorder, mirroring
+  the ULID replay path `capture` already uses.
+- *Batch for Lightning and Super* — **unavailable**, established by reading the
+  account rather than the docs. `us-central1` serves no `/v1/batches` route at
+  all, and creation on the unregioned host returns 403 "temporarily
+  unavailable". Night reasoning runs on the standard API; the 50% saving stays
+  hypothetical. The modeling is settled regardless: a batch turn is an
+  `Executor` job, never a `Reasoner` that polls behind a synchronous signature.
 
 #### Pricing structure observed in the Token Factory console, 2026-08-27
 
@@ -421,7 +437,7 @@ A deferred obligation with no home is a dropped one, so they have a home now.
 | Capability | Covers | Blocks |
 |---|---|---|
 | ~~`agents`~~ | **Shipped 2 Sep** — `2026-09-02-add-agents`. Six drafted prompts, pinned by content hash; `deadbeef` is gone. Detail below. | — |
-| `configuration` | Ten `SECOND_SHIFT_*` variables across three TOML files, with no way to print the resolved configuration or where each value came from. | `night-pipeline` |
+| `configuration` | **Thirteen** `SECOND_SHIFT_*` variables across three TOML files, with no way to print the resolved configuration or where each value came from. Enumerate them at the time — this said ten on 2 Sep and was already wrong by four. Also the home for per-role `max_tokens`, deferred out of `agents`. | `night-pipeline` |
 | `api-layer` | `api/app.py` is one file five sessions need to add routes to; `api/routes/` is in `ARCHITECTURE.md`'s own tree and does not exist. | nothing, but it de-collides five later sessions |
 | `test-harness` | CI gates. Runs any time. | nothing |
 | `operations` | The machine: reboot story, backups, a recovery procedure someone has actually executed. Nobody owns it. | nothing, and that is the problem |
@@ -516,6 +532,57 @@ not have been.
 assembly function exists and is verified end to end against the live model, but
 no agent and no night stage consumes it, because neither exists. `night-pipeline`
 is where retrieval stops being a capability and starts being memory.
+
+**Two things this capability got wrong about its own compliance, corrected
+2 Sep.** Both were self-certified in the proposal and neither was true.
+
+1. **It superseded ADR 0002 and said it did not.** 0002's Decision section reads
+   "embeddings are stored as `BLOB`s in SQLite"; the shipped spec forbids
+   persisting them. `design.md` asserted "this implements ADR 0002 rather than
+   superseding it," and `proposal.md` that 0002 "settled the search mechanism but
+   not this." **ADR 0011** records the supersession, what it changes (the storage
+   clause only — cosine, no vector database and no native extension all stand),
+   and why the archive gate did not catch it: the gate was answered from the
+   change's account of the ADR instead of from the ADR.
+2. **Its principle-6 row read "nothing in `NOT_BUILDING.md`."** "Vector search
+   over the brain" is in that file, under *Deferred, not excluded*, conditioned
+   on "only when keyword + recency retrieval demonstrably falls over." **That
+   condition was never evaluated** — there is no keyword search and no recency
+   ranking in the codebase, so nothing fell over. Not a constitution violation
+   (principle 6 enumerates the *Excluded* table) but a deferral gate stepped
+   past, and the check that should have surfaced it asserted the opposite.
+   Open, and the subject's call: build the keyword + recency baseline and
+   measure whether cosine beats it, or record that the comparison will not be
+   run. `NOT_BUILDING.md` carries the question.
+
+---
+
+## The drift pass — 2 Sep
+
+The audit's central finding was that the drift that matters is between the
+repository and reality, not between documents. This pass closed the
+document-to-reality half. Everything below was a document asserting something
+that was not true on the machine or in the tree:
+
+| Fixed | Was |
+|---|---|
+| Schema authority, 4 places incl. `openspec/config.yaml` | Pointed at the wrong file — and `config.yaml` injects it into every proposal, so it propagated |
+| Capability counts in `README.md`, `SPEC_ROADMAP.md`, `GRADES.md`, `00_INDEX.md` | Stale numbers; the roadmap header now says to run `openspec list --specs` rather than carrying one |
+| `00_INDEX.md`'s "what is true on 2 Sep" table | A frozen snapshot labeled "do not re-derive any of it." Replaced with the commands that derive it, plus a dated table of what cannot be derived |
+| Four resolved-but-open nebius markers; the `4a7c2e91b3d0` rubric hash; ADR 0006 pricing | Written out as resolutions; the hash matched no file on the machine |
+| `configuration` scope, 10 → 13 variables | Enumerated from source; scoping to 10 would have shipped it 30% short |
+| `ARCHITECTURE.md`'s repository tree | Seven entries that do not exist (`NEBIUS_USAGE.md`, `night/`, `morning/`, `api/routes/`, `charts/`, `deploy/tailscale/`, `deploy/nebius/`), and eleven real directories absent — `openspec/` and `config/` among them. Now marks planned ones `(planned)` and says to generate the real tree |
+| `WEEK_ONE.md`'s day-3 pass gate | Read as pending; it was missed. Now says which of the four were met, and that the 2 Sep baseline pins a later brain because the day-3 state is unrecoverable |
+| Five prompts → six, in `WEEK_ONE.md` and `DATA_MODEL.md` | Six were activated 30 Aug. `DATA_MODEL.md`'s "45 points of noise" derived from nothing in the rubric |
+| Spike letters C and D | Collided: the harnesses in `scripts/spikes/` and the plan used them for different spikes. `WEEK_ONE.md` now carries the reconciliation table, and E and F are the two the plan lost |
+| `MODELS.md`'s "to verify in week one" | Week one ended with two of three unverified. Each now states its real status; the pricing in `config/pricing.toml` is `eu-north1`'s and the account targets `us-central1` |
+| `DATA_MODEL.md` "Vectors are `BLOB`s in SQLite" | Contradicted the shipped spec. See ADR 0011 |
+| ADR 0002 and 0004 | Both superseded in part with no forward pointer. Added, bodies untouched — how long a decision stood is part of the record |
+
+**What this pass did not close.** The repository-to-production half. Production
+on the always-on machine is 4 days stale, is not a git repository, and the live
+database still reads `runs=0, model_calls=0, agent_invocations=0, artifacts=0`.
+No document edit changes that, and nothing here should be read as if it did.
 
 ---
 

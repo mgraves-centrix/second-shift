@@ -1,6 +1,9 @@
 # 0004 — What runs on Nebius
 
 **Status:** accepted · **Date:** 2026-08-27
+**Superseded in part by [0009](0009-judge-instance-runs-on-a-no-gpu-serverless-endpoint.md)** — the
+open risk in *Consequences* is closed. The bullet is left as written: how long a
+risk stayed open is part of the record.
 
 ## Context
 
