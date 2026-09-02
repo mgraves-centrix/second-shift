@@ -1,0 +1,37 @@
+# The user variant: no substitution, no sudo. `loginctl enable-linger $USER` is
+# what makes a user service start without a login, and it needs sudo once.
+#
+# See the system unit beside this one for why the flags are what they are, and
+# why the host port is not the container port.
+
+[Unit]
+Description=Second Shift local reasoner (vLLM, user service)
+After=network-online.target
+
+[Service]
+Type=simple
+# The container listens on vLLM's default 8000; the host port is 8200, which is
+# what config/models.toml allocates to the local reasoner and what the capability
+# probe checks. They are deliberately different: 8000 is the port an ad-hoc
+# server grabs, and the spike found it already claimed by an unrelated container.
+ExecStartPre=-/usr/bin/docker rm -f second-shift-reasoner
+ExecStart=/usr/bin/docker run --rm --name second-shift-reasoner \
+    --gpus all --ipc=host --shm-size=8g \
+    -v %h/.cache/huggingface:/root/.cache/huggingface \
+    -p 127.0.0.1:8200:8000 \
+    vllm/vllm-openai:v0.27.1 \
+    nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4 \
+    --served-model-name nemotron-3.5-lightning \
+    --host 0.0.0.0 --port 8000 \
+    --kv-cache-dtype fp8 --enable-prefix-caching \
+    --gpu-memory-utilization 0.30 \
+    --max-model-len 65536 --max-num-seqs 8 \
+    --speculative-config '{"method":"mtp","num_speculative_tokens":3}'
+ExecStop=/usr/bin/docker stop second-shift-reasoner
+TimeoutStartSec=1800
+TimeoutStopSec=120
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=default.target

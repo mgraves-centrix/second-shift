@@ -14,11 +14,18 @@ from __future__ import annotations
 
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
 from ..airlock.policy import assert_permitted
 from ..telemetry.recorder import Recorder, TelemetryDescriptor
+
+#: The backend's word for generation ending because the model finished. Shared
+#: across OpenAI-compatible servers; a backend that says something else is
+#: reporting a reason worth recording.
+STOPPED_CLEANLY = "stop"
 
 
 # -- value types -----------------------------------------------------------
@@ -45,6 +52,10 @@ class RawCompletion:
     completion_tokens: int = 0
     reasoning_tokens: int = 0
     cache_hit: bool = False
+    #: Why generation stopped, in the backend's own vocabulary. Anything other
+    #: than a clean stop is recorded: a brief truncated at the token limit and
+    #: presented as finished is a wrong answer that reads like a right one.
+    finish_reason: str = STOPPED_CLEANLY
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +112,24 @@ class Provider(ABC):
     def model(self) -> str:
         return self._model
 
+    @contextmanager
+    def _recording_failures(self, scope: str) -> Iterator[None]:
+        """Record a failure escaping the backend, then let it continue.
+
+        Telemetry otherwise stops at the first exception: every public method
+        here records *after* its `_do_*` returns, so a model that timed out or an
+        endpoint that refused the connection left no row anywhere — a gap exactly
+        where the failure ledger earns its place.
+
+        The exception is re-raised rather than converted. A provider that
+        swallowed a failure would return a plausible answer nobody generated.
+        """
+        try:
+            yield
+        except Exception as exc:
+            self._recorder.record_failure(exc, scope=scope)
+            raise
+
 
 class Reasoner(Provider):
     """Text completion."""
@@ -122,8 +151,21 @@ class Reasoner(Provider):
         assert_permitted(policy, self.provider_kind)
 
         started = time.perf_counter()
-        raw = self._do_complete(messages, effort=effort)
+        with self._recording_failures(f"reasoner:{self.provider_kind}"):
+            raw = self._do_complete(messages, effort=effort)
         latency_ms = int((time.perf_counter() - started) * 1000)
+
+        if raw.finish_reason != STOPPED_CLEANLY:
+            # `model_call` from the fixed `events.kind` vocabulary: the event
+            # describes a model call, and the severity is what makes it a
+            # warning. A new kind would have to earn a migration, and the
+            # scrubber renders severity already.
+            self._recorder.record_event(
+                lane="system",
+                kind="model_call",
+                label=f"{self._model} stopped: {raw.finish_reason}",
+                severity="warn",
+            )
 
         call_id = self._recorder.record_model_call(
             provider=self.provider_kind,
@@ -157,7 +199,8 @@ class Transcriber(Provider):
     def transcribe(self, audio: bytes, *, policy: str) -> Transcript:
         assert_permitted(policy, self.provider_kind)
         started = time.perf_counter()
-        transcript = self._do_transcribe(audio)
+        with self._recording_failures(f"transcriber:{self.provider_kind}"):
+            transcript = self._do_transcribe(audio)
         self._recorder.record_event(
             lane="capture",
             kind="note",
@@ -179,7 +222,8 @@ class Embedder(Provider):
     def embed(self, texts: list[str], *, policy: str) -> list[list[float]]:
         assert_permitted(policy, self.provider_kind)
         started = time.perf_counter()
-        vectors = self._do_embed(texts)
+        with self._recording_failures(f"embedder:{self.provider_kind}"):
+            vectors = self._do_embed(texts)
         self._recorder.record_event(
             lane="retrieval",
             kind="note",
@@ -204,7 +248,8 @@ class Executor(Provider):
         invocation it attaches under, so remote work appears in the tree at full
         depth instead of as an opaque span.
         """
-        handle = self._do_dispatch(job, telemetry=telemetry)
+        with self._recording_failures(f"executor:{self.provider_kind}"):
+            handle = self._do_dispatch(job, telemetry=telemetry)
         self._recorder.record_event(
             lane="executor",
             kind="job_dispatch",
@@ -214,7 +259,8 @@ class Executor(Provider):
 
     def await_result(self, handle: JobHandle) -> JobResult:
         started = time.perf_counter()
-        result = self._do_await_result(handle)
+        with self._recording_failures(f"executor:{self.provider_kind}"):
+            result = self._do_await_result(handle)
         self._recorder.record_event(
             lane="executor",
             kind="job_complete",

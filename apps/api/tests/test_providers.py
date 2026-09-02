@@ -10,6 +10,7 @@ import pytest
 import secondshift
 from secondshift.airlock.policy import AirlockViolation
 from secondshift.providers.base import (
+    JobHandle,
     JobSpec,
     Message,
     RawCompletion,
@@ -76,7 +77,7 @@ class TestBaseClassOwnsTelemetry:
         assert "record_" not in source
 
     def test_completion_carries_the_recorded_call_id(
-        self, recorder, repo, run_id, agent_id
+        self, recorder, repo, run_id, agent_id, local_reasoner_env
     ):
         providers = Registry(recorder).bind("spark")
         with recorder.invocation(agent_id, run_id=run_id):
@@ -84,6 +85,77 @@ class TestBaseClassOwnsTelemetry:
                 [Message("user", "an idea")], policy="local-only"
             )
         assert result.model_call_id == repo.model_calls_for_run(run_id)[0]["id"]
+
+
+class TestFailuresEscapingABackend:
+    """Every public method records *after* its `_do_*` returns.
+
+    Until a backend existed that could fail, that gap was unreachable; a model
+    that timed out would have left no row anywhere.
+    """
+
+    def test_a_raising_backend_records_a_classified_failure(
+        self, recorder, repo, run_id, agent_id
+    ):
+        class Broken(Reasoner):
+            provider_kind = "local-vllm"
+
+            def _do_complete(self, messages, *, effort):
+                raise TimeoutError("no answer in 300s")
+
+        with recorder.invocation(agent_id, run_id=run_id):
+            with pytest.raises(TimeoutError):
+                Broken(recorder, model="m").complete(
+                    [Message("user", "x")], policy="local-only"
+                )
+
+        rows = list(repo.connection.execute("SELECT * FROM failures"))
+        assert [r["type"] for r in rows] == ["model_timeout"]
+        assert rows[0]["run_id"] == run_id
+
+    def test_the_exception_still_reaches_the_caller(self, recorder, run_id, agent_id):
+        """Recording is not handling. A swallowed failure returns an answer
+        nobody generated."""
+
+        class Broken(Reasoner):
+            provider_kind = "local-vllm"
+
+            def _do_complete(self, messages, *, effort):
+                raise RuntimeError("the specific thing that went wrong")
+
+        with recorder.invocation(agent_id, run_id=run_id):
+            with pytest.raises(RuntimeError, match="the specific thing"):
+                Broken(recorder, model="m").complete(
+                    [Message("user", "x")], policy="local-only"
+                )
+
+    def test_a_failed_call_is_not_recorded_as_a_call(
+        self, recorder, repo, run_id, agent_id
+    ):
+        class Broken(Reasoner):
+            provider_kind = "local-vllm"
+
+            def _do_complete(self, messages, *, effort):
+                raise ConnectionError("refused")
+
+        with recorder.invocation(agent_id, run_id=run_id):
+            with pytest.raises(ConnectionError):
+                Broken(recorder, model="m").complete(
+                    [Message("user", "x")], policy="local-only"
+                )
+
+        assert not repo.model_calls_for_run(run_id)
+
+    def test_a_failing_executor_is_recorded_too(
+        self, recorder, repo, run_id, agent_id
+    ):
+        """The guard is on the shared base, so it covers every interface."""
+        executor = InProcessExecutor(recorder, model="m")
+        with recorder.invocation(agent_id, run_id=run_id):
+            with pytest.raises(KeyError):
+                executor.await_result(JobHandle(job_id="never-dispatched"))
+
+        assert list(repo.connection.execute("SELECT * FROM failures"))
 
 
 class TestAirlockAtCallTime:

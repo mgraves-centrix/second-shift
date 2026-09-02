@@ -43,6 +43,23 @@ recommended `0.85` leaves 9 GiB free and a 4.6M-token KV cache — no room for A
 or the embedder, which is the reason NVFP4 was chosen. `0.30` leaves 77 GiB and
 is faster at 3 concurrent.
 
+**The served port is 8200, not the 8000 the spike used.** The container still
+listens on vLLM's default 8000; the host publishes it on the port
+`config/models.toml` allocates to the local reasoner and the capability probe
+checks. The spike recorded 8000 as contested by an unrelated container, and a
+port that depends on start order is not an allocation. `deploy/spark/second-shift-reasoner.service`
+publishes it and is supervised, so the server survives a reboot — the spike left
+it running with `--restart no`.
+
+**Visible chain-of-thought, and what has not been tried.** Every reply opens
+"Here's a thinking process:". vLLM can separate that into a `reasoning_content`
+field with `--reasoning-parser`, and the provider already reads that field and
+its token count when they are present. **No parser has been verified for this
+checkpoint**, so the units do not carry the flag: adding an unverified flag to a
+first-party recipe is the exact trap this spike documented. Until one is
+verified, the reasoning arrives inline and the provider returns it whole rather
+than guessing where it ends.
+
 ### Why NVFP4 and not BF16
 
 A MoE model must hold **all** parameters resident — the router can call any

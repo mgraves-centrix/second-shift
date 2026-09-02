@@ -1,0 +1,60 @@
+# Template. Substitute REPLACE_USER before installing:
+#   sed "s/REPLACE_USER/$USER/g" second-shift-reasoner.service | sudo tee /etc/systemd/system/second-shift-reasoner.service
+#
+# The user unit beside this one needs no substitution and no sudo — it uses %h.
+#
+# Spike B verified this container and this configuration and then left it running
+# with `--restart no`, so a reboot ended local inference silently. Dogfooding is
+# "every idea, no exceptions", which is the same argument that gave the API a
+# unit.
+#
+# Serving configuration is docs/MODELS.md and
+# scripts/spikes/spike-b-local-inference/FINDINGS.md. Two details are load-bearing
+# and easy to get wrong:
+#
+#   --gpu-memory-utilization is a fraction of the WHOLE machine on unified
+#   memory. The model card's 0.85 leaves 9 of 121 GiB free and a KV cache for a
+#   workload nobody has; 0.30 leaves 77 GiB for ASR and the embedder and is
+#   measurably faster at 3 concurrent.
+#
+#   The published quick-start does not run on the version it names: --moe-backend
+#   marlin is refused for this checkpoint's mixed FP8/NVFP4 MoE, and
+#   num_speculative_tokens needs an explicit method.
+
+[Unit]
+Description=Second Shift local reasoner (vLLM)
+Documentation=https://github.com/mgraves-centrix/second-shift
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=REPLACE_USER
+# The container listens on vLLM's default 8000; the host port is 8200, which is
+# what config/models.toml allocates to the local reasoner and what the capability
+# probe checks. They are deliberately different: 8000 is the port an ad-hoc
+# server grabs, and the spike found it already claimed by an unrelated container.
+ExecStartPre=-/usr/bin/docker rm -f second-shift-reasoner
+ExecStart=/usr/bin/docker run --rm --name second-shift-reasoner \
+    --gpus all --ipc=host --shm-size=8g \
+    -v /home/REPLACE_USER/.cache/huggingface:/root/.cache/huggingface \
+    -p 127.0.0.1:8200:8000 \
+    vllm/vllm-openai:v0.27.1 \
+    nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4 \
+    --served-model-name nemotron-3.5-lightning \
+    --host 0.0.0.0 --port 8000 \
+    --kv-cache-dtype fp8 --enable-prefix-caching \
+    --gpu-memory-utilization 0.30 \
+    --max-model-len 65536 --max-num-seqs 8 \
+    --speculative-config '{"method":"mtp","num_speculative_tokens":3}'
+ExecStop=/usr/bin/docker stop second-shift-reasoner
+# Roughly three minutes to load from a warm HuggingFace cache, and a cold cache
+# pulls 52 shards first. A start timeout shorter than the load is a boot loop.
+TimeoutStartSec=1800
+TimeoutStopSec=120
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

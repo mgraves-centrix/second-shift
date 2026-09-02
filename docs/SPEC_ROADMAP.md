@@ -187,7 +187,7 @@ baseline actually pinned, and if it is `4a7c2e91b3d0`, whether to re-record week
 belongs to the person being measured. The brain is days old, so re-recording is
 cheap now and never again.
 
-### 4. `local-inference` — day 4
+### 4. `local-inference` — shipped 2 Sep
 
 vLLM serving Nemotron 3.5 Lightning, implementing `Reasoner` against the
 existing interface.
@@ -204,13 +204,29 @@ embedder. Co-residency is therefore answered for the reasoner; MagpieTTS adds
 1.85 GiB on top (Spike C), and ASR is unmeasured. Full detail in
 `scripts/spikes/spike-b-local-inference/FINDINGS.md`.
 
-**Still open — and this is now the whole capability.** A verified vLLM server is
-not an implemented `Reasoner`: the registry still binds `EchoReasoner` on every
-profile, so nothing in the system can actually reason. Two things carry over
-from the spike into the implementation — the served model emits visible
-chain-of-thought, which agent prompts and the brief renderer must account for,
-and the server was left running with `--restart no` and has no systemd unit, so
-it does not survive a reboot.
+**Shipped.** `VllmReasoner` implements `_do_complete` over the OpenAI-compatible
+endpoint with the standard library, and the registry binds it on every local
+profile — `cloud` keeps the placeholder, which is `nebius-executor`'s. A local
+profile with no served-model name configured is now refused rather than quietly
+echoed, because a registry that substitutes a placeholder for a missing backend
+is what produced a system that answered without a model.
+
+Both carried-over items are handled. The served model's visible chain-of-thought
+is read from `reasoning_content` where vLLM's parser separates it and returned
+whole where it does not — no marker-string splitter, which would delete the
+answer whenever it guessed wrong. And `deploy/spark/second-shift-reasoner.service`
+supervises the container, restarts it, and publishes it on 8200 rather than the
+contested 8000 the spike served on.
+
+Two telemetry gaps closed with it, both only reachable once a backend could fail:
+a call whose backend raised recorded nothing at all, and a completion truncated
+at the token limit was indistinguishable from a finished one.
+
+**Not verified from a development window.** No call has reached the real server —
+the provider is exercised against a stub speaking the endpoint's documented
+shape, and the units are checked for agreement with `config/models.toml` rather
+than started. The first real completion on the machine is where the remaining
+risk sits.
 
 ### 5. `nebius-executor` — day 5
 

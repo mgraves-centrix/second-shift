@@ -131,6 +131,47 @@ def local_endpoint() -> tuple[str, int]:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class LocalReasonerSettings:
+    """Everything needed to talk to the local inference server.
+
+    One value rather than five lookups, because the probe and the provider must
+    agree about which endpoint they mean. They disagreed once already: the spike
+    served on 8000 while this file allocated 8200.
+    """
+
+    host: str
+    port: int
+    model: str
+    max_tokens: int
+    temperature: float
+    timeout_s: float
+
+    @property
+    def base_url(self) -> str:
+        return f"http://{self.host}:{self.port}"
+
+
+def local_reasoner_settings() -> LocalReasonerSettings:
+    """Endpoint, served-model name and sampling, from configuration.
+
+    Sampling is here rather than in the providers package for the same reason
+    the rubric is a file: changing how the model is sampled is not a code
+    change, and a value baked into Python is one nobody can adjust on the
+    machine that runs it.
+    """
+    local = _local_config()
+    host, port = local_endpoint()
+    return LocalReasonerSettings(
+        host=host,
+        port=port,
+        model=expected_local_model(),
+        max_tokens=int(local.get("reasoner_max_tokens", 4096)),
+        temperature=float(local.get("reasoner_temperature", 0.7)),
+        timeout_s=float(local.get("reasoner_timeout_s", 300)),
+    )
+
+
 def expected_local_model() -> str:
     """The identifier the local reasoner must report for itself.
 

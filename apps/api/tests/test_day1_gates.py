@@ -180,10 +180,16 @@ def test_gate_6_5_degraded_profile_quarantines_local_only(repo):
     assert "endpoint" in (report.reason_for(Policy.LOCAL_ONLY) or "")
 
 
-def test_gate_end_to_end_local_only_costs_nothing(recorder, repo, run_id, agent_id):
+def test_gate_end_to_end_local_only_costs_nothing(
+    recorder, repo, run_id, agent_id, local_reasoner_env
+):
     """The Airlock demo, proven by instrumentation rather than asserted.
 
     A local-only idea produces a real artifact at exactly zero cloud spend.
+
+    Runs against a stub inference server rather than an echo, so the gate proves
+    the whole wiring — registry, provider, HTTP request, recorded call — instead
+    of proving it up to the point where a model would have been.
     """
     from secondshift.providers.registry import Registry
 
@@ -202,3 +208,5 @@ def test_gate_end_to_end_local_only_costs_nothing(recorder, repo, run_id, agent_
     ).fetchone()
     assert row["spend"] == 0.0
     assert row["cloud_tokens"] == 0
+    # The idea reached a model, rather than the gate passing because nothing ran.
+    assert len(local_reasoner_env.requests) == 1

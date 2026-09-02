@@ -17,7 +17,20 @@
 # why this is configuration and not a constant: the probe cannot know it
 # otherwise, and an endpoint serving something else must be refused by name.
 
+# Sampling is configuration, not code. `reasoner_temperature` is deliberately
+# non-zero: `evals` reports a spread alongside a mean so a week-1-to-week-8
+# difference can be told from sampling noise, and a deterministic reasoner would
+# report a spread of zero that measures the sampler rather than the system.
+#
+# `reasoner_timeout_s` is generous because it bounds one completion, not a run.
+# Spike B measured 5.3s median at 3 concurrent; a long overnight stage is the
+# case this has to survive, and a timeout that fires early is recorded as a
+# model failure and loses real work.
+
 [local]
 reasoner_model = "nemotron-3.5-lightning"
 reasoner_host = "127.0.0.1"
 reasoner_port = 8200
+reasoner_max_tokens = 4096
+reasoner_temperature = 0.7
+reasoner_timeout_s = 300
