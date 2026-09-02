@@ -737,6 +737,24 @@ class Repository:
             "SELECT * FROM entries WHERE id = ?", (entry_id,)
         ).fetchone()
 
+    def entries_for_index(self) -> list[sqlite3.Row]:
+        """Every entry with text, for the retrieval index.
+
+        Not screened on status: an archived idea is still memory, and excluding
+        it would make the system forget precisely what it has already acted on.
+
+        Not screened on `is_synthetic` either, which is the exception to the
+        rule that surrounds it. That flag keeps seeded data out of
+        *measurements* — the eval trend, the cost curves — and retrieval is not
+        a measurement. The judge instance's entire corpus is synthetic, so
+        filtering it here would ship a demo whose assistant remembers nothing.
+        """
+        return self._conn.execute(
+            "SELECT id, raw_text, default_policy, created_at_ms, is_synthetic "
+            "FROM entries WHERE COALESCE(TRIM(raw_text), '') != '' "
+            "ORDER BY created_at_ms, id"
+        ).fetchall()
+
     def entry_history(self, entry_id: str) -> list[sqlite3.Row]:
         """Events naming this entry, including those with no run."""
         return self._conn.execute(

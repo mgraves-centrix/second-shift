@@ -1,0 +1,56 @@
+# Template. Substitute REPLACE_USER before installing:
+#   sed "s/REPLACE_USER/$USER/g" second-shift-embedder.service | sudo tee /etc/systemd/system/second-shift-embedder.service
+#
+# The embedding half of retrieval. Deliberately a second server rather than a
+# second role for the reasoner's: sharing a port would make the capability probe
+# unable to say which service is down when one of them is, and the two have
+# different lifecycles — the reasoner restarts to change sampling, this almost
+# never restarts at all.
+#
+# Retrieval is local on EVERY compute profile, including `cloud`. That is
+# constitution principle 2, which names a hosted embedding endpoint as a
+# violation, so this unit is not an optimization that could be swapped for a
+# remote call — it is the only way embedding happens.
+#
+# --gpu-memory-utilization is a fraction of the WHOLE machine on unified memory,
+# the same trap documented on the reasoner unit. The reasoner is pinned at 0.30
+# and holds 43 of 121 GiB; 0.10 here leaves both resident with room to spare.
+# Spike B measured the reasoner ALONE, so the co-residency figure this unit
+# produces is the number that closes that spike's open question — measure it
+# with both up rather than trusting this comment.
+
+[Unit]
+Description=Second Shift local embedder (vLLM)
+Documentation=https://github.com/mgraves-centrix/second-shift
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=REPLACE_USER
+# The container listens on vLLM's default 8000; the host port is 8201, which is
+# what config/models.toml allocates to the embedder. 8200 is the reasoner and
+# 8000 is left free for the ad-hoc server that will otherwise claim it.
+ExecStartPre=-/usr/bin/docker rm -f second-shift-embedder
+ExecStart=/usr/bin/docker run --rm --name second-shift-embedder \
+    --gpus all --ipc=host --shm-size=2g \
+    -v /home/REPLACE_USER/.cache/huggingface:/root/.cache/huggingface \
+    -p 127.0.0.1:8201:8000 \
+    vllm/vllm-openai:v0.27.1 \
+    nvidia/llama-nemotron-embed-vl-1b-v2 \
+    --served-model-name nvidia/llama-nemotron-embed-vl-1b-v2 \
+    --task embed \
+    --host 0.0.0.0 --port 8000 \
+    --gpu-memory-utilization 0.10 \
+    --max-model-len 8192
+ExecStop=/usr/bin/docker stop second-shift-embedder
+# Far smaller than the reasoner — ~1.7B rather than 30B — but a cold
+# HuggingFace cache still pulls weights before the server binds its port.
+TimeoutStartSec=900
+TimeoutStopSec=60
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

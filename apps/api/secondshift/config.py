@@ -30,6 +30,9 @@ ENV_PROFILE = "SECOND_SHIFT_PROFILE"
 ENV_LOCAL_MODEL = "SECOND_SHIFT_LOCAL_MODEL"
 ENV_LOCAL_HOST = "SECOND_SHIFT_LOCAL_HOST"
 ENV_LOCAL_PORT = "SECOND_SHIFT_LOCAL_PORT"
+ENV_EMBEDDER_MODEL = "SECOND_SHIFT_EMBEDDER_MODEL"
+ENV_EMBEDDER_HOST = "SECOND_SHIFT_EMBEDDER_HOST"
+ENV_EMBEDDER_PORT = "SECOND_SHIFT_EMBEDDER_PORT"
 
 _MODELS_CONFIG = Path(__file__).resolve().parents[3] / "config" / "models.toml"
 
@@ -170,6 +173,68 @@ def local_reasoner_settings() -> LocalReasonerSettings:
         temperature=float(local.get("reasoner_temperature", 0.7)),
         timeout_s=float(local.get("reasoner_timeout_s", 300)),
     )
+
+
+def _embedder_config() -> dict:
+    """The `[embedder]` block from the models config, or empty if unreadable."""
+    try:
+        return tomllib.loads(_MODELS_CONFIG.read_text()).get("embedder", {})
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+
+
+@dataclass(frozen=True, slots=True)
+class LocalEmbedderSettings:
+    """Everything needed to talk to the local embedding server.
+
+    `dimensions` is configuration rather than something read from the first
+    response: the index allocates its array up front, and a server swapped for
+    a model of a different width should fail as a shape mismatch naming both
+    numbers rather than silently building an index nothing can search.
+    """
+
+    host: str
+    port: int
+    model: str
+    dimensions: int
+    timeout_s: float
+
+    @property
+    def base_url(self) -> str:
+        return f"http://{self.host}:{self.port}"
+
+
+def local_embedder_settings() -> LocalEmbedderSettings:
+    """Endpoint, served-model name and width, from configuration.
+
+    An absent `[embedder]` block yields an empty model name rather than raising.
+    The registry is what refuses to bind on that, for the same reason
+    `local_reasoner_settings` leaves the refusal to its caller: reading
+    configuration and deciding what a missing value means are different jobs.
+    """
+    embedder = _embedder_config()
+    env_port = os.environ.get(ENV_EMBEDDER_PORT)
+    return LocalEmbedderSettings(
+        host=os.environ.get(ENV_EMBEDDER_HOST)
+        or embedder.get("embedder_host", "127.0.0.1"),
+        port=int(env_port) if env_port else int(embedder.get("embedder_port", 8201)),
+        model=expected_embedder_model(),
+        dimensions=int(embedder.get("embedder_dimensions", 2048)),
+        timeout_s=float(embedder.get("embedder_timeout_s", 30)),
+    )
+
+
+def expected_embedder_model() -> str:
+    """The identifier the local embedding server must report for itself.
+
+    Kept out of Python for the same reason as the reasoner's: no model
+    identifier may appear outside the providers package, and a source scan in
+    the test suite fails the build when one does.
+    """
+    override = os.environ.get(ENV_EMBEDDER_MODEL)
+    if override:
+        return override
+    return _embedder_config().get("embedder_model", "")
 
 
 def expected_local_model() -> str:
