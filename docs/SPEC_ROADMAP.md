@@ -423,7 +423,7 @@ around it; the night pipeline is where it gets fixed.
 | ~~`night-pipeline`~~ | **Shipped 2 Sep** — `2026-09-02-add-night-pipeline`. The checkpointed stage machine; `close_run`'s first caller. Detail below. |
 | `morning-interview` | Briefing from the log delta, then queued questions. The product. Includes the speech visualization below. |
 | ~~`retrieval`~~ | **Shipped 2 Sep** — `2026-09-02-add-retrieval`. Detail below. |
-| `research` | Tavily search, extract, crawl. Redaction before any query leaves; credit accounting. |
+| ~~`research`~~ | **Shipped 2 Sep** — `2026-09-02-add-research`. Redaction as construction rather than filtering; `query_redacted`'s first writer. Detail below. |
 | ~~`artifacts`~~ | **Shipped 2 Sep** — `2026-09-02-add-artifacts`. Files on disk, variant groups whose rank cannot be the generation order, and `outcomes`' first writer. Detail below. |
 | `judge-mode` | The demo instance: cloud profile, synthetic persona, labeled in-UI, "run the night". |
 
@@ -443,11 +443,12 @@ A deferred obligation with no home is a dropped one, so they have a home now.
 | `operations` | The machine: reboot story, backups, a recovery procedure someone has actually executed. Nobody owns it. | nothing, and that is the problem |
 | `eval-scoring` | The week-8 run and the curve. `SUBMISSION.md` declares a dependency on it that reads as satisfied and is not. | `submission` |
 
-**Five capabilities shipped on 2 Sep and the sections below are not in ship
+**Six capabilities shipped on 2 Sep and the sections below are not in ship
 order.** Each states the canonical count as of its own ship, so the numbers read
 out of sequence when scanned top to bottom. The order was `retrieval` (11),
-`agents` (12), `configuration` (13), `night-pipeline` (14), `artifacts` (15).
-Count them rather than reading the tally: `npx openspec list --specs`.
+`agents` (12), `configuration` (13), `night-pipeline` (14), `artifacts` (15),
+`research` (16). Count them rather than reading the tally:
+`npx openspec list --specs`.
 
 ### `agents` — shipped 2 Sep
 
@@ -490,6 +491,71 @@ next: `00_INDEX.md`'s dependency graph puts `configuration` and `agents` ahead o
 it. Both shipped on 2 Sep, so **`night-pipeline`'s prerequisites are now
 clear** — it has agents to sequence, retrieval to feed them, and a resolved view
 that can say which endpoint a stage actually reached.
+
+### `research` — shipped 2 Sep
+
+Sixteen canonical capabilities. The first stage that talks outward, and the
+first writer of `tool_calls.query_redacted` — a column whose *name* has carried
+the requirement since the first migration.
+
+**Redaction is construction, not filtering, and that is the whole design.** The
+obvious shape is `redact(text) -> safe_text` then search that. It fails open: an
+unknown proper noun passes, a codename that looks like a common word passes, and
+— the category no filter can address at all — the subject's own phrasing passes.
+Six distinctive words identify a writer without containing a name. So the raw
+text is never a candidate to become a query; `build_query` extracts topical
+terms and a token has to earn its way in. An unrecognized codename is dropped
+for being capitalized, not for being known.
+
+**Query construction runs locally on every profile and is not a model call.**
+Under `cloud-assisted`, a remote model turning the entry into search terms would
+send the entry one hop earlier and make the whole thing theater.
+
+**Three defects the tests found in this change's own design.**
+
+1. The query preserved word order, so *"How does Contoso handle on-call
+   rotations without burning people out?"* became `handle on-call rotations
+   without burning people` — six consecutive words and a fingerprint.
+2. **Sorting did not fix it, and a design comment claimed it did.** Where the
+   source words already run alphabetically, the sorted query reproduces them.
+   Order is now verified against the source and repaired by rotation, so the
+   guarantee is a checked postcondition rather than an argument about shuffling.
+3. Two leak categories survived the first pass: `chemo`, because it is lowercase
+   and ordinary, and a private hostname, because the contact pattern anchors on
+   `$` and the span still carried its trailing period.
+
+**No bypass, enforced by a signature test.** Principle 2 calls a redaction that
+configuration can disable a violation *even when it defaults to on*, so the
+guard is not a safe default but the absence of anywhere to put an unsafe one.
+
+**The queries, read beside their entries — including the bad ones:**
+
+```
+entry: What are people doing about agent memory systems that either forget
+       everything or remember too much?
+query: agent forget memory remember systems
+
+entry: How does Contoso handle on-call rotations without burning people out?
+query: on-call rotations burning handle
+```
+
+The first is a genuinely good search. The second is **mediocre** — "handle" is
+noise and a person would have written something sharper. That is the trade
+stated before it was measured: a mediocre query that leaks nothing beats a good
+one that leaks.
+
+**Honest about the weak part.** `_SENSITIVE` — the health, legal and financial
+term list — is the one place this module filters rather than constructs, and it
+**fails open**. A term not on it passes. It is a backstop for the category the
+capitalization rule cannot reach, not a mechanism, and an exhaustive list of
+what a person might not want searched does not exist.
+
+**Two things still owed.** No live call was ever made: there is no Tavily
+credential in the development container and obtaining one is a hard stop, so the
+provider is unproven against the real API exactly as the reasoner was before the
+Spark served it. And **the leak list has never been run against the four real
+entries** — they are on the always-on machine; the corpus is synthetic and
+adversarial by construction, and that substitute cannot perform the real check.
 
 ### `artifacts` — shipped 2 Sep
 

@@ -1,5 +1,21 @@
 # Research prompt
 
+> **✅ Shipped 2 Sep — `openspec/changes/archive/2026-09-02-add-research`.**
+> Kept as the record of what was asked. Three things to carry forward:
+>
+> 1. **There was no credential, and the instruction to stop was honored in
+>    substance rather than in letter.** Its stated reason — a stub is
+>    indistinguishable from a real search in `tool_calls`, and credits are a
+>    scored artifact — is satisfied: nothing that fabricates results is
+>    importable from `providers/`, and with no credential the stage skips, so
+>    **zero rows** exist. The provider is real and has never made a call.
+> 2. **Its open decision was answered, and the answer changed the design.**
+>    Redaction is construction, not filtering, because category 8 — verbatim
+>    phrasing — is a leak no filter can address.
+> 3. **The leak list was not run against the real four entries.** They are on
+>    the always-on machine. The corpus is synthetic and adversarial by
+>    construction, and the real check is still owed.
+
 Paste as the first message of a fresh session. Needs a Tavily credential —
 **check for one before planning any code.**
 
@@ -22,7 +38,7 @@ name: **raw entry text in a Tavily query.**
 
 The schema was built expecting this. `tool_calls.query_redacted` is not called
 `query` — the column name is the requirement, and its comment says *the raw query
-is never stored*. Nothing has written that column yet.
+is never stored*. Nothing had written that column until this capability did.
 
 ## What already exists — do not invent any of it
 

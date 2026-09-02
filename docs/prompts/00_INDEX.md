@@ -20,12 +20,12 @@ grouped by that rule, not by how interesting it is.
    CONFIGURATION ✅┤
                    ├──> NIGHT_PIPELINE ✅> ARTIFACTS ✅┐
    AGENTS ────────✅┘        │                         ├──> JUDGE_MODE ──> SUBMISSION
-                             ├──> RESEARCH ────────────┤                      ^
+                             ├──> RESEARCH ✅─────────┤                      ^
    RETRIEVAL ───────────────✅┘                        │                      │
                                                        │       EVAL_SCORING ──┘
    FRONTEND ──> MORNING_INTERVIEW ─────────────────────┘
 
-   ✅ shipped 2 Sep. RESEARCH and MORNING_INTERVIEW are the unblocked ones now.
+   ✅ shipped 2 Sep. MORNING_INTERVIEW and API_LAYER are the unblocked ones now.
 
    TEST_HARNESS    OPERATIONS    ASR    NEBIUS_EXECUTOR
    any time        needs the     needs  blocked on
@@ -44,7 +44,7 @@ all three cases differs from the prompt in at least one decision.
 | 2 | ~~`AGENTS.md`~~ | ✅ shipped 2 Sep | — | — |
 | 3 | ~~`RETRIEVAL.md`~~ | ✅ shipped 2 Sep | — | — |
 | 4 | ~~`NIGHT_PIPELINE.md`~~ | ✅ shipped 2 Sep | — | — |
-| 5 | `RESEARCH.md` | `research/`, `providers/tavily*` | 3, 4 | 6 |
+| 5 | ~~`RESEARCH.md`~~ | ✅ shipped 2 Sep | — | — |
 | 6 | ~~`ARTIFACTS.md`~~ | ✅ shipped 2 Sep | — | — |
 | 7 | `NEBIUS_EXECUTOR.md` | `providers/nebius*`, ingest route | credentials | anything |
 | 8 | `FRONTEND.md` | `components/`, `app/globals.css` | — | 0, 1, 2, 3, 10 |

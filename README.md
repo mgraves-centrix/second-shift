@@ -38,11 +38,12 @@ describes the target — this table describes the present.
 | Configuration — resolved view with provenance | done — `python -m secondshift.config show`; not yet run on the always-on machine |
 | Night orchestrator | done — checkpointed six-stage walk, quarantine over downgrade; **never run against the real reasoner** |
 | Artifacts — files on disk, variant groups, outcomes | done — hashed from what landed; `cost_per_accepted_artifact` returns a number once a `keep` is recorded |
+| Research — redaction before egress | done — queries are constructed, never filtered from raw text; `local-only` makes zero calls. **Never run against the live Tavily API**: no credential here |
 | Morning interview | not started |
 | Night scrubber UI | done — reads a recorded night, scrubs by pointer or keyboard |
 | Judge demo instance | not started |
 
-Fifteen capabilities have shipped across fourteen OpenSpec changes. Their
+Sixteen capabilities have shipped across fifteen OpenSpec changes. Their
 specifications are in `openspec/specs/`; the changes that built them, with their
 task lists, are in `openspec/changes/archive/`. Both directories are the
 authority on that count — this sentence has been wrong before, so count them
