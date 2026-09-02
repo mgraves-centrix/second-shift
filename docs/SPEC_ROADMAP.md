@@ -420,17 +420,54 @@ A deferred obligation with no home is a dropped one, so they have a home now.
 
 | Capability | Covers | Blocks |
 |---|---|---|
-| `agents` | The roster and its versioned prompt files. `docs/ARCHITECTURE.md` specifies `agents/`; the directory does not exist, and `agents.prompt_sha` is `NOT NULL` with nothing but a test fixture writing `deadbeef` into it. | `night-pipeline` — a stage machine with no agents has nothing to run |
+| ~~`agents`~~ | **Shipped 2 Sep** — `2026-09-02-add-agents`. Six drafted prompts, pinned by content hash; `deadbeef` is gone. Detail below. | — |
 | `configuration` | Ten `SECOND_SHIFT_*` variables across three TOML files, with no way to print the resolved configuration or where each value came from. | `night-pipeline` |
 | `api-layer` | `api/app.py` is one file five sessions need to add routes to; `api/routes/` is in `ARCHITECTURE.md`'s own tree and does not exist. | nothing, but it de-collides five later sessions |
 | `test-harness` | CI gates. Runs any time. | nothing |
 | `operations` | The machine: reboot story, backups, a recovery procedure someone has actually executed. Nobody owns it. | nothing, and that is the problem |
 | `eval-scoring` | The week-8 run and the curve. `SUBMISSION.md` declares a dependency on it that reads as satisfied and is not. | `submission` |
 
+### `agents` — shipped 2 Sep
+
+Twelve canonical capabilities. Six roles, six drafted prompt files, content-derived
+pinning, and the first invocation path that is not a test fixture.
+
+**`prompt_sha` stopped being `deadbeef`.** It is computed from file bytes at
+registration and nowhere else. The mutation was run: replacing the hash with a
+constant turns four tests red, including the append-only guard — because a
+constant hash makes an edit in place undetectable, which is the whole failure
+this column exists to prevent.
+
+**The versioning question AGENTS.md posed was already answered by the schema.**
+`0001_initial.sql` line 88: `version INTEGER NOT NULL, -- a prompt change is a
+new version`. `config/evals/rubric.md` reached the same conclusion independently.
+Prompt files are append-only, the filename carries the version, and registration
+refuses a file whose content no longer matches what was recorded.
+
+**The six prompts are drafts and say so in their own text.** What a prompt says
+is the subject's decision. Replacing one is `v2`, visible in the curve at the
+point it happened.
+
+**The real model still shows its work, and that is the finding.** One live call
+through the distiller: the completion opens with the literal `Here's a thinking
+process:` as prose, *not* inside the `<think>` wrapper observed hours earlier the
+same day. The strip trimmed something — a `</think>` did appear later — but what
+survived still opens with deliberation. **The wrapper is inconsistent between
+calls**, so a strip conditioned on a delimiter handles the observed case and not
+the general one. It degrades to verbose rather than empty, which was the design
+intent and is the most that can be claimed. 2395 completion tokens for a
+one-sentence request.
+
+**Deliberately not done:** per-role `max_tokens`. `Reasoner.complete()` takes no
+per-call budget, so this needs the provider interface widened — beyond this
+capability, and the token count above makes it matter more than it looked.
+Carried into `night-pipeline`, where budgets per stage first bite.
+
 **Ordering, corrected.** `night-pipeline` heads the table above but is not next:
-`00_INDEX.md`'s dependency graph puts `configuration` and `agents` ahead of it,
-and `agents` is the hard one — nothing produces an agent invocation today, so
-the stage machine would have no work to checkpoint. Take `agents` first.
+`00_INDEX.md`'s dependency graph puts `configuration` and `agents` ahead of it.
+`agents` shipped 2 Sep, so `configuration` is what remains between here and
+`night-pipeline` — and `night-pipeline` now has agents to sequence and retrieval
+to feed them.
 
 ### `retrieval` — shipped 2 Sep
 
