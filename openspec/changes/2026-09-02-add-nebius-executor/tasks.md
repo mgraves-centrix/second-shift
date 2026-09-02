@@ -30,14 +30,11 @@ machine, mode 0600, outside any git-tracked path.
 
 - [x] 1.1 Resolve the four clarification markers. Resolved 2 Sep; see the
   resolutions in `proposal.md` and `design.md`.
-- [ ] 1.2 Record the judge deployment target as a numbered ADR, superseding the
-  open risk in ADR 0004 rather than editing it. **The correction is made; the
-  ADR is not yet written.** `proposal.md`'s resolution now names the target — a
-  Serverless AI Endpoint on a no-GPU container VM, verified against Nebius's
-  own docs rather than assumed, with the cost comparison worked out
-  (`≈$36/month` against `≈$2,957/month` for the GPU alternative it replaces.)
-  What remains is turning that resolution into the numbered ADR this task
-  describes.
+- [x] 1.2 Record the judge deployment target as a numbered ADR, superseding
+  the open risk in ADR 0004 rather than editing it. Recorded as
+  `docs/decisions/0009-judge-instance-runs-on-a-no-gpu-serverless-endpoint.md`.
+  ADR 0004 itself is untouched — the record of what was open, and for how
+  long, stays visible there rather than edited away.
 - [x] 1.3 Confirm a Nebius credential is available to the machine, and that it
   is held where a public repository cannot see it. Confirmed for both Token
   Factory and Cloud IAM, verified against the live account rather than
