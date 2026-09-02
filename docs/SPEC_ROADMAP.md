@@ -420,7 +420,7 @@ around it; the night pipeline is where it gets fixed.
 
 | Capability | Covers |
 |---|---|
-| `night-pipeline` | The checkpointed stage machine. "No empty mornings" as executable behavior rather than a schema affordance. |
+| ~~`night-pipeline`~~ | **Shipped 2 Sep** — `2026-09-02-add-night-pipeline`. The checkpointed stage machine; `close_run`'s first caller. Detail below. |
 | `morning-interview` | Briefing from the log delta, then queued questions. The product. Includes the speech visualization below. |
 | ~~`retrieval`~~ | **Shipped 2 Sep** — `2026-09-02-add-retrieval`. Detail below. |
 | `research` | Tavily search, extract, crawl. Redaction before any query leaves; credit accounting. |
@@ -442,6 +442,12 @@ A deferred obligation with no home is a dropped one, so they have a home now.
 | `test-harness` | CI gates. Runs any time. | nothing |
 | `operations` | The machine: reboot story, backups, a recovery procedure someone has actually executed. Nobody owns it. | nothing, and that is the problem |
 | `eval-scoring` | The week-8 run and the curve. `SUBMISSION.md` declares a dependency on it that reads as satisfied and is not. | `submission` |
+
+**Four capabilities shipped on 2 Sep and the sections below are not in ship
+order.** Each states the canonical count as of its own ship, so the numbers read
+out of sequence when scanned top to bottom. The order was `retrieval` (11),
+`agents` (12), `configuration` (13), `night-pipeline` (14). Count them rather
+than reading the tally: `npx openspec list --specs`.
 
 ### `agents` — shipped 2 Sep
 
@@ -484,6 +490,67 @@ next: `00_INDEX.md`'s dependency graph puts `configuration` and `agents` ahead o
 it. Both shipped on 2 Sep, so **`night-pipeline`'s prerequisites are now
 clear** — it has agents to sequence, retrieval to feed them, and a resolved view
 that can say which endpoint a stage actually reached.
+
+### `night-pipeline` — shipped 2 Sep
+
+Fourteen canonical capabilities. Six stages, each committing its own outcome as
+it completes, and the first caller `Repository.close_run` has ever had.
+
+**What was actually broken.** `run_stages` had a writer only in
+`packages/seed/`. `close_run` had no caller *and no test* — the only other
+mention of it in the tree was a comment noting its own absence, and its
+docstring's claim to refuse a double close had never been checked. Every run the
+system could record would have sat permanently in flight.
+
+**The crash test is the only test here that can find the defect it exists for.**
+Every other assertion in the file passes against an implementation that buffers
+all six stage writes to the end of the walk, because they assert on final state.
+So it runs a night in a real subprocess, kills it after three stages, reopens
+the database and asserts what survived. Mutated by making the walk buffer: it
+goes red with `KeyError: 'brief'` — nothing survived the kill, which is the
+all-or-nothing transaction principle 3 names as the violation.
+
+**Blocking is a predicate per stage, not an edge in a chain.** Two blocking
+edges: `brief` blocks everything, `build` blocks `critique`. Mutating to a
+uniform "each stage needs the one before" turns three tests red, and in
+production would skip `mockups` and `build` on every night today, since
+`research` has no provider — producing empty mornings on exactly the nights the
+principle exists for. `distill` is blocked by *all* predecessors failing rather
+than by any one, which is why a dependency list would have needed a mode flag
+beside it and a predicate did not.
+
+**Quarantine opens no run at all.** Not a run of six skipped stages: `runs` is
+the denominator of the cost-per-artifact curve, and a night that never happened
+must not enter it. The trap is concrete — `Registry.bind("cloud")` returns an
+`EchoReasoner`, so a `local-only` entry on a cloud profile would otherwise run
+to `complete` against a placeholder.
+
+**`distill` writes the brain additively.** One file per night under `nights/`,
+never a rewrite of `profile.md`. The distiller's own prompt warns that an
+over-confident inference there compounds silently for weeks, and no output has
+been read against the real reasoner yet. Append first, earn the rewrite.
+
+**Two defects found during implementation rather than after.** `_retrieve`
+returned `ContextPiece` objects where a string was expected — it would have
+raised only once an embedder was reachable, so never in a container and first on
+the machine. And `stages_for_run` did not select `commit_sha` or
+`committed_at_ms`, so the commit `distill` records would have been invisible to
+the one query written to answer what the night did.
+
+**Recorded rather than resolved:** the failure taxonomy has no entry for a
+policy refusal, so a quarantine lands as `orchestrator_crash` by
+`telemetry/failures.py`'s own documented fallback rule. That is misleading — a
+deliberate refusal is not a crash — and adding a `policy_refused` type is a
+migration, which is a data-model change beyond a capability scoped to control
+flow. The signature is scoped `night.quarantine` so it still groups distinctly.
+
+**The material gap: it has never met the real reasoner.** The Spark has been
+unreachable for days, so this ships tested against a stub and one end-to-end run
+against the `cloud` profile's `EchoReasoner` placeholder. A pipeline that has
+never run against the live model is unproven where it matters most, and that is
+the first thing to do when the machine returns. There is also **no reaper**: a
+process killed mid-run leaves an open row, which is honest and visible — a
+reaper would have to guess an outcome, and the guess would enter the curve.
 
 ### `configuration` — shipped 2 Sep
 
@@ -582,10 +649,11 @@ therefore assembles from entries alone — 3 of 6 documents on today's corpus.
 That is a real functional limit in the recoverable direction; failing open would
 not have been.
 
-**Still open, and inherited by whatever calls this:** nothing calls it yet. The
-assembly function exists and is verified end to end against the live model, but
-no agent and no night stage consumes it, because neither exists. `night-pipeline`
-is where retrieval stops being a capability and starts being memory.
+**Still open, and inherited by whatever calls this:** ~~nothing calls it yet~~ —
+`night-pipeline` calls it as of 2 Sep. The brief stage attempts retrieval and,
+where the embedder is unreachable, is told so explicitly rather than quietly
+handed nothing: a brief written with no memory behind it otherwise reads exactly
+like one written with memory that had nothing to say.
 
 **Two things this capability got wrong about its own compliance, corrected
 2 Sep.** Both were self-certified in the proposal and neither was true.

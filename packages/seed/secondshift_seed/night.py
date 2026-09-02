@@ -521,12 +521,15 @@ class _Generator:
     def _stages(self, windows: dict[str, _Span]) -> None:
         """Stage checkpoints, plus the boundary events the scrubber draws against.
 
-        The final stage is left running, and that is a deliberate consequence of
-        what the repository offers: there is no operation that closes a run, so
-        a night whose every stage read `complete` would sit forever beside a run
-        with no end and no outcome. A run still in flight is a state the system
-        genuinely produces and the live view spends most of its time rendering,
-        so the seed generates that one rather than an incoherent finished night.
+        The final stage is left running. That was originally a consequence of
+        what the repository offered — nothing closed a run, so a night whose
+        every stage read `complete` would have sat forever beside a run with no
+        end and no outcome. **`night-pipeline` closed that gap on 2 Sep**, and
+        the shape is kept anyway for the reason that outlives it: a run still in
+        flight is a state the system genuinely produces, it is what the live
+        view spends most of its time rendering, and it is the scrubber's
+        degraded-render case. Generating a finished night instead would remove
+        the only test data for the harder rendering.
         """
         final = STAGES[-1]
         for seq, stage in enumerate(STAGES, start=1):

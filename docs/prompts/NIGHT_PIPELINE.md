@@ -1,5 +1,16 @@
 # Night pipeline prompt
 
+> **✅ Shipped 2 Sep — `openspec/changes/archive/2026-09-02-add-night-pipeline`.**
+> Kept as the record of what was asked. Two things are worth carrying forward:
+>
+> 1. **Its report asks for a real night on the Spark and that did not happen.**
+>    The machine has been unreachable for days. The pipeline ships tested
+>    against a stub and has never met the live reasoner — a material gap, and
+>    the first thing to do when the machine returns.
+> 2. **Its open decision was the right question**, and the answer was
+>    non-uniform exactly as it predicted: two blocking edges, and `distill`
+>    whose predicate is over the whole run rather than any predecessor.
+
 Paste as the first message of a fresh session. Local to build; the Spark to run
 it for real.
 

@@ -18,14 +18,14 @@ grouped by that rule, not by how interesting it is.
 ```
    API_LAYER ──────┐   (run early: it de-collides four later sessions)
    CONFIGURATION ✅┤
-                   ├──> NIGHT_PIPELINE ──> ARTIFACTS ──┐
+                   ├──> NIGHT_PIPELINE ✅> ARTIFACTS ──┐
    AGENTS ────────✅┘        │                         ├──> JUDGE_MODE ──> SUBMISSION
                              ├──> RESEARCH ────────────┤                      ^
    RETRIEVAL ───────────────✅┘                        │                      │
                                                        │       EVAL_SCORING ──┘
    FRONTEND ──> MORNING_INTERVIEW ─────────────────────┘
 
-   ✅ shipped 2 Sep. NIGHT_PIPELINE's three prerequisites are all met.
+   ✅ shipped 2 Sep. ARTIFACTS and RESEARCH are now the unblocked ones.
 
    TEST_HARNESS    OPERATIONS    ASR    NEBIUS_EXECUTOR
    any time        needs the     needs  blocked on
@@ -43,7 +43,7 @@ all three cases differs from the prompt in at least one decision.
 | 1 | ~~`CONFIGURATION.md`~~ | ✅ shipped 2 Sep | — | — |
 | 2 | ~~`AGENTS.md`~~ | ✅ shipped 2 Sep | — | — |
 | 3 | ~~`RETRIEVAL.md`~~ | ✅ shipped 2 Sep | — | — |
-| 4 | `NIGHT_PIPELINE.md` | `night/`, `repository.close_run` | **unblocked — 1, 2 and 3 all shipped** | 9, 10 |
+| 4 | ~~`NIGHT_PIPELINE.md`~~ | ✅ shipped 2 Sep | — | — |
 | 5 | `RESEARCH.md` | `research/`, `providers/tavily*` | 3, 4 | 6 |
 | 6 | `ARTIFACTS.md` | `secondshift/artifacts/` | 4 | 5 |
 | 7 | `NEBIUS_EXECUTOR.md` | `providers/nebius*`, ingest route | credentials | anything |
@@ -115,8 +115,10 @@ Found 2 Sep. Each is now a prompt above.
 2. ~~**`agents`**~~ — **closed 2 Sep** (`2026-09-02-add-agents`). Six roles, six
    drafted prompt files, `prompt_sha` computed from file content. `deadbeef` is
    gone from the codebase.
-3. **`close_run` has no caller.** Every run is permanently in flight, with a null
-   outcome and no end time. `night-timeline` reads around it.
+3. ~~**`close_run` has no caller.**~~ — **closed 2 Sep**
+   (`2026-09-02-add-night-pipeline`). It also had no test; both are fixed, and
+   the refusal-to-double-close its docstring always claimed is now checked. An
+   open run means a process died, not the normal case.
 4. **`docs/NEBIUS_USAGE.md` does not exist.** `SUBMISSION.md` still lists it as a
    deliverable and describes what it has to argue; it was a day-7 item and did
    not happen. `ARCHITECTURE.md`'s directory tree used to assert it as a file on
