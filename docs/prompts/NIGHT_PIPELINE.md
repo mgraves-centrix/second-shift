@@ -116,6 +116,9 @@ run on demand is one you cannot debug at 2am.
 - **No retrieval and no research.** Stages call what exists; if `retrieval` has
   not landed, the brief stage takes the entry text and says so.
 - **No artifact rendering.** `ARTIFACTS.md` owns what a brief looks like on disk.
+  *(Shipped 2 Sep and wired into these stages: each one that produces something
+  now writes it through `artifacts.store`. The boundary held — the pipeline
+  calls the writer and owns none of the layout.)*
 - **No new stages.** Six, fixed by a database CHECK.
 - **Nothing runs generated code.** `NOT_BUILDING.md` excludes autonomous
   execution of generated code, and a build stage that executes its own output

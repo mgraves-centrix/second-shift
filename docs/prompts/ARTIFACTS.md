@@ -1,5 +1,17 @@
 # Artifacts prompt
 
+> **✅ Shipped 2 Sep — `openspec/changes/archive/2026-09-02-add-artifacts`.**
+> Kept as the record of what was asked. Two things to carry forward:
+>
+> 1. **Its first open decision is still open.** Whether a rank is trustworthy
+>    needs five real variants read by the subject, and the Spark has been
+>    unreachable since 2 Sep. The machinery ships with the *structure* verified;
+>    the trust question is not answered and was not faked.
+> 2. **Its report asks for a real brief, pasted, and the honest answer is that
+>    the ones produced are unreadable.** They are the entry text echoed back,
+>    because the `cloud` profile binds `EchoReasoner`. That is a finding about
+>    what has been proven, not a defect in the writer.
+
 Paste as the first message of a fresh session. Local; the Spark to produce real
 ones.
 

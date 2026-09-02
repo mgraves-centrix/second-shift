@@ -37,11 +37,12 @@ describes the target — this table describes the present.
 | Agents — six roles, versioned prompts pinned by content | done — prompts are drafts awaiting judgment |
 | Configuration — resolved view with provenance | done — `python -m secondshift.config show`; not yet run on the always-on machine |
 | Night orchestrator | done — checkpointed six-stage walk, quarantine over downgrade; **never run against the real reasoner** |
+| Artifacts — files on disk, variant groups, outcomes | done — hashed from what landed; `cost_per_accepted_artifact` returns a number once a `keep` is recorded |
 | Morning interview | not started |
 | Night scrubber UI | done — reads a recorded night, scrubs by pointer or keyboard |
 | Judge demo instance | not started |
 
-Fourteen capabilities have shipped across thirteen OpenSpec changes. Their
+Fifteen capabilities have shipped across fourteen OpenSpec changes. Their
 specifications are in `openspec/specs/`; the changes that built them, with their
 task lists, are in `openspec/changes/archive/`. Both directories are the
 authority on that count — this sentence has been wrong before, so count them

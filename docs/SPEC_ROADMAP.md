@@ -424,7 +424,7 @@ around it; the night pipeline is where it gets fixed.
 | `morning-interview` | Briefing from the log delta, then queued questions. The product. Includes the speech visualization below. |
 | ~~`retrieval`~~ | **Shipped 2 Sep** — `2026-09-02-add-retrieval`. Detail below. |
 | `research` | Tavily search, extract, crawl. Redaction before any query leaves; credit accounting. |
-| `artifacts` | Briefs, mockups, builds. Variant grouping and critic ranking; outcome capture. |
+| ~~`artifacts`~~ | **Shipped 2 Sep** — `2026-09-02-add-artifacts`. Files on disk, variant groups whose rank cannot be the generation order, and `outcomes`' first writer. Detail below. |
 | `judge-mode` | The demo instance: cloud profile, synthetic persona, labeled in-UI, "run the night". |
 
 ### The capabilities this table was missing
@@ -443,11 +443,11 @@ A deferred obligation with no home is a dropped one, so they have a home now.
 | `operations` | The machine: reboot story, backups, a recovery procedure someone has actually executed. Nobody owns it. | nothing, and that is the problem |
 | `eval-scoring` | The week-8 run and the curve. `SUBMISSION.md` declares a dependency on it that reads as satisfied and is not. | `submission` |
 
-**Four capabilities shipped on 2 Sep and the sections below are not in ship
+**Five capabilities shipped on 2 Sep and the sections below are not in ship
 order.** Each states the canonical count as of its own ship, so the numbers read
 out of sequence when scanned top to bottom. The order was `retrieval` (11),
-`agents` (12), `configuration` (13), `night-pipeline` (14). Count them rather
-than reading the tally: `npx openspec list --specs`.
+`agents` (12), `configuration` (13), `night-pipeline` (14), `artifacts` (15).
+Count them rather than reading the tally: `npx openspec list --specs`.
 
 ### `agents` — shipped 2 Sep
 
@@ -490,6 +490,74 @@ next: `00_INDEX.md`'s dependency graph puts `configuration` and `agents` ahead o
 it. Both shipped on 2 Sep, so **`night-pipeline`'s prerequisites are now
 clear** — it has agents to sequence, retrieval to feed them, and a resolved view
 that can say which endpoint a stage actually reached.
+
+### `artifacts` — shipped 2 Sep
+
+Fifteen canonical capabilities. A night now lands `brief.md`,
+`mockup/N/index.html`, `build/N/build.md`, `critique.md` and `summary.md`, each
+hashed from the file as read back.
+
+**What was broken.** `insert_artifact` existed but only `packages/seed/` called
+it. `outcomes` had **no writer at all** — it appeared in `repository.py` only in
+the append-only table list. So `cost_per_accepted_artifact`, which counts
+`label = 'keep'`, reported `accepted = 0` and a null cost on every night. The
+chart the submission's thesis rests on could not return a number.
+
+**The layout found a defect in the convention the seed established.**
+`artifacts/{night_of}/{kind}.md` collides when two entries are worked on the
+same night — both write `brief.md`. The seed gets away with it because it writes
+rows, not files, and nothing ever opens those paths. Keyed on `run_id` instead,
+with `night_of` leading so a person can list a date by hand, and the stored path
+relative to a configured root: an absolute path would pin a home directory into
+rows a judge reads.
+
+**The rank is honest by construction, not by rule.** `write_artifact` takes no
+rank parameter, so the writer *cannot* default one to the generation index. A
+rank is written afterward by a separate ranker from an ordering parsed out of
+the critic's prose, and a partial, repeated or unknown-index ordering is refused
+wholesale — a group with three of five ranked reads as fully ranked to anything
+that sorts by rank and puts nulls last.
+
+**The mutation that stayed green is the useful one.** Hashing `content.encode()`
+instead of the file read back left every test in the writer's suite passing,
+because for a successful write the two are byte-identical, and the corruption
+tests damage the file *after* the row exists. So the decision the module argues
+for hardest had no test behind it. `test_a_short_write_is_recorded_as_what_landed`
+closes it by patching the write to truncate.
+
+**Two defects found during implementation.** `produced_by_invocation_id` was
+being handed the *agent* id — a different table, caught by the foreign key
+rather than stored; `AgentTurn` now carries `invocation_id`. And stage-to-kind
+is mapped explicitly and checked against the `artifacts.kind` CHECK, because the
+two lists overlap in five of six places and differ in one (`research` produces a
+`research_digest`).
+
+**The night that ran, and why its output is worthless.** Two entries, one night,
+no collision, every row carrying its invocation, every `variant_rank` NULL — and
+the ledger says why:
+
+```
+orchestrator_crash:night.critique.ranking |
+  the critic's ordering [] does not cover exactly the variants in group '...'
+```
+
+That is the refusal working. The `cloud` profile binds `EchoReasoner`, whose
+critique contains no ordering, so nothing was ranked rather than the column
+being filled with generation order. **The briefs are the entry text echoed
+back.** A pipeline that produces unreadable artifacts is a finding, not a
+milestone, and this is that finding.
+
+**Still open, and unanswerable here:** whether a rank is trustworthy when the
+same model family generates and judges. It needs five real variants read by the
+subject. Recommendation recorded: treat `variant_rank` as the critic's opinion,
+and never let it select what an outcome defaults to — `cost_per_accepted_artifact`
+counts a person's `keep`, so the chart stays honest while the rank is unproven.
+The moment rank chooses what gets kept, the chart measures the critic.
+
+**Not built, recorded rather than dropped:** no retention or deletion story
+(tables are append-only, files are not, and what "the artifact for this run"
+means after a cleanup is a decision); and no implicit `signal` outcomes, which
+need a UI that observes the person.
 
 ### `night-pipeline` — shipped 2 Sep
 
