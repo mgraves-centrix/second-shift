@@ -10,9 +10,12 @@ Build `configuration`. Read `openspec/constitution.md`, `CLAUDE.md`, and
 
 ## Why this one, and why first
 
-Ten `SECOND_SHIFT_*` variables are read across three TOML files, and there is no
-way to ask the system what it resolved or where a value came from. Every
-capability after this adds more. Sequence it first or it never gets cheaper.
+Thirteen `SECOND_SHIFT_*` variables are read across three TOML files, and there
+is no way to ask the system what it resolved or where a value came from. Every
+capability after this adds more — this prompt said *ten* when it was written on
+2 Sep and `retrieval` had already added three the same day, which is the argument
+for the enumeration test below in one sentence. Sequence it first or it never
+gets cheaper.
 
 It is also the only thing that makes the always-on machine debuggable. When the
 capability probe says `local_reasoner unavailable` on a box you are reaching over
@@ -24,10 +27,19 @@ today the only way to answer is to read the code and re-derive the precedence.
 These are read from the environment, verified by scanning the source on 2 Sep:
 
 ```
-SECOND_SHIFT_BRAIN       SECOND_SHIFT_LOCAL_MODEL   SECOND_SHIFT_PROFILE
-SECOND_SHIFT_DB          SECOND_SHIFT_LOCAL_PORT    SECOND_SHIFT_RUBRIC_OVERWRITE
-SECOND_SHIFT_LOCAL_HOST  SECOND_SHIFT_LOCATION      SECOND_SHIFT_SYNTHETIC
-SECOND_SHIFT_PRICING
+SECOND_SHIFT_BRAIN            SECOND_SHIFT_LOCAL_HOST    SECOND_SHIFT_PRICING
+SECOND_SHIFT_DB               SECOND_SHIFT_LOCAL_MODEL   SECOND_SHIFT_PROFILE
+SECOND_SHIFT_EMBEDDER_HOST    SECOND_SHIFT_LOCAL_PORT    SECOND_SHIFT_RUBRIC_OVERWRITE
+SECOND_SHIFT_EMBEDDER_MODEL   SECOND_SHIFT_LOCATION      SECOND_SHIFT_SYNTHETIC
+SECOND_SHIFT_EMBEDDER_PORT
+```
+
+Do not trust that block either — regenerate it. It was ten names until the drift
+pass on 2 Sep found the three `EMBEDDER_*` ones `retrieval` had added:
+
+```bash
+grep -rho 'SECOND_SHIFT_[A-Z_]*' --include='*.py' --include='*.sh' \
+  apps/api/secondshift deploy scripts | sort -u
 ```
 
 Three TOML files: `config/models.toml`, `config/pricing.toml`,
@@ -95,7 +107,7 @@ top would make three of them worse.
 
 ```bash
 git status --short && openspec list && openspec list --specs
-apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 302 pass today
+apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 358 pass today
 npm --prefix apps/web run test && npm --prefix apps/web run typecheck
 scripts/check-no-environment.sh && scripts/check-american-english.sh
 ```
