@@ -255,8 +255,20 @@ because a deferred obligation with no home is a dropped one.**
 `Executor.dispatch` carries the telemetry descriptor; `JobResult` never carries
 telemetry.
 
-**Open:** the ingest transport and its authentication; retry and idempotency
-when a job reports telemetry twice.
+**Proposed 2 Sep, not implemented.** `2026-09-02-add-nebius-executor` carries the
+proposal, the design and the delta spec. No Nebius credential exists in a
+development window, and nothing is stubbed: a stub executor returning plausible
+job results would be indistinguishable in `model_calls` from the real fan-out
+that is the whole evidence for the Nebius argument.
+
+**Open, as four clarification markers.** The judge deployment target, which is
+submission-blocking and closes an open risk in ADR 0004. How a job reaches the
+machine that holds the brain — the design records a third option the roadmap did
+not consider, in which the job reports nothing and the poller collects its
+telemetry, so no inbound path exists at all. Idempotency when a job reports
+twice. And whether Token Factory offers a Batch variant for Lightning and Super
+specifically, which decides whether a batch reasoning turn is a `Reasoner` call
+or an `Executor` job.
 
 #### Pricing structure observed in the Token Factory console, 2026-08-27
 
