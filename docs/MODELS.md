@@ -51,6 +51,33 @@ port that depends on start order is not an allocation. `deploy/spark/second-shif
 publishes it and is supervised, so the server survives a reboot — the spike left
 it running with `--restart no`.
 
+### Verified against the running server, 2026-09-02
+
+First real calls, made over the tailnet against the live container (up 4 days,
+serving `nemotron-3.5-lightning`, `max_model_len` 65536). Four things the spike
+could not have known:
+
+- **The reasoning is wrapped in `<think>...</think>` inline in `content`.** Not a
+  prose marker — a structural delimiter. The `reasoning` field exists on the
+  message and is `null`, because no reasoning parser is configured.
+- **`usage` carries no `completion_tokens_details`.** Reasoning tokens are inside
+  `completion_tokens` with no split available, so `reasoning_tokens` is honestly
+  zero on every local call until a parser is enabled.
+- **The reasoning can consume the whole completion budget.** "Reply with exactly:
+  OK" spent 163 completion tokens, almost all of it deliberation. At
+  `max_tokens=200` a one-sentence question hit `finish_reason: length` and
+  returned reasoning with no answer at all. `reasoner_max_tokens` is not a
+  length preference here; it is the budget the model thinks inside, and setting
+  it too low returns nothing usable.
+- **The container publishes on `0.0.0.0:8200`, not loopback**, and listens on
+  8200 inside the container rather than vLLM's default 8000. Both differ from
+  `deploy/spark/second-shift-reasoner.service`, which binds loopback and maps
+  8200→8000. The unit is the safer shape; the running container predates it.
+
+`--reasoning-parser` is the fix for the first two and remains **unverified for
+this checkpoint**, so the unit still does not carry it. Verifying it costs a
+container restart and about three minutes of model load.
+
 **Visible chain-of-thought, and what has not been tried.** Every reply opens
 "Here's a thinking process:". vLLM can separate that into a `reasoning_content`
 field with `--reasoning-parser`, and the provider already reads that field and
