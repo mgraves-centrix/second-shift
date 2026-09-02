@@ -22,6 +22,15 @@ from pathlib import Path
 
 _DEFAULT_PATH = Path(__file__).resolve().parents[4] / "config" / "pricing.toml"
 
+
+def default_pricing_path() -> Path:
+    """Where the rate table lives when nothing says otherwise.
+
+    Exposed so the resolved view can report it without importing a private name
+    or keeping a second copy of the path that could drift from this one.
+    """
+    return _DEFAULT_PATH
+
 WILDCARD = "*"
 
 
@@ -63,7 +72,14 @@ class PricingTable:
         )
         if not resolved.exists():
             raise MissingRate(f"pricing table not found at {resolved}")
-        raw = tomllib.loads(resolved.read_text())
+        try:
+            raw = tomllib.loads(resolved.read_text())
+        except tomllib.TOMLDecodeError as exc:
+            # Named, unlike the bare decoder error: "line 1, column 7" of which
+            # file? This one raises rather than degrading because a missing rate
+            # already does, and a silent zero understates the cost curve in the
+            # direction that flatters the project.
+            raise MissingRate(f"pricing table {resolved} is malformed: {exc}") from exc
         return cls(
             [
                 Rate(

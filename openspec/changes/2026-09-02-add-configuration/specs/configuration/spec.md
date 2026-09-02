@@ -53,19 +53,29 @@ resolved.
 - **WHEN** a setting whose name ends in `_KEY`, `_TOKEN`, `_SECRET`, or `_PASSWORD` resolves from the environment
 - **THEN** the view reports that it is set and where it came from, and does not print the value
 
-### Requirement: A file that exists and cannot be parsed is loud and names itself
+### Requirement: A file that exists and cannot be parsed says so and names itself
 
-Where a configuration file is present but unparseable, the system SHALL raise an
-error naming the file. An absent file SHALL continue to yield documented
-defaults. A malformed file SHALL NOT be indistinguishable from an absent one.
+Where a configuration file is present but unparseable, the system SHALL report
+the parse failure naming the file, at every surface whose value depends on that
+file. An absent file SHALL continue to yield documented defaults. A malformed
+file SHALL NOT be indistinguishable from an absent one.
 
-#### Scenario: A malformed models file is reported rather than defaulted
-- **WHEN** `config/models.toml` exists and contains invalid TOML, and the local endpoint is resolved
-- **THEN** an error is raised naming `models.toml`, rather than the resolution silently returning the built-in host and port
+Reporting SHALL NOT mean raising where the file is not already required to
+start. `config/models.toml` is not read by capture, and a malformed one SHALL
+NOT prevent the API from starting; it is surfaced through the capability finding
+that depends on it and through a non-zero exit from the resolved view.
+
+#### Scenario: A malformed models file is named by the capability it breaks
+- **WHEN** `config/models.toml` exists and contains invalid TOML, and the capability probe runs
+- **THEN** the local reasoner finding names the malformed file as the reason, rather than reporting the endpoint unreachable
+
+#### Scenario: A malformed models file does not stop the API from starting
+- **WHEN** `config/models.toml` exists and contains invalid TOML
+- **THEN** profile resolution still returns a profile, so capture continues to accept entries
 
 #### Scenario: A malformed location file is reported rather than yielding no coordinates
 - **WHEN** the configured location file exists and contains invalid TOML
-- **THEN** an error is raised naming that file, rather than returning empty coordinates
+- **THEN** the resolved view reports that file as malformed, distinguishably from a file that is absent
 
 #### Scenario: An absent file still defaults
 - **WHEN** a configuration file does not exist and a setting it would supply is resolved
@@ -74,6 +84,10 @@ defaults. A malformed file SHALL NOT be indistinguishable from an absent one.
 #### Scenario: A malformed pricing file names the file
 - **WHEN** the pricing file exists and contains invalid TOML
 - **THEN** the raised error names that file's path
+
+#### Scenario: The resolved view exits non-zero on a malformed file
+- **WHEN** any configuration file exists and cannot be parsed
+- **THEN** the resolved view names the file and exits non-zero, so a deploy can gate on it
 
 ### Requirement: The synthetic flag refuses a value it does not recognize
 

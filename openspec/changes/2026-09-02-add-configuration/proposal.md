@@ -81,6 +81,34 @@ So the rule is: **a file that exists and cannot be parsed is loud and names
 itself; a file that is absent is a default.** That changes three call sites, not
 thirteen.
 
+**Loud is not the same as fatal, and implementation found the difference.** The
+first draft of this rule said a malformed file raises. Checking the blast radius
+before writing it: `api/app.py:77`'s `build_context` calls both
+`resolve_profile()` and `PricingTable.load()` at construction, so raising from
+either takes the API down — and with it capture, which is live and taking real
+ideas. The two files are not alike:
+
+- **`pricing.toml` is already a hard startup dependency.** A missing one raises
+  `MissingRate` today and a malformed one already propagates `TOMLDecodeError`.
+  That is correct and stays: the cost curve is a scored measurement and a silent
+  zero understates it in the direction that flatters the project. The only fix it
+  needs is that the parse error currently does not say *which file* it failed on.
+- **`models.toml` is not, and must not become one.** Capture never reads it. A
+  mistyped model name should not cost captures that cannot be recovered.
+
+So a malformed `models.toml` surfaces as **the capability finding that depends on
+it** — `local_reasoner unavailable: config/models.toml is malformed at line N`
+instead of the misleading `unreachable` — and as a non-zero exit from
+`config show` naming the file. The operator gets the truth, the diagnostic gates
+the deploy, and capture stays up. `location.toml` is the same shape: a rendering
+nicety must not raise, so it reports and degrades. That is the defect this
+capability exists to end — an operator who cannot tell a malformed file from an
+absent one — and it is fixed without a new way to lose captures.
+
+`SECOND_SHIFT_SYNTHETIC` is the one place that does raise, and the asymmetry is
+the reason: failing to start is recoverable, telemetry contaminated by seed rows
+written without `is_synthetic = 1` is not.
+
 `SECOND_SHIFT_SYNTHETIC` is the one row that is neither. `is_synthetic` is a
 constitution-load-bearing flag (principle 7), and `SECOND_SHIFT_SYNTHETIC=ture`
 silently meaning "real data" is the wrong direction to fail. It is made strict:
@@ -98,8 +126,10 @@ an unrecognized value raises, naming what it accepts.
 - Secret-shaped names (`*_KEY`, `*_TOKEN`, `*_SECRET`, `*_PASSWORD`) are
   redacted. Nothing here is a credential today; `nebius-executor` changes that.
 - Exit code 0 when everything required resolved, 1 when it did not.
-- Three loud-on-malformed fixes: `_local_config`, `_embedder_config`,
-  `home_location`. `PricingTable.load` gets the file named in its parse error.
+- Three report-on-malformed fixes: `_local_config`, `_embedder_config`,
+  `home_location` — each carries the parse error to the surface that depends on
+  it rather than swallowing it, and none of the three raises.
+  `PricingTable.load`, which already raises, gets the file named in its error.
 - An enumeration test that scans the tree for `SECOND_SHIFT_[A-Z_]+` and fails
   when the view does not know one.
 
