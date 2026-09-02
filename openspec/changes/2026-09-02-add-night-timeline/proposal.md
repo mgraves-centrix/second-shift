@@ -28,8 +28,26 @@ convenience.
 
 `GET /runs` lists recorded nights. `GET /runs/{id}/timeline` returns the whole
 night in one response — the scalar event columns, the lanes those events
-recorded, the invocation tree, and the run's frame. `GET /events/{id}` returns
-one event's `payload_json` and the model call joined through its invocation.
+recorded, the invocation tree, the run's stages, and the frame it occupies.
+`GET /events/{id}` returns one event's `payload_json` and every model call its
+invocation made.
+
+**The frame ends where the last event ends, not where it starts.** In the
+generated night the longest bar begins 67 minutes before the last event starts
+and runs past it; a frame taken from the last start would have drawn that bar 15%
+beyond the right edge of its own timeline. `runs.ended_at_ms` is not the frame
+either — nothing calls `close_run`, so it is null on every recorded run.
+
+**Stages travel with the night, because the run's own verdict is empty.**
+`runs.outcome` is null for the same reason. `run_stages` is where "no empty
+mornings" lives — the schema says so in as many words — and the generated night
+leaves its last stage running, which is exactly the case a timeline must not
+render as a finish.
+
+**Instants read in the night's own timezone**, carried from the entry behind the
+run. A night is a local thing: "the frantic bit at 3am" is a claim about where
+the person was. It is also everything the deferred celestial layer will need, and
+carrying it now is what keeps that layer unprecluded.
 
 **The timeline route cannot return `payload_json`.** The scalar-columns property
 is currently a docstring on `Repository.timeline` and a promise the renderer
@@ -77,8 +95,8 @@ mode, and zoom. Nothing here writes.
 | Principle | Status | Note |
 |---|---|---|
 | 1. Brain plaintext under git | Not applicable | Reads telemetry, never memory. |
-| 2. Privacy Airlock | Compliant | Read-only, same-origin, no egress. The view renders what a run recorded and adds no path by which anything leaves; `payload_json` is served to the same local surface that already reads entries. |
-| 3. No empty mornings | **Implements** | "Honest at rest" is this principle rendered. A night with a failed stage must look like one — a degraded run that renders as a smooth success is the visual form of hiding partial results, and it is the same failure the principle forbids in the morning view. |
+| 2. Privacy Airlock | **Constrains** | `GET /events/{id}` is the first route in this system that serves recorded content back out — `POST /entries` only echoes the row a client just sent, so there is no precedent to lean on. The constitution names an export path including `model_call_payloads` as a violation, so no route here joins it and the response shape has no field a prompt or completion could travel in. Counts and costs are accounting; the words are not. Read-only, no egress. |
+| 3. No empty mornings | **Renders** | The principle is a query over `run_stages`, and this reads it. It has to: nothing calls `close_run`, so `runs.outcome` is null on every recorded run, and a night that stopped part-way says how far it got through its stages or nowhere. A degraded night rendering as a smooth success would be the visual form of hiding partial results. |
 | 4. Text-first | Compliant | No voice surface. The timeline is readable and operable by keyboard, and announces the moment for a screen reader. |
 | 5. One codebase, two deployments | **Implements** | One component, three callers — the night view, judge mode, and the trend axis. No demo branch: judge mode is a different caller of the same component, and a synthetic night is labeled rather than rendered differently. |
 | 6. Scope boundary | Compliant | It reads. A timeline that grew an edit or retry control would have crossed into task management, and the absence of any write path is what keeps it out. |
@@ -109,12 +127,26 @@ No violations.
 - **No `payload_json` on the timeline route.** Structural rather than
   documented, because "the renderer must never parse JSON to draw a frame" is a
   property, and a property enforced by what the API cannot return does not
-  depend on the renderer remembering it.
+  depend on the renderer remembering it. The same argument is why the detail
+  route has no field for prompt or completion text.
+- **Depth renders as an offset, and does not collapse.** The roadmap lists "how
+  deep the invocation tree renders before it needs collapsing" as open. The
+  generated night answers it at the depth this system produces: the tree is three
+  deep, and three offsets inside a 30px lane are distinguishable without
+  collapsing anything. It reopens at a depth nothing here generates, and the
+  measurement rather than a preference is what closes it now.
 
 ## Impact
 
 **New:** three read routes on the API and their schemas; a night route and
 scrubber component in `apps/web`.
+
+**One static page, not a dynamic segment.** `next.config.mjs` sets
+`output: "export"` so the API can serve the PWA as files — a second running
+server on the Spark is a second thing that can be down at 2am. A `/night/[runId]`
+route would need `generateStaticParams` over ULIDs unknown at build time, so the
+night view is one exported page that takes the run on the client. Changing the
+export configuration would be an architectural decision; this avoids needing one.
 
 **Changed:** `Repository` gains a run listing and the two joined reads the detail
 route needs. Nothing existing changes behavior — the capture path is untouched,
@@ -124,3 +156,9 @@ and it is taking real ideas.
 covers script, style and layout — not paint, and not a phone. The check on that
 is looking at it, which is part of this change's verification rather than a
 follow-up.
+
+**The bound Spike D attached to its own recommendation carries into the spec.**
+Incremental rendering degenerates to the naive cost when a drag crosses the whole
+night in one frame — 1.8ms at this night's size, 14ms at eight times it. That is
+the worst case the frame-budget requirement names, and the abort criterion if
+nights ever get much denser.

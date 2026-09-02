@@ -758,3 +758,78 @@ class Repository:
             "agent_invocation_id FROM events WHERE run_id = ? ORDER BY ts_ms, id",
             (run_id,),
         ).fetchall()
+
+    #: A run with the three things a timeline needs and the row itself does not
+    #: carry: the frame its events actually occupy, and the timezone the idea
+    #: behind it was captured in.
+    #:
+    #: The frame ends at the last event's *end*, not its start. In one generated
+    #: night the longest bar begins 67 minutes before the last start and runs
+    #: past it; a frame taken from `MAX(ts_ms)` would draw that bar 15% beyond
+    #: the right edge of the night it belongs to.
+    #:
+    #: `started_at_ms`/`ended_at_ms` are not the frame either: nothing calls
+    #: `close_run` yet, so every recorded run has a null end.
+    _RUN_SUMMARY = (
+        "SELECT r.*, e.captured_tz AS captured_tz, e.tz_offset_min AS tz_offset_min, "
+        "(SELECT MIN(ts_ms) FROM events WHERE run_id = r.id) AS first_event_ms, "
+        "(SELECT MAX(ts_ms + COALESCE(duration_ms, 0)) FROM events WHERE run_id = r.id) "
+        "AS last_event_end_ms, "
+        "(SELECT COUNT(*) FROM events WHERE run_id = r.id) AS event_count "
+        "FROM runs r LEFT JOIN entries e ON e.id = r.entry_id"
+    )
+
+    def get_run(self, run_id: str) -> sqlite3.Row | None:
+        return self._conn.execute(
+            "SELECT * FROM runs WHERE id = ?", (run_id,)
+        ).fetchone()
+
+    def run_summary(self, run_id: str) -> sqlite3.Row | None:
+        return self._conn.execute(
+            f"{self._RUN_SUMMARY} WHERE r.id = ?", (run_id,)
+        ).fetchone()
+
+    def list_runs(self, limit: int = 50) -> list[sqlite3.Row]:
+        """Recorded nights, newest first, each with the frame its events occupy."""
+        return self._conn.execute(
+            f"{self._RUN_SUMMARY} ORDER BY r.started_at_ms DESC, r.id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+
+    def stages_for_run(self, run_id: str) -> list[sqlite3.Row]:
+        """What each stage reached, in order.
+
+        "No empty mornings" is a query, and this is the query: a run whose
+        `outcome` is null — which is every run, because nothing closes one yet —
+        still says exactly how far it got here. A timeline that read only the run
+        row would render an unfinished night as a blank verdict.
+        """
+        return self._conn.execute(
+            "SELECT stage, seq, status, started_at_ms, ended_at_ms "
+            "FROM run_stages WHERE run_id = ? ORDER BY seq",
+            (run_id,),
+        ).fetchall()
+
+    def get_event(self, event_id: int) -> sqlite3.Row | None:
+        """One event in full, payload included.
+
+        The counterpart to `timeline`, and separate from it on purpose: detail is
+        fetched for one event that a person is looking at, never for the
+        thousand a frame is drawn from.
+        """
+        return self._conn.execute(
+            "SELECT * FROM events WHERE id = ?", (event_id,)
+        ).fetchone()
+
+    def model_calls_for_invocation(self, invocation_id: str) -> list[sqlite3.Row]:
+        """Every model call an invocation made, in time order.
+
+        Every one, rather than the one an event corresponds to: `events` carries
+        no model call id, so any single answer would be a guess from adjacency.
+        An invocation makes one to three calls, and showing all of them is both
+        honest and small.
+        """
+        return self._conn.execute(
+            "SELECT * FROM model_calls WHERE agent_invocation_id = ? ORDER BY ts_ms, id",
+            (invocation_id,),
+        ).fetchall()

@@ -1,0 +1,37 @@
+/* The night view's own chrome. The scrubber brings its own styles; this is the
+ * page around it, and it reuses the capture app's palette so the two surfaces
+ * read as one product. */
+
+.page {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 1.25rem;
+}
+
+.runs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.run {
+  width: auto;
+  margin: 0;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: var(--panel);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+.run[data-selected="true"] { color: var(--text); border-color: var(--accent); }
+
+.tag { font-size: 0.7rem; color: var(--warn); }
+
+.notice { color: var(--muted); font-size: 0.9rem; }

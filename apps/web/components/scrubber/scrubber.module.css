@@ -1,0 +1,239 @@
+/* The night scrubber.
+ *
+ * Tokens, not magic numbers: the lane height and the mark sizes are referenced
+ * from three places each, and the bar-versus-tick distinction depends on them
+ * staying in proportion.
+ *
+ * Colors come from the capture app's palette in globals.css so the two surfaces
+ * read as one product. The lane hues are the only additions, and they exist
+ * because "which agent was leading" has to be answerable without a legend.
+ */
+
+.night {
+  /* Severity is its own color, and deliberately not one of the lane hues. A
+     lane that reads as failed when nothing failed makes the view dishonest at
+     rest, which is the one thing it must not be. */
+  --severe: #ff6b6b;
+  --lane-h: 30px;
+  --mark-h: 9px;
+  --tick: 7px;
+  --rail: 44px;
+  --gutter: 1.25rem;
+  color: var(--text);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.title { font-size: 1.05rem; font-weight: 600; margin: 0; letter-spacing: 0.01em; }
+.sub { color: var(--muted); font-size: 0.85rem; }
+
+.badge {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.3rem;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+/* A generated night is the only kind that exists yet. It is shown, and it says
+   so, so a screenshot of one is never mistaken for evidence. */
+.badge[data-synthetic="true"] { color: var(--warn); border-color: var(--warn); }
+.badge[data-outcome="degraded"], .badge[data-outcome="failed"] { color: var(--severe); border-color: var(--severe); }
+
+/* -- the timeline itself ------------------------------------------------- */
+
+.frame {
+  position: relative;
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.rail {
+  flex: 0 0 auto;
+  width: 5.5rem;
+  border-right: 1px solid var(--line);
+  padding-top: var(--rail);
+}
+.laneName {
+  height: var(--lane-h);
+  display: flex;
+  align-items: center;
+  padding: 0 0.6rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.laneName[data-active="true"] { color: var(--text); }
+
+.plot {
+  position: relative;
+  flex: 1 1 auto;
+  padding-top: var(--rail);
+  cursor: ew-resize;
+  touch-action: none;
+  outline: none;
+}
+.plot:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+
+.lane { position: relative; height: var(--lane-h); }
+.lane::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+/* A bar is a rectangle whose length is a duration. A tick is a diamond.
+ *
+ * The shapes differ because the widths cannot: Spike D measured one pixel at
+ * 22 seconds across a full night, which makes the median bar 1.4px — narrower
+ * than the tick it has to be distinguishable from. */
+.mark {
+  position: absolute;
+  top: calc((var(--lane-h) - var(--mark-h)) / 2);
+  height: var(--mark-h);
+  border-radius: 2px;
+  background: var(--lane-color, var(--accent));
+  opacity: 0.9;
+  transition: opacity 90ms linear;
+}
+.mark[data-tick="true"] {
+  width: var(--tick);
+  height: var(--tick);
+  top: calc((var(--lane-h) - var(--tick)) / 2);
+  border-radius: 1px;
+  transform: translateX(-50%) rotate(45deg);
+  opacity: 0.7;
+}
+.mark[data-past="true"] { opacity: 0.28; }
+.mark[data-severe="true"] {
+  background: var(--severe);
+  height: calc(var(--mark-h) + 5px);
+  top: calc((var(--lane-h) - var(--mark-h) - 5px) / 2);
+  opacity: 1;
+}
+.mark[data-severe="true"][data-past="true"] { opacity: 0.65; }
+/* Nesting, without another lane. Depth 0 sits on the baseline; deeper
+   invocations are inset, so a call made by a call is visibly inside it. */
+.mark[data-depth="1"] { margin-top: 2px; }
+.mark[data-depth="2"] { margin-top: 4px; }
+.mark[data-depth="3"] { margin-top: 6px; }
+.mark[data-selected="true"] {
+  outline: 1px solid var(--text);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+/* Moved by a pixel transform, not a percentage one: a percentage translate
+ * resolves against the element's own width, and this is one pixel wide. */
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: var(--text);
+  pointer-events: none;
+  will-change: transform;
+}
+.playhead::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--rail) - 10px);
+  left: -4px;
+  width: 9px;
+  height: 9px;
+  background: var(--text);
+  border-radius: 50%;
+}
+
+.clock {
+  position: absolute;
+  top: 0.6rem;
+  left: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  will-change: transform;
+  white-space: nowrap;
+  padding-left: 0.5rem;
+}
+
+/* -- detail -------------------------------------------------------------- */
+
+.detail {
+  margin-top: 0.75rem;
+  min-height: 6.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--panel);
+  padding: 0.75rem 0.9rem;
+  font-size: 0.85rem;
+}
+.detailHead { display: flex; gap: 0.6rem; align-items: baseline; flex-wrap: wrap; }
+.detailLabel { font-weight: 600; }
+.detailMeta { color: var(--muted); }
+.calls { margin: 0.6rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.35rem; }
+.call {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.call strong { color: var(--text); font-weight: 500; }
+.empty { color: var(--muted); }
+
+.legend {
+  display: flex;
+  gap: 1.1rem;
+  align-items: center;
+  margin-top: 0.6rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+/* The shape swatches are neutral on purpose: they explain shape, and a colored
+   one would read as though that color were part of the meaning. */
+.swatchBar, .swatchTick, .swatchSevere {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.35rem;
+  background: var(--muted);
+}
+.swatchBar { width: 18px; height: 8px; border-radius: 2px; }
+.swatchTick { width: 7px; height: 7px; transform: rotate(45deg); }
+.swatchSevere { width: 18px; height: 13px; border-radius: 2px; background: var(--severe); }
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* What the playhead is inside, in words. The rendering says it in shapes; this
+ * says it in a form a screen reader and a screenshot both carry. */
+.atPlayhead {
+  margin: 0.55rem 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  min-height: 1.2rem;
+}
