@@ -6,8 +6,9 @@ per capability unless noted.
 Shipped, in the order they landed: `persistence`, `telemetry`,
 `compute-profiles`, `privacy-airlock` (`2026-08-27-add-foundations`, and
 `2026-08-27-fix-probe-model-identity`), then `capture`, `brain`, `evals`,
-`synthetic-seed` and `local-inference`. Nine canonical capabilities across eight
-archived changes, all under `openspec/changes/archive/`.
+`synthetic-seed`, `local-inference` and `night-timeline`. Ten canonical
+capabilities across nine archived changes, all under
+`openspec/changes/archive/`.
 
 Each entry lists what is **already decided** — so the proposal has material to
 draw on rather than re-deriving it — and what is **still open**, which becomes
@@ -322,16 +323,44 @@ screenshotting. The shape is dense enough to build against; whether the prose
 inside an artifact survives a judge reading it closely is unanswered, and is a
 question for `night-timeline` to raise once something renders it.
 
-### 7. `night-timeline` — day 7
+### 7. `night-timeline` — shipped 2 Sep
 
 The playback contract behind the scrubber. Built once, used three times.
 
 **Decided:** `events` carries pre-rendered scalar columns so rendering never
-parses JSON; `duration_ms` non-null renders as a bar, null as a tick; the
-invocation tree renders as lanes over time.
+parses JSON; `duration_ms` non-null renders as a bar, null as a tick.
 
-**Open:** the query contract for a time window at 20x; how deep the invocation
-tree renders before it needs collapsing.
+**Both open questions closed by measurement, not preference.** There is no
+windowed query: the whole night is one response, because a window would put a
+fetch in the middle of a drag. And the tree does not collapse at the depth this
+system produces — three offsets inside a 30px lane are distinguishable, and
+Spike D's numbers say the rendering is nowhere near its budget.
+
+**Spike D chose DOM.** Incremental DOM holds 0.1ms per steady frame against a
+16.7ms budget, and its cost is flat in night size where canvas's is linear —
+canvas is the approach that degrades as nights get denser, which inverts the
+intuition the abort criterion in `docs/WEEK_ONE.md` was written on. Full detail
+in `scripts/spikes/spike-d-scrubber-rendering/FINDINGS.md`.
+
+**Four things the data corrected**, each of which would otherwise have shipped
+quietly. The frame ends where the last event *ends* — the longest bar begins 67
+minutes before the last event starts. Stages travel with the night because
+`runs.outcome` is null on every recorded run: **nothing calls `close_run`**, and
+`run_stages` is where "no empty mornings" actually lives. A lane is `events.lane`
+and is never joined for — `agent_invocations` carries no role, 11 of 1,223 events
+have no invocation, and 20 record `system` while their producer is a builder or a
+critic. And instants read in the capture timezone, which is also what keeps the
+deferred celestial layer unprecluded.
+
+**Two defects only looking at it could find.** The playhead moved by a percentage
+transform, which resolves against the element's own width — one pixel — so it sat
+at the left edge reporting the correct time, and every automated check passed
+because they read the ARIA value. And a lane hue sat within a shade of the
+failure color, so a lane with no failures rendered as a lane of failures.
+
+**Still open, and now sharper:** nothing closes a run. `close_run` exists and is
+called from nowhere, so every night is permanently in flight. The timeline reads
+around it; the night pipeline is where it gets fixed.
 
 ---
 

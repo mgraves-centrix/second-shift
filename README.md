@@ -34,7 +34,7 @@ describes the target — this table describes the present.
 | Nebius Token Factory + Serverless Jobs | not started |
 | Night orchestrator | not started |
 | Morning interview | not started |
-| Night scrubber UI | not started |
+| Night scrubber UI | done — reads a recorded night, scrubs by pointer or keyboard |
 | Judge demo instance | not started |
 
 Eight capabilities have shipped across six OpenSpec changes. Their specifications
