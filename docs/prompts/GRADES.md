@@ -4,7 +4,7 @@ Run `python3 scripts/grade-prompts.py` rather than trusting this file. A grade
 that was claimed instead of computed is not a grade.
 
 ```
-all 16 prompts at 12/12
+all 17 prompts at 12/12
 ```
 
 ## What the score does and does not prove
@@ -47,6 +47,21 @@ review. Two of those gaps were structural rather than merely absent:
 
 Both were found by being asked "is anything missing?", not by grading.
 
+## A prompt excluded from grading is not the same as a prompt below the bar
+
+`OVERNIGHT.md` sat in the grader's exclusion list from the start, alongside
+`00_INDEX.md` and `GRADES.md` — but for a different reason than either of
+those. It was not written to this rubric; it predated it, carried a work
+queue that went stale within a day of being read (see its own file for what
+that cost), and was never held to the same twelve checks the rest of this set
+passes. Excluding it was accurate at the time and stopped being accurate the
+moment it was rewritten on 2 Sep to be judged by the same bar as everything
+else here — at which point leaving it excluded would have been the thing this
+whole file warns against: a grade nobody computed, standing in for one that
+was never asked. It is graded now, listed in the set below, and reached
+12/12 the same way everything else did — by fixing the prompt, not the
+regex. `NIGHT_SCRUBBER.md` stays excluded; nothing about it changed.
+
 ## First-pass failures, and what fixed them
 
 Every prompt was graded before commit. Six failed. The fixes are listed because a
@@ -60,6 +75,7 @@ grade with no named weakness behind it is a claim, not a finding.
 | `JUDGE_MODE.md` | 11/12 | No way to reach the starting state; no mutation check | Added the seed-and-serve commands; added two can-fail proofs including inserting a non-synthetic row |
 | `SUBMISSION.md` | 11/12 | No falsification of its own verification | Added "change one figure and confirm the regeneration disagrees" |
 | `TEST_HARNESS.md` | 11/12 | Can-fail phrasing ambiguous | Made the browser-test mutation explicit, citing the playhead defect that shipped through three passing tests |
+| `OVERNIGHT.md` | 11/12 | Verification discipline was described in the abstract — never a concrete instruction to watch a specific check fail | Added the instruction to break the guard a shipped capability's argument rests on and confirm the suite goes red before trusting it green, citing the same playhead defect by what actually caused it: every check read the ARIA value, not where the element rendered |
 
 ## Three grader bugs, which are the point
 
