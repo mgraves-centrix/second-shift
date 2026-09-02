@@ -49,13 +49,17 @@ def repo(conn) -> Repository:
 
 @pytest.fixture
 def agent_id(repo) -> str:
-    return repo.insert_agent(
-        name="researcher",
-        role="researcher",
-        version=1,
-        prompt_path="agents/prompts/researcher.v1.md",
-        prompt_sha="deadbeef",
-    )
+    """The researcher, registered against its real prompt file.
+
+    This fixture wrote `prompt_sha="deadbeef"` against a path that did not
+    exist until `agents` shipped — which meant the column that exists to prove
+    an eight-week curve measures the brain rather than an edited prompt was
+    provably measuring nothing. Registering for real means every test that
+    records an invocation records a hash of text that is actually on disk.
+    """
+    from secondshift.agents.roster import register
+
+    return register(repo)["researcher"]
 
 
 @pytest.fixture

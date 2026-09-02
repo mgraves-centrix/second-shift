@@ -737,6 +737,19 @@ class Repository:
             "SELECT * FROM entries WHERE id = ?", (entry_id,)
         ).fetchone()
 
+    def get_agent(self, name: str, version: int) -> sqlite3.Row | None:
+        """One roster row. `UNIQUE(name, version)` makes this at most one."""
+        return self._conn.execute(
+            "SELECT * FROM agents WHERE name = ? AND version = ?", (name, version)
+        ).fetchone()
+
+    def active_agents(self) -> list[sqlite3.Row]:
+        """The roster in effect: everything not retired."""
+        return self._conn.execute(
+            "SELECT * FROM agents WHERE retired_at_ms IS NULL "
+            "ORDER BY role, name, version"
+        ).fetchall()
+
     def entries_for_index(self) -> list[sqlite3.Row]:
         """Every entry with text, for the retrieval index.
 
