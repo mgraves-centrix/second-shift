@@ -88,20 +88,37 @@ exist when the risk was written: dedicated endpoints bill by GPU hour (H100
 $4.05, L40S $2.00), which is rentable for a demo window rather than requiring a
 serverless application target at all.
 
-**Resolved: a CPU container or VM target, with models called per token.** The
-judge instance is a web application — the static export and the API process on
-the `cloud` profile — and Serverless Endpoints and dedicated endpoints both
-serve models rather than applications. Renting an H100 at $4.05/hr to host a
-process with no GPU work in it pays GPU rates for a web server.
+**Resolved: a Serverless AI Endpoint, on a no-GPU container VM.** An earlier
+version of this answer argued Endpoints only serve models and reached for a
+plain container or VM target instead. That premise was wrong. Endpoints and
+Jobs both run an arbitrary container on a Compute container VM, and both
+creation flows offer the identical choice — "Select whether the VM should have
+GPUs" — with a VM lacking one a supported configuration, not a hypothetical
+one. ADR 0004's open risk closes as answered, not deferred to the fallback it
+named: Endpoints can host the application after all.
 
-The two questions the marker ran together are therefore separated: the app runs
-on the cheapest CPU target, and the models it calls are Token Factory per-token.
-The demo-window rental is rejected as the default and kept only as a latency
-contingency for a known demo slot — judges arrive unpredictably across a
-multi-day window, and an hourly endpoint bills for the idle between them.
+The cost argument survives and sharpens. Compute bills a non-GPU VM at $0.012
+per vCPU-hour and $0.0032 per GiB-hour. A `2vcpu-8gb` preset run continuously —
+730 hours, a full month — costs `2 × $0.012 × 730 + 8 × $0.0032 × 730 ≈ $36`.
+The same month on an H100 dedicated endpoint, run the same way, is
+`730 × $4.05 ≈ $2,957` — GPU rates for a process with no GPU work in it, made
+concrete rather than asserted.
 
-This closes ADR 0004's open risk in the direction that ADR named as its own
-fallback. It is recorded as a superseding ADR rather than by editing 0004.
+The two questions the marker ran together stay separated: the app runs on this
+endpoint, and the models it calls are Token Factory per-token — hosting the
+process on a Nebius Endpoint does not route its model calls through that
+endpoint. The demo-window GPU rental is rejected as the default and kept only
+as a latency contingency for a known demo slot — judges arrive unpredictably
+across a multi-day window, and an hourly endpoint bills for the idle between
+them.
+
+One constraint the corrected answer carries that the first draft did not: a
+no-GPU VM supports only the regular VM type, never preemptible — Nebius
+reserves preemptible pricing for GPU platforms. That changes nothing here; a
+judge instance cannot tolerate being preempted mid-demo regardless of what the
+first draft assumed.
+
+Recorded as a superseding ADR rather than by editing 0004.
 
 **How a job reaches the machine that holds the brain.** Ingest is inbound: a
 Nebius job must reach the orchestrator. Joining the job to the tailnet is the

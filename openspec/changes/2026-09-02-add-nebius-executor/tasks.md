@@ -31,13 +31,13 @@ machine, mode 0600, outside any git-tracked path.
 - [x] 1.1 Resolve the four clarification markers. Resolved 2 Sep; see the
   resolutions in `proposal.md` and `design.md`.
 - [ ] 1.2 Record the judge deployment target as a numbered ADR, superseding the
-  open risk in ADR 0004 rather than editing it. **Blocked on a correction, not
-  the credential.** The proposal's resolution asserted Nebius Serverless
-  Endpoints only serve models; Nebius's own docs describe them as hosting
-  arbitrary containers, and the Jobs docs confirm no-GPU container VMs are a
-  supported configuration. The cost argument for a CPU target likely survives;
-  the reasoning for it does not, and needs rewriting before this ADR is written
-  on top of it.
+  open risk in ADR 0004 rather than editing it. **The correction is made; the
+  ADR is not yet written.** `proposal.md`'s resolution now names the target — a
+  Serverless AI Endpoint on a no-GPU container VM, verified against Nebius's
+  own docs rather than assumed, with the cost comparison worked out
+  (`≈$36/month` against `≈$2,957/month` for the GPU alternative it replaces.)
+  What remains is turning that resolution into the numbered ADR this task
+  describes.
 - [x] 1.3 Confirm a Nebius credential is available to the machine, and that it
   is held where a public repository cannot see it. Confirmed for both Token
   Factory and Cloud IAM, verified against the live account rather than
