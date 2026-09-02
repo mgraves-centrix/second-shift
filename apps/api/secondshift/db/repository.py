@@ -831,12 +831,19 @@ class Repository:
         """What each stage reached, in order.
 
         "No empty mornings" is a query, and this is the query: a run whose
-        `outcome` is null — which is every run, because nothing closes one yet —
-        still says exactly how far it got here. A timeline that read only the run
-        row would render an unfinished night as a blank verdict.
+        `outcome` is null still says exactly how far it got here. A timeline that
+        read only the run row would render an unfinished night as a blank
+        verdict. (This said "which is every run, because nothing closes one yet"
+        until `night-pipeline` gave `close_run` its first caller. An open run is
+        now a process that died, not the normal case.)
+
+        `commit_sha` and `committed_at_ms` are selected because `distill` writes
+        them. Both are scalars, so this stays within the timeline's rule that
+        frame data carries no payload to parse.
         """
         return self._conn.execute(
-            "SELECT stage, seq, status, started_at_ms, ended_at_ms "
+            "SELECT stage, seq, status, started_at_ms, ended_at_ms, "
+            "committed_at_ms, commit_sha "
             "FROM run_stages WHERE run_id = ? ORDER BY seq",
             (run_id,),
         ).fetchall()

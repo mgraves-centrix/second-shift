@@ -1,0 +1,16 @@
+[Unit]
+Description=Work the queued entries overnight
+
+[Timer]
+# Once a night, late enough that the day's captures are in. The product is
+# "it works while you sleep"; a pipeline that ran hourly would burn the local
+# reasoner on half-formed queues and produce six thin briefs instead of one
+# considered one.
+OnCalendar=*-*-* 02:00:00
+# So a night missed because the machine was off still runs when it comes back.
+# An idea captured on Tuesday must not be silently skipped because Tuesday
+# night the box was asleep.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
