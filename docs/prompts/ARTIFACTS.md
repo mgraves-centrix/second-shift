@@ -3,8 +3,8 @@
 Paste as the first message of a fresh session. Local; the Spark to produce real
 ones.
 
-**Depends on `NIGHT_PIPELINE.md`. Runs in parallel with `RESEARCH.md`; the two
-must not both be in `secondshift/night/`.**
+**Depends on `NIGHT_PIPELINE.md`, which shipped 2 Sep. Runs in parallel with
+`RESEARCH.md`; the two must not both be in `secondshift/night/`.**
 
 ---
 
@@ -58,6 +58,15 @@ ranking matches your own ordering. If it does not, say so plainly and propose
 what the rank should be used for instead — a rank nobody trusts is worse than no
 rank, because it looks like evidence.
 
+> **This cannot be answered without the machine, and it must not be faked.** The
+> Spark has been unreachable since 2 Sep. Variants generated against the `cloud`
+> profile's `EchoReasoner` are placeholders, so ranking them measures nothing and
+> a comparison written from them would be exactly the untrustworthy evidence this
+> section warns about. Build the machinery, make the *structure* verifiable —
+> rank is not index, the group id is stable, the three fields are never
+> conflated — and leave the trust question open with a recommendation. Answer it
+> when the machine returns.
+
 The second open thing: **where artifacts live on disk.** `path` is a column, not
 a directory layout. Decide the layout with the judge instance in mind — it must
 hold artifacts that contain zero real data.
@@ -106,7 +115,7 @@ hold artifacts that contain zero real data.
 
 ```bash
 git status --short && openspec list && openspec list --specs
-apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 302 pass today
+apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 431 pass today
 npm --prefix apps/web run test && npm --prefix apps/web run typecheck
 scripts/check-no-environment.sh && scripts/check-american-english.sh
 ```
@@ -124,8 +133,10 @@ All green before starting. Then propose, clarify, apply, verify, sync, archive.
 - An artifact resolves to its producing invocation and back.
 - Recording an outcome makes `cost_per_accepted_artifact` return a number, and
   synthetic rows are excluded from it.
-- **Then produce a real brief on the Spark from one of the three entries queued
-  since 28 Aug, and read it.** Paste it in the report.
+- **Then produce a real brief on the Spark and read it.** Paste it in the
+  report. (The "three entries queued since 28 Aug" this line used to name were
+  read off the machine on 2 Sep and have not been re-read since — query it
+  rather than quoting that.)
 
 ## Quality bar
 
