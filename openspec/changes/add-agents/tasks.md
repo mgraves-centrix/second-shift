@@ -60,8 +60,33 @@
 
 ## 5. Against the real model
 
-- [ ] 5.1 Make one real call through an agent against the Spark's reasoner over
+- [x] 5.1 Make one real call through an agent against the Spark's reasoner over
   the tailnet, and paste what came back into the report. The suite must not
-  depend on it.
-- [ ] 5.2 Report whether the brief still opens with visible reasoning. If it
-  does, say so plainly — that is the finding, not a detail to fix later.
+  depend on it. Run 2026-09-02, distiller role, `local-only`, against
+  `nemotron-3.5-lightning`. Recorded: 337 prompt tokens, 2395 completion
+  tokens, one `agent_invocations` row at depth 0, one `model_calls` row under
+  `local-only`.
+- [x] 5.2 Report whether the brief still opens with visible reasoning.
+  **It does. Saying so plainly, because that is the finding.**
+
+  The raw completion opens with the literal string `Here's a thinking
+  process:` — as prose, not inside the `<think>` wrapper observed on 2 Sep. A
+  `</think>` did appear later, so `strip_reasoning` trimmed something, but what
+  survived still opens with deliberation (`Given the evidence—three product
+  ideas and one avoided topic, the goal is to produce...`) before reaching the
+  actual sentence, which the model then wrapped in backticks.
+
+  Three things this establishes, none of them fixable at this layer:
+
+  1. **The wrapper is inconsistent.** 2 Sep observed `<think>...</think>`
+     inside `content`; this call emitted prose preamble *and* a delimiter. A
+     strip conditioned on the delimiter cannot clean output the model does not
+     delimit.
+  2. **2395 completion tokens for one sentence.** The model deliberates inside
+     the budget at a scale that makes per-role `max_tokens` (task 3.3) more
+     load-bearing than it looked.
+  3. **The remedy is prompt content, which is the subject's decision.** The
+     draft says "close your reasoning before the answer begins"; the model
+     partially complied. Rewriting it to comply harder means writing
+     `distiller.v2.md`, and what a prompt says is explicitly not the
+     implementer's call.
