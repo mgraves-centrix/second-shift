@@ -137,32 +137,50 @@ read back by `python -m secondshift.evals status`. It lives beside the database
 on the always-on machine, so **a clone cannot show it** — do not read an
 unmarked `candidates.md` as an unmade decision.
 
-**The week-1 baseline exists.** Confirmed on the always-on machine, 2 Sep: five
-prompts active, one `eval_runs` row awaiting scoring. The day-3 gate is met and
-the clock that could not be restarted was started on time.
+**The week-1 baseline does not exist.** Read directly from the always-on machine
+on 2 Sep over the tailnet: `eval_runs` holds **zero rows**. An earlier note in
+this file said one row was awaiting scoring and that the day-3 gate was met.
+That was wrong, and it was load-bearing — the next session was told not to
+re-open the gate.
 
-**Still open:** scoring, which needs a judge and a generating provider — that is
-`local-inference` and `nebius-executor`, not this capability.
+`docs/WEEK_ONE.md` states the day-3 pass gate as "an `eval_runs` row exists
+pinning `rubric_sha` and the day-3 `brain_sha`." No such row was ever written.
 
-**Blocking scoring — the rubric on the machine is not the rubric in this
-repository.** `status` there reports `4a7c2e91b3d0`. `config/evals/rubric.md` has
-exactly one version in the whole history, at `a4fb4da`, and it hashes to
-`b4decd6fe774`. No committed version has ever hashed to what the machine reports,
-so this is not a checkout sitting behind — it is a copy of the file that git has
-never seen.
+What the machine actually holds, all of it verified read-only:
 
-Two values are involved and only one is known. `status` hashes the file **on disk
-at the moment it runs**; the pinned value is `eval_runs.rubric_sha` on the
-baseline row, and nothing has printed it yet.
+| | |
+|---|---|
+| `eval_runs` | **0 rows** — no baseline, nothing pinned |
+| `eval_prompts` | 10 loaded, **6 active** — not the five recorded here |
+| `entries` | 4 real captures, one archived and three still queued |
+| `runs` | 0 — no night has ever executed |
 
-- If the baseline pinned `4a7c2e91b3d0`, week 1 is pinned to a rubric absent from
-  a public repository whose entire argument is that the measurement is
-  reproducible from it.
-- If it pinned `b4decd6fe774`, the baseline is sound and the file drifted
-  afterward — still fatal at scoring time, because `score` reads the file on disk
-  and would grade week 1 against a rubric the baseline never used.
+The prompts were loaded and activated on **30 Aug**. `seed` and `activate` ran;
+`baseline` never did. Two commands of the three.
 
-Either way it is resolved before a judge runs, not after.
+**There is no rubric drift, and there never was.** The rubric on the machine is
+byte-identical to the committed one — both hash to
+`b4decd6fe7748e26afca39c267d7725c6bbde0d753c1f4071ae16c390670c563`. The
+`4a7c2e91b3d0` this file previously reported matches no file on that machine, and
+with `eval_runs` empty there was no pinned value for it to disagree with either.
+Where that figure came from is unknown; it did not come from this rubric.
+
+So the question this entry spent a week framing — which of two hashes the
+baseline pinned — had no answer because it had no baseline. The reconciliation
+work still stands on its own: `status` now reports recorded runs rather than
+echoing the hash of the file it just read, and against this database it says
+"no recorded run has pinned it yet," which is the true state and the thing
+nobody could see before.
+
+**The clock that could not be restarted was never started.** Every day it stays
+unrecorded, "week 1" pins a later brain — the journal already runs through 28 Aug
+and the brain has committed since. Recording it now is cheap and gets less
+honest daily; recording it never makes the week-8 comparison impossible.
+
+**Two decisions, both the subject's, neither taken here:** whether to record a
+baseline now against a brain five days past day 3, and which prompts it pins —
+six are active where five were intended, and the active set is part of what a
+baseline fixes.
 
 **The instrument now exists** — `2026-09-02-reconcile-rubric-pinning`. `status`
 reports every recorded run's pinned `rubric_sha` and `brain_sha` beside the hash
