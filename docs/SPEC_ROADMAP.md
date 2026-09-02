@@ -411,6 +411,27 @@ around it; the night pipeline is where it gets fixed.
 | `artifacts` | Briefs, mockups, builds. Variant grouping and critic ranking; outcome capture. |
 | `judge-mode` | The demo instance: cloud profile, synthetic persona, labeled in-UI, "run the night". |
 
+### The capabilities this table was missing
+
+Added 2 Sep. `docs/prompts/00_INDEX.md` names eight gaps "nobody had a plan
+for," and six of them had a session prompt but no entry here — which meant the
+one document a session reads to decide what to build next could not see them.
+A deferred obligation with no home is a dropped one, so they have a home now.
+
+| Capability | Covers | Blocks |
+|---|---|---|
+| `agents` | The roster and its versioned prompt files. `docs/ARCHITECTURE.md` specifies `agents/`; the directory does not exist, and `agents.prompt_sha` is `NOT NULL` with nothing but a test fixture writing `deadbeef` into it. | `night-pipeline` — a stage machine with no agents has nothing to run |
+| `configuration` | Ten `SECOND_SHIFT_*` variables across three TOML files, with no way to print the resolved configuration or where each value came from. | `night-pipeline` |
+| `api-layer` | `api/app.py` is one file five sessions need to add routes to; `api/routes/` is in `ARCHITECTURE.md`'s own tree and does not exist. | nothing, but it de-collides five later sessions |
+| `test-harness` | CI gates. Runs any time. | nothing |
+| `operations` | The machine: reboot story, backups, a recovery procedure someone has actually executed. Nobody owns it. | nothing, and that is the problem |
+| `eval-scoring` | The week-8 run and the curve. `SUBMISSION.md` declares a dependency on it that reads as satisfied and is not. | `submission` |
+
+**Ordering, corrected.** `night-pipeline` heads the table above but is not next:
+`00_INDEX.md`'s dependency graph puts `configuration` and `agents` ahead of it,
+and `agents` is the hard one — nothing produces an agent invocation today, so
+the stage machine would have no work to checkpoint. Take `agents` first.
+
 ### `retrieval` — shipped 2 Sep
 
 Local embedding behind the existing `Embedder`, exact brute-force cosine over an
