@@ -1,0 +1,172 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Scrubber rendering harness</title>
+<style>
+  :root { --bg: #0b0d10; --line: #232a32; --text: #e6eaef; --accent: #7ef0a8; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 13px/1.4 system-ui, sans-serif; }
+  #stage { position: relative; width: 1200px; height: 224px; margin: 24px; }
+  #dom { position: absolute; inset: 0; }
+  #dom .ev { position: absolute; height: 10px; border-radius: 2px;
+             background: var(--accent); opacity: 0.85; }
+  #dom .ev[data-tick="1"] { height: 6px; opacity: 0.55; }
+  #dom .ev[data-past="1"] { opacity: 0.25; }
+  #dom .ev[data-sev="error"] { background: #f07e7e; }
+  canvas { position: absolute; inset: 0; }
+  #head { position: absolute; top: 0; width: 1px; height: 224px;
+          background: var(--text); will-change: transform; }
+</style>
+<div id="stage">
+  <div id="dom"></div>
+  <canvas id="cv" width="1200" height="224"></canvas>
+  <div id="head"></div>
+</div>
+<script>
+// Three renderers over one real night, measured under the same playhead motion.
+//
+// The comparison is only honest if each does the work its approach actually
+// requires. `dom-naive` is included because it is the failure mode the quality
+// bar names by hand — "a component that re-renders the whole timeline on every
+// pointer move" — and a number for it is worth more than a warning about it.
+const WIDTH = 1200, HEIGHT = 224, LANE_H = 28, TICK_W = 2, MIN_BAR_W = 2;
+const SPEED = 20;                       // 20x real time
+const stage = document.getElementById("dom");
+const canvas = document.getElementById("cv");
+const ctx = canvas.getContext("2d");
+const head = document.getElementById("head");
+
+let events = [], lanes = [], t0 = 0, span = 1, nodes = [], laneOf = new Map();
+
+function layout(data) {
+  events = data.events.slice().sort((a, b) => a.ts_ms - b.ts_ms);
+  lanes = [...new Set(events.map((e) => e.lane))].sort();
+  lanes.forEach((l, i) => laneOf.set(l, i));
+  t0 = events[0].ts_ms;
+  span = Math.max(1, events[events.length - 1].ts_ms - t0);
+  const height = lanes.length * LANE_H;
+  document.getElementById("stage").style.height = `${height}px`;
+  head.style.height = `${height}px`;
+  canvas.height = height;
+  for (const e of events) {
+    e._x = ((e.ts_ms - t0) / span) * WIDTH;
+    e._w = e.duration_ms == null
+      ? TICK_W
+      : Math.max(MIN_BAR_W, (e.duration_ms / span) * WIDTH);
+    e._y = laneOf.get(e.lane) * LANE_H + 8;
+  }
+}
+
+function buildDom() {
+  stage.textContent = "";
+  nodes = events.map((e) => {
+    const n = document.createElement("div");
+    n.className = "ev";
+    n.style.transform = `translate(${e._x}px, ${e._y}px)`;
+    n.style.width = `${e._w}px`;
+    if (e.duration_ms == null) n.dataset.tick = "1";
+    if (e.severity === "error") n.dataset.sev = "error";
+    stage.appendChild(n);
+    return n;
+  });
+}
+
+// --- the three renderers -------------------------------------------------
+
+let crossed = 0;   // dom-incremental keeps a pointer into the sorted events
+
+const renderers = {
+  // Touches only the nodes the playhead has crossed since the last frame.
+  "dom-incremental"(now) {
+    while (crossed < events.length && events[crossed].ts_ms <= now) {
+      nodes[crossed].dataset.past = "1";
+      crossed++;
+    }
+    head.style.transform = `translateX(${((now - t0) / span) * WIDTH}px)`;
+  },
+  // Writes to every node every frame. The failure mode, measured.
+  "dom-naive"(now) {
+    for (let i = 0; i < events.length; i++) {
+      nodes[i].dataset.past = events[i].ts_ms <= now ? "1" : "0";
+    }
+    head.style.transform = `translateX(${((now - t0) / span) * WIDTH}px)`;
+  },
+  // Clears and redraws every mark.
+  canvas(now) {
+    ctx.clearRect(0, 0, WIDTH, canvas.height);
+    for (let i = 0; i < events.length; i++) {
+      const e = events[i];
+      const past = e.ts_ms <= now;
+      ctx.fillStyle = e.severity === "error" ? "#f07e7e" : "#7ef0a8";
+      ctx.globalAlpha = past ? 0.25 : e.duration_ms == null ? 0.55 : 0.85;
+      ctx.fillRect(e._x, e._y, e._w, e.duration_ms == null ? 6 : 10);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#e6eaef";
+    ctx.fillRect(((now - t0) / span) * WIDTH, 0, 1, canvas.height);
+  },
+};
+
+// --- measurement ---------------------------------------------------------
+
+function reset(mode) {
+  crossed = 0;
+  const usesDom = mode.startsWith("dom");
+  stage.style.display = usesDom ? "block" : "none";
+  canvas.style.display = usesDom ? "none" : "block";
+  head.style.display = usesDom ? "block" : "none";
+  if (usesDom) {
+    buildDom();
+  } else {
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  }
+}
+
+window.__measure = (mode, frames) =>
+  new Promise((resolve) => {
+    reset(mode);
+    const render = renderers[mode];
+    const costs = [], periods = [];
+    let now = t0, last = performance.now(), count = 0;
+
+    function step(ts) {
+      const dt = ts - last;
+      last = ts;
+      // Advance the playhead by wall-clock time at 20x, so the measurement
+      // tracks the motion a viewer would actually see rather than a fixed step.
+      now += dt * SPEED;
+      if (now > t0 + span) now = t0;
+
+      const a = performance.now();
+      render(now);
+      // Reading a layout property forces style and layout to happen *inside*
+      // the measured window. Without it the DOM modes look almost free: their
+      // writes are queued and the browser does the work after the callback
+      // returns, so the number would measure how fast the writes were recorded
+      // rather than what they cost. Canvas has nothing pending to flush, which
+      // is the asymmetry this comparison exists to price.
+      void stage.offsetHeight;
+      costs.push(performance.now() - a);
+      if (count > 0) periods.push(dt);
+
+      if (++count < frames) requestAnimationFrame(step);
+      else resolve({ mode, costs, periods });
+    }
+    requestAnimationFrame(step);
+  });
+
+//: A stress multiplier. `scale` copies the night into additional lanes so the
+//: abort criterion can be located rather than guessed at — a night four times
+//: denser than the one the generator produces is not a claim about real data,
+//: it is where the approach stops holding 60fps.
+window.__load = (data, scale = 1) => {
+  const source = data.events;
+  const stretched = [];
+  for (let copy = 0; copy < scale; copy++) {
+    for (const e of source) {
+      stretched.push(copy === 0 ? e : { ...e, lane: `${e.lane}~${copy}` });
+    }
+  }
+  layout({ ...data, events: stretched });
+  return { events: events.length, lanes: lanes.length };
+};
+</script>
