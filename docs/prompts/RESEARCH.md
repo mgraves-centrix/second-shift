@@ -3,8 +3,10 @@
 Paste as the first message of a fresh session. Needs a Tavily credential —
 **check for one before planning any code.**
 
-**Depends on `RETRIEVAL.md` and `NIGHT_PIPELINE.md`. Runs in parallel with
-`ARTIFACTS.md`; the two must not both be in `secondshift/night/`.**
+**Depends on `RETRIEVAL.md` and `NIGHT_PIPELINE.md`, both shipped 2 Sep.
+`ARTIFACTS.md` also shipped, so the "must not both be in `secondshift/night/`"
+collision is settled rather than avoided: `artifacts` lives in its own package
+and the night calls it.**
 
 ---
 
@@ -64,6 +66,17 @@ the database and the brain's `profile.md`, and enumerate what a search query
 derived from each would leak. Then design to that list, and keep it as the test
 corpus. Put the list in the proposal.
 
+> **That corpus was not reachable when this shipped, and the substitute is
+> labeled rather than passed off.** The development container's database holds
+> zero entries and `../second-shift-brain` is absent; the four real entries live
+> on the always-on machine. The real subject-authored text that *is* in the
+> repository — `config/evals/candidates.md` — is pre-sanitized, because the
+> repository is public and `scripts/check-no-environment.sh` enforces it, so a
+> redaction test against it would pass with redaction deleted. A deliberately
+> adversarial synthetic corpus was built instead, one entry per leak category.
+> **Re-run the list against the real four when the machine returns** — that is
+> the check this substitute cannot perform.
+
 The second open thing: **who builds the query.** A model turning an idea into
 search terms is itself an egress path if it runs remotely — under
 `cloud-assisted` the entry text reaching Token Factory to *produce* the query is
@@ -106,7 +119,7 @@ the same disclosure as the query itself. Say where query construction runs.
 
 ```bash
 git status --short && openspec list && openspec list --specs
-apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 302 pass today
+apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 473 pass today
 npm --prefix apps/web run test && npm --prefix apps/web run typecheck
 scripts/check-no-environment.sh && scripts/check-american-english.sh
 ```
