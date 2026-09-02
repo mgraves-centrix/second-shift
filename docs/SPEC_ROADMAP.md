@@ -5,9 +5,9 @@ per capability unless noted.
 
 Shipped, in the order they landed: `persistence`, `telemetry`,
 `compute-profiles`, `privacy-airlock` (`2026-08-27-add-foundations`, and
-`2026-08-27-fix-probe-model-identity`), then `capture`, `brain`, `evals` and
-`synthetic-seed`. Eight canonical capabilities across six archived changes, all
-under `openspec/changes/archive/`.
+`2026-08-27-fix-probe-model-identity`), then `capture`, `brain`, `evals`,
+`synthetic-seed` and `local-inference`. Nine canonical capabilities across eight
+archived changes, all under `openspec/changes/archive/`.
 
 Each entry lists what is **already decided** — so the proposal has material to
 draw on rather than re-deriving it — and what is **still open**, which becomes
