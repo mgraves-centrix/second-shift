@@ -437,7 +437,7 @@ A deferred obligation with no home is a dropped one, so they have a home now.
 | Capability | Covers | Blocks |
 |---|---|---|
 | ~~`agents`~~ | **Shipped 2 Sep** — `2026-09-02-add-agents`. Six drafted prompts, pinned by content hash; `deadbeef` is gone. Detail below. | — |
-| `configuration` | **Thirteen** `SECOND_SHIFT_*` variables across three TOML files, with no way to print the resolved configuration or where each value came from. Enumerate them at the time — this said ten on 2 Sep and was already wrong by four. Also the home for per-role `max_tokens`, deferred out of `agents`. | `night-pipeline` |
+| ~~`configuration`~~ | **Shipped 2 Sep** — `2026-09-02-add-configuration`. Thirteen `SECOND_SHIFT_*` settings, each with the layer it resolved from, and a tree scan that fails when the registry falls behind. Detail below. | — |
 | `api-layer` | `api/app.py` is one file five sessions need to add routes to; `api/routes/` is in `ARCHITECTURE.md`'s own tree and does not exist. | nothing, but it de-collides five later sessions |
 | `test-harness` | CI gates. Runs any time. | nothing |
 | `operations` | The machine: reboot story, backups, a recovery procedure someone has actually executed. Nobody owns it. | nothing, and that is the problem |
@@ -479,11 +479,65 @@ per-call budget, so this needs the provider interface widened — beyond this
 capability, and the token count above makes it matter more than it looked.
 Carried into `night-pipeline`, where budgets per stage first bite.
 
-**Ordering, corrected.** `night-pipeline` heads the table above but is not next:
-`00_INDEX.md`'s dependency graph puts `configuration` and `agents` ahead of it.
-`agents` shipped 2 Sep, so `configuration` is what remains between here and
-`night-pipeline` — and `night-pipeline` now has agents to sequence and retrieval
-to feed them.
+**Ordering, corrected.** `night-pipeline` heads the table above but was not
+next: `00_INDEX.md`'s dependency graph puts `configuration` and `agents` ahead of
+it. Both shipped on 2 Sep, so **`night-pipeline`'s prerequisites are now
+clear** — it has agents to sequence, retrieval to feed them, and a resolved view
+that can say which endpoint a stage actually reached.
+
+### `configuration` — shipped 2 Sep
+
+Thirteen canonical capabilities. `python -m secondshift.config show` prints
+every `SECOND_SHIFT_*` setting, its resolved value, and the layer it came
+from — environment, a named file, or a default.
+
+**The count was the argument.** `docs/prompts/CONFIGURATION.md` was written on
+2 Sep saying *ten* variables and listing ten; `retrieval` had added three the
+same day. A capability scoped to that number would have shipped three settings
+short. So the load-bearing test scans the tree — Python **and** shell, because
+`SECOND_SHIFT_RUBRIC_OVERWRITE` is read only by `deploy/spark/deploy.sh` and a
+Python-only view has a hole exactly its shape — and fails when the registry
+falls behind. Proved by adding a throwaway read to `brain/repo.py` and watching
+it go red naming the variable.
+
+**The open decision was the wrong question, and enumeration is what showed it.**
+The prompt asked whether an unresolvable required value is a startup failure or
+a runtime one. Measuring all thirteen — a script setting each state and recording
+what came back, rather than reading the source — says the axis is
+**absent versus malformed**:
+
+- **Absent is legitimate for twelve of thirteen** and the existing defaults are
+  right. A missing `models.toml` genuinely means "use the defaults." A uniform
+  startup-failure rule would have made ten settings worse.
+- **Malformed never is.** A mistyped `config/models.toml` was indistinguishable
+  from an absent one — both yielded `127.0.0.1:8000` and an empty model name — so
+  the probe reported the reasoner **unreachable** while the real cause was a
+  syntax error nothing mentioned. An operator would go debug a network that was
+  fine. That is the failure this capability exists to end.
+
+**Loud is not fatal, and checking the blast radius changed the design
+mid-implementation.** The first draft said a malformed file raises. But
+`api/app.py:77` resolves the profile at construction, so raising there takes the
+API down — and capture with it — over a file capture never reads. It reports
+instead: through the capability finding that depends on it, and through a
+non-zero exit a deploy can gate on. `pricing.toml` keeps raising, because it
+already did and a silent zero understates a scored measurement; it just names
+the file now.
+
+**`SECOND_SHIFT_SYNTHETIC` is the one setting that refuses.** `is_synthetic` is
+what keeps seed rows out of a measurement (principle 7), and `SYNTHETIC=ture`
+quietly meaning "real data" fails in the direction that cannot be undone.
+Failing to start is recoverable; a contaminated eight-week curve is not.
+
+**Still open, and honestly so:** the view has only ever run in this container.
+It reports `/root/...` for the database default here and will report the service
+account's path on the always-on machine — which is the point, and is also
+unverified there. `operations` owns running it on the box.
+
+**Deferred with a handoff rather than dropped:** per-role `max_tokens`, which
+this table parked here. The `[agents]` block shape depends on what
+`night-pipeline` needs per stage, and a shape guessed now is one that gets
+rewritten.
 
 ### `retrieval` — shipped 2 Sep
 
@@ -570,7 +624,7 @@ that was not true on the machine or in the tree:
 | Capability counts in `README.md`, `SPEC_ROADMAP.md`, `GRADES.md`, `00_INDEX.md` | Stale numbers; the roadmap header now says to run `openspec list --specs` rather than carrying one |
 | `00_INDEX.md`'s "what is true on 2 Sep" table | A frozen snapshot labeled "do not re-derive any of it." Replaced with the commands that derive it, plus a dated table of what cannot be derived |
 | Four resolved-but-open nebius markers; the `4a7c2e91b3d0` rubric hash; ADR 0006 pricing | Written out as resolutions; the hash matched no file on the machine |
-| `configuration` scope, 10 → 13 variables | Enumerated from source; scoping to 10 would have shipped it 30% short |
+| `configuration` scope, 10 → 13 variables | Enumerated from source; scoping to 10 would have shipped it three settings short. The roadmap said "wrong by four" — 10 against 13 is wrong by three, and a drift pass that miscounts its own finding is the thing it exists to stop |
 | `ARCHITECTURE.md`'s repository tree | Seven entries that do not exist (`NEBIUS_USAGE.md`, `night/`, `morning/`, `api/routes/`, `charts/`, `deploy/tailscale/`, `deploy/nebius/`), and eleven real directories absent — `openspec/` and `config/` among them. Now marks planned ones `(planned)` and says to generate the real tree |
 | `WEEK_ONE.md`'s day-3 pass gate | Read as pending; it was missed. Now says which of the four were met, and that the 2 Sep baseline pins a later brain because the day-3 state is unrecoverable |
 | Five prompts → six, in `WEEK_ONE.md` and `DATA_MODEL.md` | Six were activated 30 Aug. `DATA_MODEL.md`'s "45 points of noise" derived from nothing in the rubric |

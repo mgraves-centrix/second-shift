@@ -16,27 +16,34 @@ at once only if the set of files they write is disjoint. Everything below is
 grouped by that rule, not by how interesting it is.
 
 ```
-   API_LAYER ──────┐   (run early: it de-collides five later sessions)
-   CONFIGURATION ──┤
+   API_LAYER ──────┐   (run early: it de-collides four later sessions)
+   CONFIGURATION ✅┤
                    ├──> NIGHT_PIPELINE ──> ARTIFACTS ──┐
-   AGENTS ─────────┘         │                         ├──> JUDGE_MODE ──> SUBMISSION
+   AGENTS ────────✅┘        │                         ├──> JUDGE_MODE ──> SUBMISSION
                              ├──> RESEARCH ────────────┤                      ^
-   RETRIEVAL ────────────────┘                         │                      │
+   RETRIEVAL ───────────────✅┘                        │                      │
                                                        │       EVAL_SCORING ──┘
    FRONTEND ──> MORNING_INTERVIEW ─────────────────────┘
+
+   ✅ shipped 2 Sep. NIGHT_PIPELINE's three prerequisites are all met.
 
    TEST_HARNESS    OPERATIONS    ASR    NEBIUS_EXECUTOR
    any time        needs the     needs  blocked on
                    machine       Spark  credentials
 ```
 
+Shipped rows are struck through. A prompt for a shipped capability is a record
+of what was asked, not a session to run — read it for the reasoning, and read
+the change in `openspec/changes/archive/` for what actually happened, which in
+all three cases differs from the prompt in at least one decision.
+
 | # | Prompt | Owns | Runs after | Parallel with |
 |---|---|---|---|---|
-| 0 | `API_LAYER.md` | `api/routes/`, `api/app.py` | — | 1, 2, 3, 8, 10 |
-| 1 | `CONFIGURATION.md` | `config.py`, `config/*.toml` | — | 0, 2, 3, 8, 10 |
-| 2 | `AGENTS.md` | `secondshift/agents/` | — | 0, 1, 3, 8, 10 |
-| 3 | `RETRIEVAL.md` | `retrieval/`, `providers/embed*` | — | 0, 1, 2, 8, 9 |
-| 4 | `NIGHT_PIPELINE.md` | `night/`, `repository.close_run` | 1, 2 | 9, 10 |
+| 0 | `API_LAYER.md` | `api/`, `api/app.py` | — | 8, 10 |
+| 1 | ~~`CONFIGURATION.md`~~ | ✅ shipped 2 Sep | — | — |
+| 2 | ~~`AGENTS.md`~~ | ✅ shipped 2 Sep | — | — |
+| 3 | ~~`RETRIEVAL.md`~~ | ✅ shipped 2 Sep | — | — |
+| 4 | `NIGHT_PIPELINE.md` | `night/`, `repository.close_run` | **unblocked — 1, 2 and 3 all shipped** | 9, 10 |
 | 5 | `RESEARCH.md` | `research/`, `providers/tavily*` | 3, 4 | 6 |
 | 6 | `ARTIFACTS.md` | `secondshift/artifacts/` | 4 | 5 |
 | 7 | `NEBIUS_EXECUTOR.md` | `providers/nebius*`, ingest route | credentials | anything |
@@ -47,7 +54,7 @@ grouped by that rule, not by how interesting it is.
 | 12 | `EVAL_SCORING.md` | `eval_runs` rows, the curve | a judge | 11 |
 | 13 | `SUBMISSION.md` | `docs/NEBIUS_USAGE.md`, the write-up | 11, 12 | — |
 | — | `OPERATIONS.md` | `deploy/`, the machine | — | everything |
-| — | `ASR.md` | `providers/asr*`, spike E | — | everything |
+| — | `ASR.md` | `providers/asr*`, spike F | — | everything |
 
 **Three collision surfaces, not two.** Two sessions must never both be in
 `apps/web/app/`, in `secondshift/night/`, or in **`api/app.py`** — which is a
@@ -99,12 +106,12 @@ empty. The gap is a deploy, not a missing capability.
 
 Found 2 Sep. Each is now a prompt above.
 
-1. **`configuration`** — **thirteen** `SECOND_SHIFT_*` variables across three
-   TOML files, no way to print the resolved configuration or where each value
-   came from. (This said ten until 2 Sep; the three embedder variables and
-   `_RUBRIC_OVERWRITE` postdate the count. Scoping the capability to the wrong
-   number would have shipped it 30% short — enumerate them, do not trust this
-   line either.)
+1. ~~**`configuration`**~~ — **closed 2 Sep** (`2026-09-02-add-configuration`).
+   Thirteen `SECOND_SHIFT_*` settings, each reporting the layer it resolved
+   from. The count was the whole lesson: this line said *ten* until 2 Sep while
+   `retrieval` had already added three, so the capability now carries a test that
+   scans the tree — Python and shell both — and fails when the registry falls
+   behind. Do not trust a count in a document; run the scan.
 2. ~~**`agents`**~~ — **closed 2 Sep** (`2026-09-02-add-agents`). Six roles, six
    drafted prompt files, `prompt_sha` computed from file content. `deadbeef` is
    gone from the codebase.

@@ -1,5 +1,19 @@
 # Configuration prompt
 
+> **✅ Shipped 2 Sep — `openspec/changes/archive/2026-09-02-add-configuration`.**
+> Kept as the record of what was asked. Two things below did not survive contact
+> with the code, and both are worth reading before writing the next prompt:
+>
+> 1. **The open decision was the wrong question.** It asks whether an
+>    unresolvable required value is a startup or a runtime failure. Enumerating
+>    all thirteen says the axis is **absent versus malformed** — absent is
+>    legitimate for twelve of them, malformed for none.
+> 2. **"What good looks like" says a malformed file should be loud, and loud
+>    turned out not to mean raising.** `api/app.py` resolves the profile at
+>    construction, so raising on a malformed `models.toml` takes capture down
+>    over a file capture never reads. It reports through the capability finding
+>    and a non-zero exit instead.
+
 Paste as the first message of a fresh session. Entirely local — no Spark, no
 tailnet, no credentials.
 

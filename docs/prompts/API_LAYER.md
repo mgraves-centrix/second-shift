@@ -46,7 +46,11 @@ Do this first and those five become parallel. Do it late and they queue.
   `app.mount("/", StaticFiles(directory=WEB_EXPORT, html=True))`. Move it and the
   PWA silently swallows the API.
 - `main.py` reads `SECOND_SHIFT_DB` and `SECOND_SHIFT_SYNTHETIC`, and the latter
-  is **server-derived, never accepted from a request**.
+  is **server-derived, never accepted from a request**. Since `configuration`
+  shipped it goes through `config.synthetic_flag()`, which raises on a value it
+  does not recognize rather than resolving to false — do not reintroduce a
+  permissive parse. `python -m secondshift.config show` prints what both
+  resolved to and where from.
 - Two migrations: `0001_initial.sql` and `0002_capture.sql`.
 
 ## The open decision
