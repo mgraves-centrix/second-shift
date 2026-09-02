@@ -1,0 +1,60 @@
+# Prompt grades
+
+Run `python3 scripts/grade-prompts.py` rather than trusting this file. A grade
+that was claimed instead of computed is not a grade.
+
+```
+all 12 prompts at 12/12
+```
+
+## What the score does and does not prove
+
+**It proves presence, not quality.** The grader checks that each prompt has a
+named open decision, a runnable loop, a verification step that can fail, explicit
+non-goals, and a report that demands honesty. It cannot check whether the open
+decision is the *sharp* one, or whether the facts are true.
+
+Criterion 1 — "grounded in verified fact" — is the weakest check by far. It
+matches the phrase `do not invent any of it`, which is a proxy for a discipline,
+not a measurement of it. **The facts in these prompts were verified by hand**
+against the running machine and the schema on 2 Sep: row counts read from the
+database over the tailnet, the reasoner's response shape read from a live
+completion, the environment variables enumerated from the source, the absent
+files confirmed absent. Nothing in the grader would catch it if a later edit put
+a wrong number in.
+
+Treat 12/12 as *this prompt has the parts a good prompt has*. Whether it is a
+good prompt is a question for the session that uses it, and the report format is
+what surfaces the answer.
+
+## First-pass failures, and what fixed them
+
+Every prompt was graded before commit. Six failed. The fixes are listed because a
+grade with no named weakness behind it is a claim, not a finding.
+
+| Prompt | First pass | Missing | Fix |
+|---|---|---|---|
+| `NEBIUS_EXECUTOR.md` | 9/12 | No open-decision section; no by-preference guard; no honesty demand | Added a section saying the decisions are all upstream markers and must not be answered in-session, and a report item asking whether the fan-out actually beat one machine |
+| `AGENTS.md` | 10/12 | No proof the sha test can fail; no honesty demand | Added "hardcode the sha and watch the suite go red"; added "if the brief still opens with *Here's a thinking process*, say so" |
+| `ARTIFACTS.md` | 11/12 | Can-fail proof implied, not instructed | Added "replace the critic's rank with the generation index and watch it go red" |
+| `JUDGE_MODE.md` | 11/12 | No way to reach the starting state; no mutation check | Added the seed-and-serve commands; added two can-fail proofs including inserting a non-synthetic row |
+| `SUBMISSION.md` | 11/12 | No falsification of its own verification | Added "change one figure and confirm the regeneration disagrees" |
+| `TEST_HARNESS.md` | 11/12 | Can-fail phrasing ambiguous | Made the browser-test mutation explicit, citing the playhead defect that shipped through three passing tests |
+
+## Three grader bugs, which are the point
+
+The first version of the checker reported `NEBIUS_EXECUTOR.md` and
+`SUBMISSION.md` as failing criteria they satisfied. Both were the checker's
+fault: a line break split `by preference` across two lines, and the pattern
+accepted `able to fail` but not `can fail`.
+
+The fix was to normalize whitespace and widen the pattern — **not** to reword the
+prose so it matched a bad regex. Bending the artifact to satisfy the test is the
+failure mode this whole repository is written against, and it would have been
+invisible in a green result.
+
+The third bug was this file. The grader scored `GRADES.md` as a prompt and failed
+it on seven criteria, correctly — a report card has no runnable loop. Scoping the
+grader to actual prompts fixed it. Three bugs in a checker that fits on one
+screen is the argument for running it rather than trusting a number pasted into a
+document.
