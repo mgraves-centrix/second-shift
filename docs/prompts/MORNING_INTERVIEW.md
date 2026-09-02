@@ -7,6 +7,20 @@ judge it.
 `TEST_HARNESS.md`; must not be in `apps/web/app/` at the same time as
 `FRONTEND.md`.**
 
+> **`FRONTEND.md` had not shipped when this ran, and that split the capability.**
+> Its own prompt says it "must land before `MORNING_INTERVIEW.md`", and the
+> reason is concrete: `/` and `/night/` have no navigation between them, and
+> design tokens are already drifting across `app/globals.css` and
+> `components/scrubber/scrubber.module.css`. Building a third surface on that
+> makes the drift worse, which is the thing `FRONTEND.md` exists to stop.
+>
+> So **the server half shipped and the screen did not** — briefing assembly,
+> the interviewer raising decisions, answering with a modality, and the policy
+> upgrade. All of it is exercised through the API and tests rather than through
+> a rendered page. The screen is `FRONTEND.md`'s to unblock, and the report
+> item asking whether the interview *felt* like an interview is unanswerable
+> until it exists.
+
 ---
 
 Build `morning-interview`. Read `openspec/constitution.md`, `CLAUDE.md`,
@@ -24,6 +38,13 @@ brain gets better because the interview corrects it; nothing else writes belief.
 
 ## What already exists — do not invent any of it
 
+- **The interviewer agent is what raises a decision**, not the night. The
+  schema says so — `raised_by_invocation_id` is commented *which interviewer
+  version asked* — and the shipped `interviewer.v1.md` prompt agrees: "The night
+  has run; some of it worked and some of it got stuck. Your job is to ask the
+  person the smallest number of questions that would have unblocked the most
+  work." So the questions are produced at briefing time by reading the night's
+  record, and `night-pipeline` correctly does not write this table.
 - `decisions`: `question`, `rationale` (*why the agent could not proceed*),
   `blocking_stage`, `raised_by_invocation_id` (*which interviewer version asked*),
   `answer`, `answer_modality` CHECK over `voice` and `text`, `status` CHECK over
@@ -127,7 +148,7 @@ defensible; silently half-building it is not.
 
 ```bash
 git status --short && openspec list && openspec list --specs
-apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 302 pass today
+apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 518 pass today
 npm --prefix apps/web run test && npm --prefix apps/web run typecheck
 npm --prefix apps/web run build
 scripts/check-no-environment.sh && scripts/check-american-english.sh
