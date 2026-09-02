@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from secondshift.brain.repo import BrainRepo, BrainUnavailable
+from secondshift.evals.__main__ import main
 from secondshift.evals.content import Rubric, load_prompts, load_rubric
 from secondshift.evals.judge import (
     DIMENSIONS,
@@ -16,7 +17,12 @@ from secondshift.evals.judge import (
     StubJudge,
     UnreadableJudgement,
 )
-from secondshift.evals.runner import AWAITING, EvalRunner, NoJudgeConfigured
+from secondshift.evals.runner import (
+    AWAITING,
+    EvalRunner,
+    NoJudgeConfigured,
+    RubricMismatch,
+)
 
 GOOD = {d: 4 for d in DIMENSIONS}
 
@@ -329,3 +335,186 @@ class TestExplicitSlugs:
         # Every slug names what the prompt asks, not why it was chosen.
         assert "readme-in-my-voice" in slugs
         assert not any("tests-" in s for s in slugs)
+
+
+class TestRubricPinningIsBinding:
+    """The pinned hash was recorded and then trusted. Now it is checked."""
+
+    def _drifted(self, tmp_path) -> Rubric:
+        """A rubric that is not the one a baseline pinned.
+
+        Written as a separate file rather than by editing the fixture in place,
+        because editing a rubric in place is exactly what the rubric forbids and
+        what this guard exists to catch.
+        """
+        path = tmp_path / "rubric-drifted.md"
+        path.write_text("# Rubric v1\n\nFive dimensions, one to five. Plus a sixth.\n")
+        return load_rubric(path)
+
+    def test_scoring_under_a_different_rubric_is_refused(self, runner, rubric, tmp_path):
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
+        drifted = self._drifted(tmp_path)
+
+        with pytest.raises(RubricMismatch) as raised:
+            runner.score(run_id, judge=StubJudge(), generate=_generate, rubric=drifted)
+
+        # Both hashes named: a refusal that does not say which two values
+        # disagree leaves the operator running the same SQL by hand.
+        message = str(raised.value)
+        assert rubric.sha[:12] in message
+        assert drifted.sha[:12] in message
+
+    def test_a_refused_score_records_nothing(self, runner, rubric, repo, tmp_path):
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
+
+        with pytest.raises(RubricMismatch):
+            runner.score(
+                run_id, judge=StubJudge(), generate=_generate,
+                rubric=self._drifted(tmp_path),
+            )
+
+        assert repo.connection.execute(
+            "SELECT COUNT(*) n FROM eval_results WHERE eval_run_id = ?", (run_id,)
+        ).fetchone()["n"] == 0
+        assert runner.awaiting_scoring() == [run_id]
+
+    def test_a_refusal_is_not_recorded_as_failed_samples(
+        self, runner, rubric, repo, tmp_path
+    ):
+        """A wrong rubric is wrong for every sample, so it is not a partial run."""
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
+        before = repo.connection.execute("SELECT COUNT(*) n FROM failures").fetchone()["n"]
+
+        with pytest.raises(RubricMismatch):
+            runner.score(
+                run_id, judge=StubJudge(), generate=_generate,
+                rubric=self._drifted(tmp_path),
+            )
+
+        after = repo.connection.execute("SELECT COUNT(*) n FROM failures").fetchone()["n"]
+        assert after == before
+
+    def test_the_refusal_happens_before_anything_is_generated(
+        self, runner, rubric, tmp_path
+    ):
+        """Generation is where the cost is. The check is cheaper and comes first."""
+        calls: list[str] = []
+
+        def _record(prompt: str, brain, sample: int) -> str:
+            calls.append(prompt)
+            return "answer"
+
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
+        with pytest.raises(RubricMismatch):
+            runner.score(
+                run_id, judge=StubJudge(), generate=_record,
+                rubric=self._drifted(tmp_path),
+            )
+        assert calls == []
+
+    def test_scoring_under_the_pinned_rubric_proceeds(self, runner, rubric, repo):
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
+        summary = runner.score(run_id, judge=StubJudge(), generate=_generate, rubric=rubric)
+        assert summary.complete
+        assert repo.connection.execute(
+            "SELECT COUNT(*) n FROM eval_results WHERE eval_run_id = ?", (run_id,)
+        ).fetchone()["n"] == 6
+
+    def test_an_identical_rubric_at_another_path_is_the_same_rubric(
+        self, runner, rubric, tmp_path
+    ):
+        """The hash follows content, not location. A copy is not drift."""
+        elsewhere = tmp_path / "copied" / "rubric.md"
+        elsewhere.parent.mkdir()
+        elsewhere.write_text(rubric.text)
+
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
+        summary = runner.score(
+            run_id, judge=StubJudge(), generate=_generate, rubric=load_rubric(elsewhere)
+        )
+        assert summary.complete
+
+
+class TestStatusReportsThePinning:
+    """`status` hashed the file it had just read and exited zero either way.
+
+    That is the one value that cannot reveal a disagreement with what a run
+    pinned, which is how a mismatch stayed invisible in its output.
+    """
+
+    def _run(self, tmp_path, rubric_path, capsys) -> tuple[int, str]:
+        code = main([
+            "status",
+            "--db", str(tmp_path / "second-shift.db"),
+            "--rubric", str(rubric_path),
+            "--brain", str(tmp_path / "brain"),
+        ])
+        return code, capsys.readouterr().out
+
+    def test_a_recorded_run_reports_what_it_pinned(
+        self, runner, rubric, brain, tmp_path, capsys
+    ):
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
+
+        code, out = self._run(tmp_path, rubric.path, capsys)
+
+        assert code == 0
+        assert run_id in out
+        assert "2026-08-24" in out
+        assert rubric.sha[:12] in out
+        assert brain.head()[:12] in out
+        assert "awaiting scoring" in out
+        assert "every recorded run pinned the rubric on disk" in out
+
+    def test_a_run_pinned_to_another_rubric_is_called_out(
+        self, runner, rubric, tmp_path, capsys
+    ):
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
+
+        # The file drifts after the baseline — the case that actually happened.
+        rubric.path.write_text("# Rubric v1\n\nSix dimensions now.\n")
+        on_disk = load_rubric(rubric.path)
+        assert on_disk.sha != rubric.sha
+
+        code, out = self._run(tmp_path, rubric.path, capsys)
+
+        assert code == 1
+        assert "not the rubric on disk" in out
+        assert f"run {run_id} pinned rubric {rubric.sha[:12]}" in out
+        assert on_disk.sha[:12] in out
+        assert "superseded, never edited in place" in out
+
+    def test_an_empty_database_reports_the_rubric_and_exits_zero(
+        self, runner, rubric, tmp_path, capsys
+    ):
+        code, out = self._run(tmp_path, rubric.path, capsys)
+        assert code == 0
+        assert rubric.sha[:12] in out
+        assert "no recorded run has pinned it yet" in out
+
+    def test_the_active_set_is_still_reported(self, runner, rubric, tmp_path, capsys):
+        _seed_and_activate(runner, rubric, slugs=("alpha", "beta"))
+        code, out = self._run(tmp_path, rubric.path, capsys)
+        assert code == 0
+        assert "2 active prompts" in out
+        assert "alpha" in out and "beta" in out
+
+    def test_a_scored_run_names_its_judge_rather_than_awaiting(
+        self, runner, rubric, tmp_path, capsys
+    ):
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
+        runner.score(run_id, judge=StubJudge(), generate=_generate, rubric=rubric)
+
+        code, out = self._run(tmp_path, rubric.path, capsys)
+        assert code == 0
+        assert "judged by stub-judge" in out
+        assert "awaiting scoring" not in out

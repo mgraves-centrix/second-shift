@@ -10,13 +10,15 @@ makes a number mean anything.
 
 from .content import Rubric, load_prompts, load_rubric
 from .judge import Judgement, Judge, StubJudge, UnreadableJudgement
-from .runner import EvalRunner, RunSummary
+from .runner import EvalRunner, RecordedRun, RubricMismatch, RunSummary
 
 __all__ = [
     "EvalRunner",
     "Judge",
     "Judgement",
+    "RecordedRun",
     "Rubric",
+    "RubricMismatch",
     "RunSummary",
     "StubJudge",
     "UnreadableJudgement",

@@ -161,19 +161,31 @@ baseline row, and nothing has printed it yet.
   afterward — still fatal at scoring time, because `score` reads the file on disk
   and would grade week 1 against a rubric the baseline never used.
 
-Either way it is resolved before a judge runs, not after. Reconcile with:
+Either way it is resolved before a judge runs, not after.
+
+**The instrument now exists** — `2026-09-02-reconcile-rubric-pinning`. `status`
+reports every recorded run's pinned `rubric_sha` and `brain_sha` beside the hash
+of the file on disk, says so plainly when they disagree, and exits non-zero. On
+the always-on machine, this now answers the question:
 
 ```bash
-sqlite3 <db> 'SELECT id, week_of, rubric_sha, brain_sha FROM eval_runs;'
-sha256sum config/evals/rubric.md
-git status --short config/evals/rubric.md   # in the working copy that ran status
+python -m secondshift.evals status
 ```
 
-An uncommitted local edit is the most likely cause and the easiest to miss. Note
-that `deploy.sh` wipes and re-extracts the remote tree, so an edit made only on
-the machine is destroyed by the next deploy — which would change the rubric out
-from under a pinned baseline with nothing surfacing it. The rubric's own opening
-line is the rule here: never edit in place; supersede with `rubric-v2.md`.
+Two guards close behind it. `score` compares the rubric it was handed against the
+run's pinned hash before generating anything and refuses on a mismatch, so week 1
+cannot be graded against a rubric it never used. And `deploy.sh` hashes the
+target's rubric before the `rm -rf` and refuses to replace one that differs — an
+edit made only on the machine was previously destroyed by the next deploy, which
+would have changed the rubric out from under a pinned baseline with nothing
+surfacing it. The rubric's own opening line is the rule: never edit in place;
+supersede with `rubric-v2.md`.
+
+**Still open, and a decision rather than an implementation:** which value the
+baseline actually pinned, and if it is `4a7c2e91b3d0`, whether to re-record week
+1 under the committed rubric. That needs the machine, and the re-record question
+belongs to the person being measured. The brain is days old, so re-recording is
+cheap now and never again.
 
 ### 4. `local-inference` — day 4
 

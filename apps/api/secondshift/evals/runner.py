@@ -34,6 +34,16 @@ class NoJudgeConfigured(RuntimeError):
     """Scoring was attempted with nothing to score with."""
 
 
+class RubricMismatch(RuntimeError):
+    """Scoring was attempted under a rubric the run did not pin.
+
+    Raised before generation rather than recorded per sample. A failed sample is
+    evidence about one output; a wrong rubric is wrong for every sample in the
+    same way, so recording it as a partial run would present a rubric error as a
+    measurement of the brain.
+    """
+
+
 @dataclass(frozen=True, slots=True)
 class PromptSummary:
     slug: str
@@ -52,6 +62,21 @@ class PromptSummary:
         evidence.
         """
         return statistics.stdev(self.samples) if len(self.samples) > 1 else 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class RecordedRun:
+    """A run as it was pinned, independent of whether it has been scored."""
+
+    eval_run_id: str
+    week_of: str
+    rubric_sha: str
+    brain_sha: str
+    judge_model: str
+
+    @property
+    def awaiting(self) -> bool:
+        return self.judge_model == AWAITING
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,6 +175,35 @@ class EvalRunner:
         )
         return eval_run_id
 
+    def pinned_rubric_sha(self, eval_run_id: str) -> str:
+        row = self._repo.connection.execute(
+            "SELECT rubric_sha FROM eval_runs WHERE id = ?", (eval_run_id,)
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"unknown eval run {eval_run_id!r}")
+        return row["rubric_sha"]
+
+    def recorded_runs(self) -> list[RecordedRun]:
+        """Every run and what it pinned, oldest first.
+
+        A pinned hash nobody can read is pinned in name only. This exists so
+        reconciling one is a supported command rather than SQL written from
+        memory against a database on another machine.
+        """
+        return [
+            RecordedRun(
+                eval_run_id=r["id"],
+                week_of=r["week_of"],
+                rubric_sha=r["rubric_sha"],
+                brain_sha=r["brain_sha"],
+                judge_model=r["judge_model"],
+            )
+            for r in self._repo.connection.execute(
+                "SELECT id, week_of, rubric_sha, brain_sha, judge_model FROM eval_runs "
+                "ORDER BY started_at_ms"
+            )
+        ]
+
     def awaiting_scoring(self) -> list[str]:
         return [
             r["id"]
@@ -196,6 +250,21 @@ class EvalRunner:
         if judge is None:
             raise NoJudgeConfigured(
                 "no judge configured; refusing to record unscored results as scored"
+            )
+
+        # The rubric arrives from disk and the run recorded a hash. Nothing
+        # compared them until now, so a rubric edited after a baseline was
+        # recorded would have graded that baseline and stamped the result with a
+        # hash that did not produce it — a wrong number wearing the pinning that
+        # exists to make numbers trustworthy.
+        pinned = self.pinned_rubric_sha(eval_run_id)
+        if rubric.sha != pinned:
+            raise RubricMismatch(
+                f"eval run {eval_run_id} pinned rubric {pinned[:12]}, but "
+                f"{rubric.path} hashes to {rubric.sha[:12]}. Scoring would grade "
+                "this run against a rubric it never used. Restore the rubric it "
+                "pinned, or record a new baseline under the rubric on disk — a "
+                "rubric is superseded, never edited in place."
             )
 
         brain = self.brain_at_baseline(eval_run_id)

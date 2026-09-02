@@ -17,6 +17,54 @@ HOST="${SPARK_HOST}"
 USER_NAME="${SPARK_USER}"
 REMOTE="${SPARK_PATH:-/home/${USER_NAME}/second-shift}"
 
+# The rubric is the one file under config/ whose content hash is recorded in the
+# database — `eval_runs.rubric_sha` pins a measurement to it. The transfer below
+# does `rm -rf` on the target tree, so a rubric edited only on the target is
+# destroyed here with nothing printed, silently changing the rubric under a
+# pinned baseline. Compare before anything is built or destroyed.
+RUBRIC="config/evals/rubric.md"
+
+sha256_of() {
+    # Not `sha256sum` alone: this script runs on macOS, which ships `shasum`.
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | cut -d' ' -f1
+    else
+        shasum -a 256 "$1" | cut -d' ' -f1
+    fi
+}
+
+LOCAL_RUBRIC_SHA="$(sha256_of "${RUBRIC}")"
+# Reports a hash or the literal `absent`, never nothing: an indeterminate answer
+# fails the ssh under `set -e` rather than reading as "no rubric there".
+REMOTE_RUBRIC_SHA="$(ssh "${USER_NAME}@${HOST}" "
+    set -eu
+    if [ ! -f '${REMOTE}/${RUBRIC}' ]; then
+        echo absent
+    elif command -v sha256sum >/dev/null 2>&1; then
+        sha256sum '${REMOTE}/${RUBRIC}' | cut -d' ' -f1
+    else
+        shasum -a 256 '${REMOTE}/${RUBRIC}' | cut -d' ' -f1
+    fi
+")"
+
+if [ "${REMOTE_RUBRIC_SHA}" != "absent" ] \
+   && [ "${REMOTE_RUBRIC_SHA}" != "${LOCAL_RUBRIC_SHA}" ]; then
+    if [ -z "${SECOND_SHIFT_RUBRIC_OVERWRITE:-}" ]; then
+        echo "refusing to deploy: the target's rubric is not the one being shipped." >&2
+        echo "  on the target  ${REMOTE_RUBRIC_SHA:0:12}" >&2
+        echo "  being shipped  ${LOCAL_RUBRIC_SHA:0:12}" >&2
+        echo "This deploy would delete the target's copy, and any eval run pinned to" >&2
+        echo "it would then be scored against a rubric it never used. Retrieve it:" >&2
+        echo "  scp ${USER_NAME}@${HOST}:${REMOTE}/${RUBRIC} ./rubric-from-target.md" >&2
+        echo "then reconcile with: python -m secondshift.evals status" >&2
+        echo "A rubric is superseded, never edited in place. To replace it anyway:" >&2
+        echo "  SECOND_SHIFT_RUBRIC_OVERWRITE=1 $0" >&2
+        exit 1
+    fi
+    echo "override set: replacing the target's rubric ${REMOTE_RUBRIC_SHA:0:12}" \
+         "with ${LOCAL_RUBRIC_SHA:0:12}"
+fi
+
 echo "building the web export..."
 NEXT_PUBLIC_API_BASE="" npm --prefix apps/web run build >/dev/null
 
