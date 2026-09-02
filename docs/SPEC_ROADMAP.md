@@ -406,10 +406,58 @@ around it; the night pipeline is where it gets fixed.
 |---|---|
 | `night-pipeline` | The checkpointed stage machine. "No empty mornings" as executable behavior rather than a schema affordance. |
 | `morning-interview` | Briefing from the log delta, then queued questions. The product. Includes the speech visualization below. |
-| `retrieval` | Local embedding, assembly, policy filtering before egress. Brute-force cosine per ADR 0002. |
+| ~~`retrieval`~~ | **Shipped 2 Sep** — `2026-09-02-add-retrieval`. Detail below. |
 | `research` | Tavily search, extract, crawl. Redaction before any query leaves; credit accounting. |
 | `artifacts` | Briefs, mockups, builds. Variant grouping and critic ranking; outcome capture. |
 | `judge-mode` | The demo instance: cloud profile, synthetic persona, labeled in-UI, "run the night". |
+
+### `retrieval` — shipped 2 Sep
+
+Local embedding behind the existing `Embedder`, exact brute-force cosine over an
+in-memory `numpy` array, and policy-filtered assembly. Eleven canonical
+capabilities now.
+
+**Both open questions were answered by measurement, not preference**, and the
+numbers came from the machine rather than from arithmetic on paper. The index is
+rebuilt in memory and never persisted: the real corpus is 6 documents, a rebuild
+takes **40ms** steady-state, and the index is **48.0 KiB** — against 48 KB
+predicted in the proposal, and 4.70 MiB projected at ADR 0002's own week-8 scale
+of ~600 entries. `docs/prompts/RETRIEVAL.md` set the bar at "if rebuilding takes
+under a second, the argument for persisting anything is weak." It is
+twenty-five times under.
+
+**The embedder is served by vLLM on 8201**, mirroring the reasoner rather than
+adding `torch`/`transformers` as a second aarch64-uncertain dependency chain.
+The unit shipped `--task embed`, which vLLM 0.27.1 rejects outright; only
+running it on the machine found that. `--runner pooling --trust-remote-code` is
+correct, and the second of those runs code from the model repository — a real
+supply-chain surface, accepted because the repository is NVIDIA's own, and
+called out rather than buried.
+
+**Spike B's co-residency question is closed.** It measured the reasoner alone
+and could not say whether an embedder fits beside it. Measured with both
+serving: reasoner 4.98 GiB RSS, embedder 3.56 GiB, **69 of 121 GiB still
+available**.
+
+**Two things this change corrected in accepted documents.**
+`docs/ARCHITECTURE.md`'s profile table said the `cloud` embedder was "Token
+Factory embeddings" — which constitution principle 2 names as a violation in as
+many words. The constitution outranks the table; the embedder is now local on
+every profile, the row is fixed, and there is no remote embedder in
+`providers/` to select. The same file's "Serverless Endpoints appear to be for
+serving models" note is answered by ADR 0009 and no longer open.
+
+**One decision that needed an ADR**: brain topic files carry `local-only`
+(ADR 0010). They are distilled from every idea regardless of the policy each was
+captured under, so they inherit the most restrictive one. A `cloud-assisted` run
+therefore assembles from entries alone — 3 of 6 documents on today's corpus.
+That is a real functional limit in the recoverable direction; failing open would
+not have been.
+
+**Still open, and inherited by whatever calls this:** nothing calls it yet. The
+assembly function exists and is verified end to end against the live model, but
+no agent and no night stage consumes it, because neither exists. `night-pipeline`
+is where retrieval stops being a capability and starts being memory.
 
 ---
 

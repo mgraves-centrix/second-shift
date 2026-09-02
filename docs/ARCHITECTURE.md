@@ -25,9 +25,23 @@ probe (CUDA present? vLLM reachable? NeMo importable?), else `cloud`.
 | Transcriber | Nemotron Speech 0.6B, local | Nemotron Speech 0.6B, local | hosted ASR |
 | Reasoner (local-only policy) | Lightning 30B via vLLM | Lightning 30B via vLLM | **unavailable** |
 | Reasoner (cloud-assisted) | Lightning local, Super/Ultra via Token Factory | Token Factory | Token Factory |
-| Embedder | Nemotron Embed 1B, local | Nemotron Embed 1B, local | Token Factory embeddings |
+| Embedder | Nemotron Embed 1B, local | Nemotron Embed 1B, local | **Nemotron Embed 1B, local** |
 | Executor | Nebius Serverless Jobs | Nebius Serverless Jobs | Nebius Serverless Jobs |
 | Night trigger | systemd timer | systemd timer | scheduled job |
+
+### The embedder row was wrong until 2 Sep
+
+This table read "Token Factory embeddings" in the `cloud` column until
+`add-retrieval` implemented it and the contradiction surfaced. Constitution
+principle 2 requires retrieval to run locally on **every** compute profile and
+names "retrieval delegated to a hosted embedding endpoint" as a violation in as
+many words. The constitution outranks this document, so the row is corrected
+rather than the principle bent: there is no remote embedder in `providers/`, and
+no configuration that could reach one.
+
+The judge instance therefore needs a local embedding server in its container.
+That is a deployment cost, and it is the honest one — a demo whose privacy story
+depends on a switch nobody flipped is not a privacy story.
 
 ### The consequence that makes this a feature
 
@@ -133,10 +147,12 @@ Nightly eval runs dispatch the same way.
 The `cloud` profile in a container, seeded with a synthetic persona and zero
 real data, labeled in-UI as a demo.
 
-> **Open, must be resolved in week one:** Serverless Endpoints appear to be for
-> serving *models*, not arbitrary web applications. If that is correct, the
-> judge instance needs a container or VM target instead. This is a
-> submission-blocking assumption and it gets a spike on day 4, not week 7.
+> **Resolved 2 Sep, ADR 0009.** The assumption above was wrong: Nebius
+> Serverless AI runs arbitrary containers, and both its Endpoints and Jobs
+> creation flows offer a VM with no GPU as a supported configuration. The judge
+> instance runs as a Serverless AI Endpoint on a no-GPU container VM — roughly
+> $36/month at Compute's published non-GPU rate, against roughly $2,957 for the
+> H100 endpoint the fallback would have rented.
 
 ### The demo moment this split produces
 
