@@ -3,7 +3,8 @@
 Paste as the first message of a fresh session. Local to build; the Spark to run
 it for real.
 
-**Depends on `CONFIGURATION.md` and `AGENTS.md`. Do not start before both land.**
+**Depends on `CONFIGURATION.md` and `AGENTS.md`. Both landed 2 Sep, along with
+`RETRIEVAL.md`. All three prerequisites are met.**
 
 ---
 
@@ -15,9 +16,17 @@ Build `night-pipeline`. Read `openspec/constitution.md`, `CLAUDE.md`, and
 This is the product's verb. Everything shipped so far captures, stores, measures
 or renders; nothing has ever *done the work overnight*.
 
-Three real entries have been sitting in `queued` since 28 Aug and nothing has
-ever processed them. `runs` holds zero rows. The system has been dogfooded for
-five days and has produced nothing back.
+Nothing has ever processed a captured entry. `run_stages` has no writer outside
+the synthetic seed, and `Repository.close_run` has no caller anywhere in the
+tree — not even a test.
+
+> **The counts that were here are unverifiable from a development container.**
+> This said "three real entries queued since 28 Aug, `runs` holds zero rows,"
+> which was read off the always-on machine on 2 Sep and has not been re-read
+> since — the machine has been unreachable. Query it rather than quoting this:
+> `SELECT status, COUNT(*) FROM entries GROUP BY status;` and
+> `SELECT COUNT(*) FROM runs;`. What is verifiable from the repository is the
+> statement above it, and that is the argument.
 
 **Principle 3 is executable behavior, and it lives here.** "No empty mornings" is
 not a schema affordance — `run_stages` exists and nothing writes it. This is the
@@ -31,9 +40,13 @@ capability that makes the principle true or leaves it decorative.
   `committed_at_ms`, `commit_sha`; `UNIQUE(run_id, stage)`.
 - `runs`: `outcome` CHECK over `complete`, `degraded`, `failed`, `aborted`;
   `furthest_stage`; `effective_policy`; `policy_source`; `brain_sha`.
-- **`Repository.close_run` exists and has no caller.** Every recorded run is
-  permanently in flight, with a null outcome and no end time. `night-timeline`
-  reads around it through `run_stages`. Give it a caller.
+- **`Repository.close_run` exists, has no caller, and has no test.** Verified by
+  scanning the tree on 2 Sep: the only other mention is a comment in
+  `repository.py` noting the absence. Every recorded run is permanently in
+  flight, with a null outcome and no end time; `night-timeline` reads around it
+  through `run_stages`. Its docstring claims it "refuses to close one that is
+  already closed" — nothing has ever checked that. Give it a caller **and** a
+  test.
 - `dispatch_eligible_entries()` screens for queued, non-synthetic, non-empty —
   and `ineligible_entries()` returns the rest *with a reason each*, because an
   entry that can never run must not be silently invisible.
@@ -115,7 +128,7 @@ run on demand is one you cannot debug at 2am.
 
 ```bash
 git status --short && openspec list && openspec list --specs
-apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 302 pass today
+apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 395 pass today
 npm --prefix apps/web run test && npm --prefix apps/web run typecheck
 scripts/check-no-environment.sh && scripts/check-american-english.sh
 ```
