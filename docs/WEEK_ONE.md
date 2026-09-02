@@ -219,7 +219,8 @@ records what cannot be reconstructed later and defers scoring to day 5.
 **Pass gate**
 - Every idea from today forward is captured in the real system. No exceptions,
   no notes app.
-- The five held-out prompts and the rubric are fixed and committed.
+- The held-out prompts and the rubric are fixed and committed. (Six were
+  activated, not five; the number was an expectation, not a requirement.)
 - An `eval_runs` row exists pinning `rubric_sha` and the day-3 `brain_sha`.
 - The brain's topic files exist and are non-empty, so week 1 is a real baseline
   rather than an empty one.

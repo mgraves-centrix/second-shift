@@ -54,9 +54,10 @@ cannot silently slip. Two workable shapes:
 
 **Resolved: split the baseline.**
 
-Day 3 records only what cannot be reconstructed later — the five fixed prompts,
+Day 3 records only what cannot be reconstructed later — the fixed prompt set,
 the `rubric_sha`, and the `brain_sha` of a two-day-old brain. No model is
-required for that. Day 5 generates and scores against that recorded brain
+required for that. (In the event day 3 recorded nothing; the baseline was written
+on 2 Sep against the brain it actually had. See the `evals` entry.) Day 5 generates and scores against that recorded brain
 state, once Token Factory is verified.
 
 `eval_runs` already separates `brain_sha` from `judge_model`, so this needs no
@@ -130,7 +131,7 @@ change. Rubric v1 is committed at `config/evals/rubric.md` and hashed by content
 rather than by the commit that touched it. The sequencing question above is
 resolved.
 
-**Which five are held out is database state, not repository state.** The ten
+**Which prompts are held out is database state, not repository state.** The ten
 candidates live in `config/evals/candidates.md`; the selection is
 `eval_prompts.active`, set by `python -m secondshift.evals activate <slug>` and
 read back by `python -m secondshift.evals status`. It lives beside the database
@@ -177,10 +178,27 @@ unrecorded, "week 1" pins a later brain — the journal already runs through 28 
 and the brain has committed since. Recording it now is cheap and gets less
 honest daily; recording it never makes the week-8 comparison impossible.
 
-**Two decisions, both the subject's, neither taken here:** whether to record a
-baseline now against a brain five days past day 3, and which prompts it pins —
-six are active where five were intended, and the active set is part of what a
-baseline fixes.
+**Both decisions taken, 2 Sep, and the baseline is now recorded.**
+
+```
+01M1FYFECEXC5ZJEWHNP7WZMXB  week_of 2026-08-31  rubric b4decd6fe774
+                            brain ad17b3bcddb6  awaiting-scoring
+```
+
+`week_of` is the Monday of the week it was actually recorded, not of the week it
+was meant to be. The run pins the brain it genuinely measured — `ad17b3b`, five
+days past day 3 — so the lateness is visible in the data rather than papered over
+by a label. Recorded as `mgraves`, not as root: the database and both user
+services are owned by that account, and a root-owned WAL file would have broken
+them silently.
+
+**The held-out set is six, not five.** The number five in this plan was never a
+requirement, only an expectation; six prompts were activated on 30 Aug and six is
+what the baseline pins. `agent-memory-systems`, `been-avoiding`,
+`every-metric-dashboard`, `file-naming`, `readme-in-my-voice`, `shorter-briefing`.
+
+**Still open:** scoring, which needs a judge and a generating provider — that is
+`local-inference` and `nebius-executor`, not this capability.
 
 **The instrument now exists** — `2026-09-02-reconcile-rubric-pinning`. `status`
 reports every recorded run's pinned `rubric_sha` and `brain_sha` beside the hash
