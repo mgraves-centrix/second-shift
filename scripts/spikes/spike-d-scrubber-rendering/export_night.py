@@ -34,10 +34,13 @@ def main() -> int:
         ).fetchone()["id"]
 
         events = [dict(r) for r in repo.timeline(run_id)]
+        # No role here: `agent_invocations` does not carry one — it is on
+        # `agents`, through `agent_id`. The tree supplies parentage and depth;
+        # the lane an event renders in is `events.lane`, which is a decision
+        # recorded at write time rather than a join.
         invocations = [
             {
                 "id": r["id"],
-                "role": r["role"] if "role" in r.keys() else None,
                 "depth": r["depth"],
                 "parent_invocation_id": r["parent_invocation_id"],
             }
