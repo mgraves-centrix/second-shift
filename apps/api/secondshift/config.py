@@ -39,6 +39,7 @@ ENV_LOCATION = "SECOND_SHIFT_LOCATION"
 ENV_PRICING = "SECOND_SHIFT_PRICING"
 ENV_SYNTHETIC = "SECOND_SHIFT_SYNTHETIC"
 ENV_RUBRIC_OVERWRITE = "SECOND_SHIFT_RUBRIC_OVERWRITE"
+ENV_ARTIFACTS = "SECOND_SHIFT_ARTIFACTS"
 
 _MODELS_CONFIG = Path(__file__).resolve().parents[3] / "config" / "models.toml"
 
@@ -568,6 +569,12 @@ SETTINGS: tuple[Setting, ...] = (
     Setting(ENV_BRAIN, "brain.repo.brain_path", "brain repository path", required=True),
     Setting(ENV_LOCATION, "api.location.home_location", "home coordinates file"),
     Setting(ENV_PRICING, "telemetry.pricing", "rate table path", required=True),
+    Setting(
+        ENV_ARTIFACTS,
+        "artifacts.store.artifact_root",
+        "where produced artifacts land on disk",
+        required=True,
+    ),
     Setting(ENV_SYNTHETIC, "api.main", "mark written rows as synthetic"),
     Setting(
         ENV_RUBRIC_OVERWRITE,
@@ -596,6 +603,7 @@ def resolve_all(env: dict[str, str] | None = None) -> list[Resolved]:
     resolving configuration is neither an agent invocation nor a model call.
     """
     from .api.location import location_config_error, location_path
+    from .artifacts.store import default_root as default_artifact_root
     from .brain.repo import brain_path
     from .telemetry.pricing import default_pricing_path
 
@@ -643,6 +651,7 @@ def resolve_all(env: dict[str, str] | None = None) -> list[Resolved]:
             error=location_error,
         ),
         _path_setting(ENV_PRICING, environment, default_pricing_path()),
+        _path_setting(ENV_ARTIFACTS, environment, default_artifact_root()),
         _synthetic_row(environment),
         Resolved(
             setting=by_name(ENV_RUBRIC_OVERWRITE),

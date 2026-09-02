@@ -34,6 +34,11 @@ class AgentTurn:
     agent_id: str
     text: str
     raw_text: str
+    #: The `agent_invocations` row this turn opened. Carried out because an
+    #: artifact records the invocation that produced it, and without this the
+    #: caller has only the agent id — which is a different table, and the
+    #: foreign key catches the confusion rather than storing it.
+    invocation_id: str | None = None
 
     @property
     def showed_its_reasoning(self) -> bool:
@@ -83,7 +88,7 @@ def invoke(
         messages.append(Message("user", f"Context you may use:\n\n{context}"))
     messages.append(Message("user", task))
 
-    with recorder.invocation(agent_id, run_id=run_id, stage=stage):
+    with recorder.invocation(agent_id, run_id=run_id, stage=stage) as invocation_id:
         completion = reasoner.complete(messages, policy=policy, effort=None)
 
     return AgentTurn(
@@ -91,4 +96,5 @@ def invoke(
         agent_id=agent_id,
         text=strip_reasoning(completion.text),
         raw_text=completion.text,
+        invocation_id=invocation_id,
     )

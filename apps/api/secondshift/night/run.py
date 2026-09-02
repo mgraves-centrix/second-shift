@@ -13,17 +13,24 @@ rows is a pipeline that can record them differently from every other caller.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 
 from ..agents.invoke import invoke
 from ..airlock.policy import resolve_policy
+from ..artifacts.store import VARIANT_KINDS, ArtifactWriteFailed, write_artifact
+from ..artifacts.variants import RankingRefused, parse_ordering, rank_group, write_variants
 from ..brain.repo import BrainRepo, BrainUnavailable
 from ..db.connection import now_ms
 from ..db.repository import Repository
 from ..providers.registry import Providers
 from ..telemetry.recorder import Recorder
 from .stages import STAGES, Stage
+
+#: `## Variant 1`, at the start of a line. What the builder prompt asks for.
+_VARIANT_SPLIT = re.compile(r"^##\s*Variant\s+\d+.*$", re.M | re.I)
 
 #: What a stage row records when a stage never ran. `skipped` is not `failed`:
 #: nothing was attempted, so nothing broke, and a morning that reports them the
@@ -59,6 +66,11 @@ class StageResult:
     status: str
     reason: str | None = None
     text: str = ""
+    #: Artifact ids this stage landed. Empty where it produced no file — a
+    #: stage that ran but wrote nothing is distinguishable from one that wrote.
+    artifacts: tuple[str, ...] = ()
+    #: The `variant_group` this stage opened, where it produced a fan-out.
+    variant_group: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +141,9 @@ def _run_stage(
     results: dict[str, StageResult],
     retrieved: str,
     brain: BrainRepo | None,
+    entry_id: str,
+    night_of: str,
+    artifact_root: Path | None,
 ) -> StageResult:
     """One stage, in its own transaction. Never raises.
 
@@ -184,13 +199,127 @@ def _run_stage(
     if stage.name == "distill" and brain is not None:
         committed_at, commit_sha = _write_to_brain(brain, run_id, turn.text)
 
+    # The artifact lands before the stage closes. A stage recorded `complete`
+    # whose file is not there would be a morning that promises something it
+    # cannot open.
+    try:
+        landed, group = _write_output(
+            repo,
+            stage,
+            turn.text,
+            run_id=run_id,
+            entry_id=entry_id,
+            night_of=night_of,
+            invocation_id=turn.invocation_id,
+            root=artifact_root,
+        )
+    except ArtifactWriteFailed as exc:
+        recorder.record_failure(exc, scope=f"night.{stage.name}.artifact")
+        repo.complete_run_stage(stage_id, status=FAILED)
+        return StageResult(stage.name, FAILED, reason=str(exc))
+
     repo.complete_run_stage(
         stage_id,
         status=COMPLETE,
         committed_at_ms=committed_at,
         commit_sha=commit_sha,
     )
-    return StageResult(stage.name, COMPLETE, text=turn.text)
+    return StageResult(
+        stage.name,
+        COMPLETE,
+        text=turn.text,
+        artifacts=tuple(landed),
+        variant_group=group,
+    )
+
+
+def _write_output(
+    repo: Repository,
+    stage: Stage,
+    text: str,
+    *,
+    run_id: str,
+    entry_id: str,
+    night_of: str,
+    invocation_id: str | None,
+    root: Path | None,
+) -> tuple[list[str], str | None]:
+    """Land this stage's output. Returns the artifact ids and any group.
+
+    Variant kinds fan out; everything else writes one file. **No rank is passed
+    anywhere in here** — a rank is what a critic produced, and at write time the
+    critic has not spoken. That is what makes it structurally impossible for the
+    writer to default a rank to the generation index.
+
+    The fan-out is sequential today and that is the seam `nebius-executor`
+    substitutes at: it takes a list of variant bodies and does not care whether
+    they were produced in a loop or by five parallel Jobs.
+    """
+    if stage.artifact_kind is None:
+        return [], None
+    if stage.artifact_kind in VARIANT_KINDS:
+        produced = write_variants(
+            repo,
+            run_id=run_id,
+            entry_id=entry_id,
+            night_of=night_of,
+            stage=stage.name,
+            kind=stage.artifact_kind,
+            contents=_variant_bodies(text),
+            produced_by_invocation_id=invocation_id,
+            root=root,
+        )
+        return [w.artifact_id for w in produced.written], produced.group
+    written = write_artifact(
+        repo,
+        run_id=run_id,
+        entry_id=entry_id,
+        night_of=night_of,
+        stage=stage.name,
+        kind=stage.artifact_kind,
+        content=text,
+        produced_by_invocation_id=invocation_id,
+        root=root,
+    )
+    return [written.artifact_id], None
+
+
+def _variant_bodies(text: str) -> list[str]:
+    """Split one completion into the variants it proposed.
+
+    Split on a top-level `## Variant N` heading, which is what the builder and
+    architect prompts ask for. A completion with no such heading is one variant,
+    not zero: a model that ignored the format still produced something worth
+    keeping, and dropping it would lose real work to a formatting miss.
+    """
+    parts = _VARIANT_SPLIT.split(text)
+    bodies = [p.strip() for p in parts if p.strip()]
+    return bodies or [text]
+
+
+def _rank_the_builds(
+    repo: Repository,
+    recorder: Recorder,
+    results: dict[str, StageResult],
+    critique: str,
+) -> None:
+    """Apply the critic's ordering to the build group. Never raises.
+
+    A refused ranking leaves every `variant_rank` null, which is the honest
+    value for "the critic did not produce a usable ordering." The alternative —
+    falling back to the generation order — would fill the column with plausible
+    numbers that are really the order things happened to be built in, and
+    nothing downstream could tell them from a real ranking.
+    """
+    build = results.get("build")
+    if build is None or build.variant_group is None:
+        return
+    try:
+        rank_group(repo, build.variant_group, parse_ordering(critique))
+    except RankingRefused as exc:
+        # Recorded rather than swallowed: an unrankable critique is evidence
+        # about the critic's prompt, and the prompt is what is being measured.
+        recorder.record_failure(exc, scope="night.critique.ranking")
 
 
 def _write_to_brain(
@@ -234,6 +363,7 @@ def run_entry(
     retrieved: str = "",
     brain_sha: str | None = None,
     brain: BrainRepo | None = None,
+    artifact_root: Path | None = None,
 ) -> NightResult:
     """Work one entry through the stages, and close its run on every path."""
     entry_id = entry["id"]
@@ -266,9 +396,10 @@ def run_entry(
         )
 
     repo.transition_entry(entry_id, to_status="running")
+    resolved_night = night_of or datetime.now(UTC).strftime("%Y-%m-%d")
     run_id = repo.insert_run(
         entry_id=entry_id,
-        night_of=night_of or datetime.now(UTC).strftime("%Y-%m-%d"),
+        night_of=resolved_night,
         effective_policy=str(resolution.effective_policy),
         policy_source=str(resolution.policy_source),
         compute_profile=profile,
@@ -294,9 +425,14 @@ def run_entry(
                 results=results,
                 retrieved=retrieved,
                 brain=brain,
+                entry_id=entry_id,
+                night_of=resolved_night,
+                artifact_root=artifact_root,
             )
             results[stage.name] = result
             ordered.append(result)
+            if stage.name == "critique" and result.status == COMPLETE:
+                _rank_the_builds(repo, recorder, results, result.text)
     finally:
         # Every terminal path, including the exception one. `close_run` had no
         # caller at all before this capability, which is why every recorded run

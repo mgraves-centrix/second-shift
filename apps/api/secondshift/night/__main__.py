@@ -19,6 +19,7 @@ from ..config import ENV_DB, Profile, resolve_profile
 from ..db.connection import connect
 from ..db.migrate import migrate
 from ..db.repository import Repository
+from ..artifacts.store import artifact_root
 from ..providers.registry import LocalEmbedderNotConfigured, Registry
 from ..providers.vllm_embed import EmbedderUnavailable
 from ..retrieval.index import RetrievalIndex, assemble_context, collect_documents
@@ -113,6 +114,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 brain=brain,
                 brain_sha=brain.head() if brain else None,
                 retrieved=_retrieve(repo, providers, brain, row),
+                artifact_root=artifact_root(),
             )
             if result.quarantined:
                 print(f"{result.entry_id}  quarantined  {result.quarantine_reason}")

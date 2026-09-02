@@ -457,6 +457,65 @@ class Repository:
             },
         )
 
+    def insert_outcome(
+        self,
+        *,
+        entry_id: str,
+        artifact_id: str | None = None,
+        label: str | None = None,
+        signal: str | None = None,
+        note: str | None = None,
+        ts_ms: int | None = None,
+        outcome_id: str | None = None,
+        is_synthetic: bool = False,
+    ) -> str:
+        """Record what happened to an artifact, or to an entry.
+
+        `label` is the person's explicit judgement — keep, kill, revise.
+        `signal` is implicit — opened, iterated, used, exported, ignored. The
+        schema requires at least one, and this refuses before the database does
+        so the message names the caller's mistake rather than a constraint.
+
+        Nothing derives an outcome. `cost_per_accepted_artifact` counts
+        `label = 'keep'`, so an outcome inferred from a rank would make the
+        submission's headline chart measure the critic agreeing with itself.
+        The chart is only worth showing because a person put the keep there.
+        """
+        if label is None and signal is None:
+            raise ValueError(
+                "an outcome needs a label (keep/kill/revise) or a signal "
+                "(opened/iterated/used/exported/ignored), or both"
+            )
+        ts = ts_ms if ts_ms is not None else now_ms()
+        oid = self._id(outcome_id, ts)
+        self._insert(
+            "outcomes",
+            {
+                "id": oid,
+                "entry_id": entry_id,
+                "artifact_id": artifact_id,
+                "ts_ms": ts,
+                "label": label,
+                "signal": signal,
+                "note": note,
+                "is_synthetic": int(is_synthetic),
+            },
+        )
+        return oid
+
+    def artifacts_for_run(self, run_id: str) -> list[sqlite3.Row]:
+        """Everything a run produced, variants grouped and in rank order.
+
+        Ranked variants first within a group, then unranked ones — a null rank
+        is "the critic did not order this", never "last".
+        """
+        return self._conn.execute(
+            "SELECT * FROM artifacts WHERE run_id = ? "
+            "ORDER BY stage, variant_group IS NULL, variant_group, "
+            "variant_rank IS NULL, variant_rank, variant_index",
+            (run_id,),
+        ).fetchall()
+
     def insert_artifact(
         self,
         *,

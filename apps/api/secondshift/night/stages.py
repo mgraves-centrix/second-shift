@@ -52,6 +52,11 @@ class Stage:
     can_run: Callable[[frozenset[str]], bool]
     #: Set where the stage cannot run at all yet, regardless of its inputs.
     unavailable: str | None = None
+    #: The `artifacts.kind` this stage produces, or None where it produces no
+    #: file. Stage names and artifact kinds are separate CHECK constraints that
+    #: overlap in five of six places and differ in one; mapping them explicitly
+    #: is what stops a rename of either from silently breaking the other.
+    artifact_kind: str | None = None
 
     def blocked_reason(self, completed: frozenset[str]) -> str | None:
         """Why this stage cannot run, or None when it can."""
@@ -66,23 +71,49 @@ class Stage:
 #: in `0001_initial.sql` is the authority on the names; `assert_matches_schema`
 #: reads it rather than trusting this tuple.
 STAGES: tuple[Stage, ...] = (
-    Stage(BRIEF, 1, "researcher", lambda done: True),
+    Stage(BRIEF, 1, "researcher", lambda done: True, artifact_kind="brief"),
     Stage(
         RESEARCH,
         2,
         "researcher",
         lambda done: BRIEF in done,
         unavailable=NO_RESEARCH_PROVIDER,
+        artifact_kind="research_digest",
     ),
-    Stage(MOCKUPS, 3, "architect", lambda done: BRIEF in done),
-    Stage(BUILD, 4, "builder", lambda done: BRIEF in done),
-    Stage(CRITIQUE, 5, "critic", lambda done: BUILD in done),
+    Stage(MOCKUPS, 3, "architect", lambda done: BRIEF in done, artifact_kind="mockup"),
+    Stage(BUILD, 4, "builder", lambda done: BRIEF in done, artifact_kind="build"),
+    Stage(CRITIQUE, 5, "critic", lambda done: BUILD in done, artifact_kind="critique"),
     # Not "all predecessors", not "the one before" — any evidence at all. A
     # night that produced one completed stage still taught the brain something.
-    Stage(DISTILL, 6, "distiller", lambda done: bool(done)),
+    Stage(DISTILL, 6, "distiller", lambda done: bool(done), artifact_kind="summary"),
 )
 
 BY_NAME: dict[str, Stage] = {s.name: s for s in STAGES}
+
+
+def assert_artifact_kinds_match_schema(conn: sqlite3.Connection) -> None:
+    """Fail if a stage claims an artifact kind the schema does not permit.
+
+    Stage names and artifact kinds are two separate CHECK constraints that
+    overlap in five of six places and differ in one — `research` produces a
+    `research_digest`. Mapping them by coincidence of name would break silently
+    the first time either list moved.
+    """
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'artifacts'"
+    ).fetchone()
+    if row is None:
+        raise RuntimeError("no `artifacts` table; run migrations first")
+    match = re.search(r"kind\s+TEXT\s+NOT NULL\s+CHECK\s*\(kind IN \(([^)]*)\)\)", row[0])
+    if match is None:
+        raise RuntimeError("the `artifacts` table has no readable kind CHECK constraint")
+    permitted = set(re.findall(r"'([a-z_]+)'", match.group(1)))
+    claimed = {s.artifact_kind for s in STAGES if s.artifact_kind}
+    if not claimed <= permitted:
+        raise RuntimeError(
+            f"stages claim artifact kinds the schema forbids: "
+            f"{sorted(claimed - permitted)}"
+        )
 
 
 def assert_matches_schema(conn: sqlite3.Connection) -> None:
