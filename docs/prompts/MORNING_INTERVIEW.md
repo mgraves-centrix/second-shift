@@ -50,7 +50,7 @@ brain gets better because the interview corrects it; nothing else writes belief.
   `answer`, `answer_modality` CHECK over `voice` and `text`, `status` CHECK over
   `open`, `decided`, `deferred`, `queued-for-tonight`, `obsolete`, and
   `consumed_by_run_id`. **The whole interview state machine is already in the
-  schema and nothing writes it.**
+  schema and nothing wrote it until this capability did.**
 - `resolve_policy(..., upgrade_decision_id=)` widens `local-only` to
   `cloud-assisted` **only** with an attributable decision, recording
   `policy_source = 'decision-upgrade'`. That is the mechanism for "may I take

@@ -421,7 +421,7 @@ around it; the night pipeline is where it gets fixed.
 | Capability | Covers |
 |---|---|
 | ~~`night-pipeline`~~ | **Shipped 2 Sep** — `2026-09-02-add-night-pipeline`. The checkpointed stage machine; `close_run`'s first caller. Detail below. |
-| `morning-interview` | Briefing from the log delta, then queued questions. The product. Includes the speech visualization below. |
+| ⚠️ `morning-interview` | **Server half shipped 3 Sep** — `2026-09-02-add-morning-interview`. Briefing, questions, answering, policy upgrade. **The screen is not built**: `FRONTEND.md` gates it. Detail below. |
 | ~~`retrieval`~~ | **Shipped 2 Sep** — `2026-09-02-add-retrieval`. Detail below. |
 | ~~`research`~~ | **Shipped 2 Sep** — `2026-09-02-add-research`. Redaction as construction rather than filtering; `query_redacted`'s first writer. Detail below. |
 | ~~`artifacts`~~ | **Shipped 2 Sep** — `2026-09-02-add-artifacts`. Files on disk, variant groups whose rank cannot be the generation order, and `outcomes`' first writer. Detail below. |
@@ -447,8 +447,8 @@ A deferred obligation with no home is a dropped one, so they have a home now.
 order.** Each states the canonical count as of its own ship, so the numbers read
 out of sequence when scanned top to bottom. The order was `retrieval` (11),
 `agents` (12), `configuration` (13), `night-pipeline` (14), `artifacts` (15),
-`research` (16). Count them rather than reading the tally:
-`npx openspec list --specs`.
+`research` (16), and `morning-interview` (17) on 3 Sep. Count them rather than
+reading the tally: `npx openspec list --specs`.
 
 ### `agents` — shipped 2 Sep
 
@@ -491,6 +491,68 @@ next: `00_INDEX.md`'s dependency graph puts `configuration` and `agents` ahead o
 it. Both shipped on 2 Sep, so **`night-pipeline`'s prerequisites are now
 clear** — it has agents to sequence, retrieval to feed them, and a resolved view
 that can say which endpoint a stage actually reached.
+
+### `morning-interview` — server half shipped 3 Sep, screen not built
+
+Seventeen canonical capabilities. `decisions` had carried the entire interview
+state machine since the first migration — five statuses, a rationale, a modality,
+`consumed_by_run_id` — with **one caller in the repository, and it was a test**.
+`resolve_policy`'s `upgrade_decision_id` had never been passed by anything.
+
+**The open decision was settled by writing three mornings out, and is now
+enforced by them.** "Briefing from the log delta" does not say delta since when,
+and morning 1 (after a clean night) does not discriminate — all three candidate
+rules agree. Mornings 2 and 3 do:
+
+- **Since the last night:** silently drops the night you never read. Work the
+  system did that nobody will ever be told about.
+- **Since you last opened it:** loses the briefing because somebody glanced at
+  their phone while walking.
+- **Since the last *answered* decision:** none of the three reads wrong.
+
+Rendering consumes nothing; only acting does, and **deferring counts** because
+it is a choice the person made. Implementing the rejected rule turns three tests
+red, which is what makes the argument checkable rather than merely written down.
+
+**The trade the rule accepts, named rather than hidden:** a night that raised no
+questions can never be consumed, so it reappears. Repetitive, and safe in the
+direction that matters — it never hides work. Fixing it needs an acknowledgement
+column that does not exist.
+
+**Principle 3 is structural here.** The briefing assembles facts from rows with
+**no model call**, so a failing interviewer costs the questions and not the
+morning. A design where the model produced the whole briefing would render an
+error on exactly the morning it mattered most.
+
+**The scope boundary is structural too, and it was the live risk.**
+`NOT_BUILDING.md` excludes a general chat interface *by name*, and the prompt
+calls it the single most likely way this capability goes wrong. The guard is not
+a rule to remember: no function accepts free text without a question to attach
+it to. An answer takes a decision id; an unknown one is refused.
+
+**A gap found and deliberately not closed.** `run_stages` has no reason column.
+A *failed* stage's reason is recoverable — the night records failures scoped
+`night.<stage>` and `signature()` embeds that scope — but a *skipped* stage's is
+not stored anywhere. Rather than a `reason` field that is always `None`, the
+briefing carries one only where it exists and says so. Closing it properly is a
+migration.
+
+**Two defects in this change's own tests, caught before commit.** A "no
+hardcoded questions" test was grepping the source for a question mark and
+matching SQL `?` placeholders — it would have passed forever whatever the module
+did. And a failure fixture had no run attached, so its lookup failed for the
+wrong reason.
+
+**What is not built, and it is the important part.** `FRONTEND.md` must land
+first — its own prompt says so, and the reason is checkable: `/` and `/night/`
+have no navigation between them and design tokens are drifting across
+`app/globals.css` and `components/scrubber/scrubber.module.css`. A third surface
+on that foundation makes the drift worse. So the server half is reachable through
+the API and exercised by tests, and **the prompt's best report item — whether the
+interview feels like being interviewed or like filling in a form — is
+unanswerable and stays open** rather than answered badly. Voice is deferred
+entirely: there is no ASR, and a waveform with no transcription behind it is the
+decoration the prompt names.
 
 ### `research` — shipped 2 Sep
 

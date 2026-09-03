@@ -25,7 +25,7 @@ grouped by that rule, not by how interesting it is.
                                                        │       EVAL_SCORING ──┘
    FRONTEND ──> MORNING_INTERVIEW ─────────────────────┘
 
-   ✅ shipped 2 Sep. MORNING_INTERVIEW and API_LAYER are the unblocked ones now.
+   ✅ shipped. FRONTEND is now the blocker: it gates MORNING_INTERVIEW's screen.
 
    TEST_HARNESS    OPERATIONS    ASR    NEBIUS_EXECUTOR
    any time        needs the     needs  blocked on
@@ -48,7 +48,7 @@ all three cases differs from the prompt in at least one decision.
 | 6 | ~~`ARTIFACTS.md`~~ | ✅ shipped 2 Sep | — | — |
 | 7 | `NEBIUS_EXECUTOR.md` | `providers/nebius*`, ingest route | credentials | anything |
 | 8 | `FRONTEND.md` | `components/`, `app/globals.css` | — | 0, 1, 2, 3, 10 |
-| 9 | `MORNING_INTERVIEW.md` | `app/morning/`, `secondshift/morning/` | 8 | 4, 10 |
+| 9 | `MORNING_INTERVIEW.md` | ~~`secondshift/morning/`~~ ✅ 3 Sep · `app/morning/` still owed | **8 — `FRONTEND.md`** | 4, 10 |
 | 10 | `TEST_HARNESS.md` | `.github/`, `scripts/gates/` | — | everything |
 | 11 | `JUDGE_MODE.md` | `deploy/judge/` | 4, 6, 9 | 12 |
 | 12 | `EVAL_SCORING.md` | `eval_runs` rows, the curve | a judge | 11 |
