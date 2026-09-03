@@ -136,16 +136,46 @@ class TestTheMorningIsReachable:
         assert body["questions"][0]["question"] == "Do you read it on a phone?"
         assert body["questions"][0]["rationale"] == "two shapes, could not choose"
 
-    def test_the_egress_warning_travels_on_the_question(self, client, repo, entry):
+    def test_the_egress_warning_travels_on_the_question(self, client, repo):
         """So a screen cannot forget to say it. A warning that lives only in a
-        component is one the next component does not inherit."""
+        component is one the next component does not inherit.
+
+        This asserted `"will_leave_the_machine" in body["questions"][0]` until
+        3 Sep, which a field that is permanently `false` satisfies — and it was
+        permanently `false`, because `_open_questions` never set it. A test that
+        checks a key is present is a test of the response model, not of the
+        feature the response model carries.
+        """
+        local = repo.insert_entry(
+            created_at_ms=now_ms(),
+            captured_tz="UTC",
+            tz_offset_min=0,
+            modality="text",
+            default_policy="local-only",
+            status="queued",
+            capture_profile="spark",
+            raw_text="the one I would not paste into a chat box",
+        )
+        repo.insert_decision(
+            entry_id=local, question="q", rationale="r", status="open"
+        )
+
+        body = client.get("/morning").json()
+
+        assert body["questions"][0]["will_leave_the_machine"] is True
+
+    def test_a_cloud_assisted_question_carries_no_warning(
+        self, client, repo, entry
+    ):
+        """The `entry` fixture is `cloud-assisted`: the idea has already left,
+        so there is nothing an answer could authorize."""
         repo.insert_decision(
             entry_id=entry, question="q", rationale="r", status="open"
         )
 
         body = client.get("/morning").json()
 
-        assert "will_leave_the_machine" in body["questions"][0]
+        assert body["questions"][0]["will_leave_the_machine"] is False
 
 
 class TestAnsweringOverHttp:

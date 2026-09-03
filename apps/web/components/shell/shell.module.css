@@ -1,10 +1,15 @@
 /* Two shells, one system.
  *
- * The asymmetry is measured, not stylistic. Rendering the real capture markup
- * at keyboard-up viewports showed what a nav bar costs: at 390x390 it is the
- * difference between the "Local only" policy being 81% visible and 10% visible.
- * The default is `cloud-assisted`, so a person who does not scroll takes the
- * wider policy by omission — which is a privacy outcome, not a layout one.
+ * The asymmetry is measured, not stylistic. Rendering the built capture page at
+ * keyboard-up viewports showed what a nav bar costs: at 390x350 it takes the
+ * "Local only" policy option from 79% visible to 0% visible. The default is
+ * `cloud-assisted`, so a person who does not scroll takes the wider policy by
+ * omission — which is a privacy outcome, not a layout one.
+ *
+ * An earlier pass measured a mock of this stylesheet and reported 81% / 10% at
+ * 390x390; those numbers were wrong and this comment carried them after the
+ * proposal had been corrected. The conclusion survived the correction, which is
+ * the only reason it went unnoticed.
  *
  * So capture gets `.footer`, below its button and out of the way, and the
  * desktop surfaces get `.nav`. Coherence lives in the tokens and the type ramp.

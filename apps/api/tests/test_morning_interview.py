@@ -23,6 +23,7 @@ from secondshift.agents.roster import discover, register
 from secondshift.airlock.policy import Policy, PolicySource, resolve_policy
 from secondshift.db.connection import now_ms
 from secondshift.morning import briefing as briefing_module
+from secondshift.morning.briefing import Briefing
 from secondshift.morning import (
     answer,
     assemble,
@@ -367,6 +368,35 @@ class TestRaisingQuestions:
         sent = "\n".join(m.content for m in stub.messages)
         assert "weekly digest of my voice notes" not in sent
 
+    def test_the_questions_keep_the_order_the_interviewer_asked_in(
+        self, repo, recorder, entry, roster
+    ):
+        """A whole turn's questions land in the same millisecond.
+
+        With plain ULIDs the briefing's `ORDER BY raised_at_ms, id` then sorted
+        them by random bits, and two runs of the same seed produced the two
+        questions in opposite orders — observed, not theorized. The interviewer
+        is asked for "the smallest number of questions that would have unblocked
+        the most work", so the order is its judgment about which matters, and a
+        screen that asks one at a time spends it on whichever comes first.
+        """
+        agents, prompts = roster
+        asked = [f"question number {n}" for n in range(1, 9)]
+        text = "\n".join(f"Q: {q}\nWhy: because {q}" for q in asked)
+
+        raise_questions(
+            repo,
+            recorder,
+            InterviewerStub(recorder, text=text),
+            Briefing(),
+            agent_id=agents["interviewer"],
+            prompt_path=prompts["interviewer"],
+            entry_id=entry,
+            policy="local-only",
+        )
+
+        assert [q.question for q in assemble(repo).questions] == asked
+
     def test_the_facts_carry_stage_outcomes(self, repo, night):
         night()
 
@@ -475,6 +505,54 @@ class TestWideningIsAnAttributableDecision:
 
         assert resolution.effective_policy is Policy.LOCAL_ONLY
         assert resolution.policy_source is PolicySource.ENTRY_DEFAULT
+
+    def test_a_question_on_a_local_only_entry_is_marked(self, repo):
+        """The flag had never once been true, and a spec said it was.
+
+        `_open_questions` built every `Question` without it, so the default rode
+        all the way out through the API. The test that named the field asserted
+        the key was present in the JSON — which a permanently `false` value
+        satisfies, and which is why 587 passing tests did not notice.
+        """
+        local = repo.insert_entry(
+            created_at_ms=now_ms(),
+            captured_tz="UTC",
+            tz_offset_min=0,
+            modality="text",
+            default_policy="local-only",
+            status="queued",
+            capture_profile="spark",
+            raw_text="the thing I would not paste into a chat box",
+        )
+        repo.insert_decision(
+            entry_id=local,
+            question="May I search the web for prior art on this?",
+            rationale="the digest needs a source and there is none on the machine",
+            status="open",
+        )
+
+        (question,) = assemble(repo).questions
+
+        assert question.will_leave_the_machine is True
+
+    def test_a_question_on_an_idea_that_already_left_is_not_marked(
+        self, repo, entry
+    ):
+        """The negative half, and the one that makes the flag mean something.
+
+        Without it the rule could be `True` unconditionally and both the
+        positive test and the shipped spec would still pass.
+        """
+        repo.insert_decision(
+            entry_id=entry,
+            question="Should the build keep the second variant?",
+            rationale="both compile and the brief does not say which to keep",
+            status="open",
+        )
+
+        (question,) = assemble(repo).questions
+
+        assert question.will_leave_the_machine is False
 
 
 # -- the scope boundary ----------------------------------------------------

@@ -46,7 +46,7 @@ test("every built surface is reachable from the shell", () => {
    * test exercises the symbol the next session is told to extend. */
   assert.deepEqual(
     SURFACES.map((s) => s.href),
-    ["/", "/night/"],
+    ["/", "/morning/", "/night/"],
     "a surface is not reachable without typing a URL",
   );
 });

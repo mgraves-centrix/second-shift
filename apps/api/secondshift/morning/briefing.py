@@ -78,9 +78,24 @@ class Question:
     question: str
     rationale: str | None
     blocking_stage: str | None
-    #: True where answering this widens the policy, so the screen cannot forget
-    #: to say it. A warning that lives only in a component is one the next
-    #: component does not inherit.
+    #: True where the entry this was raised against is `local-only`, which is
+    #: exactly the set of questions whose answer could authorize sending the
+    #: idea off the machine — `resolve_policy` widens `local-only` and nothing
+    #: else, so on a `cloud-assisted` entry there is nothing left to widen.
+    #:
+    #: It over-warns on purpose. Answering *deferred* or *obsolete* on a marked
+    #: question sends nothing anywhere, and marking only the answer that
+    #: authorizes is not derivable: `decisions` has no column separating "yes,
+    #: take this one to the cloud" from any other queued answer. Between warning
+    #: about a harmless answer and staying silent about a harmful one, principle
+    #: 2 takes the first.
+    #:
+    #: It travels with the question rather than being a screen's job to
+    #: remember, because a warning that lives in a component is one the next
+    #: component does not inherit. The name overstates — what is true is *an
+    #: answer here is the only thing that could authorize it* — so the wording a
+    #: person reads lives beside the rule in `apps/web/lib/morning.ts` rather
+    #: than being written from this identifier.
     will_leave_the_machine: bool = False
 
 
@@ -188,8 +203,24 @@ def _failure_reasons(repo: Repository, run_id: str) -> dict[str, str]:
 
 
 def _open_questions(repo: Repository):
+    """Every open question, joined to the policy its entry was captured under.
+
+    The join is what makes `will_leave_the_machine` mean anything. Without it
+    every question was constructed with the field left at its default, so it had
+    never been `True` on any morning — while `morning-interview`'s spec claimed
+    the briefing marks the questions whose answer sends an idea off the machine.
+    The one test that named the field asserted the key was present in the JSON,
+    which a permanently `false` value satisfies.
+
+    `blocking_stage` is read here and is presently always `NULL`:
+    `Repository.insert_decision` accepts it and `raise_questions` never passes
+    it. No spec claims otherwise, so it is an unset field rather than a false
+    claim, and closing it means changing the interviewer's output format.
+    """
     rows = repo.connection.execute(
-        "SELECT * FROM decisions WHERE status = 'open' ORDER BY raised_at_ms, id"
+        "SELECT d.*, e.default_policy FROM decisions d "
+        "JOIN entries e ON e.id = d.entry_id "
+        "WHERE d.status = 'open' ORDER BY d.raised_at_ms, d.id"
     ).fetchall()
     for row in rows:
         yield Question(
@@ -198,4 +229,5 @@ def _open_questions(repo: Repository):
             question=row["question"],
             rationale=row["rationale"],
             blocking_stage=row["blocking_stage"],
+            will_leave_the_machine=row["default_policy"] == "local-only",
         )

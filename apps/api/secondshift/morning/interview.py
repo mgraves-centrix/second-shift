@@ -18,6 +18,7 @@ import re
 from dataclasses import dataclass
 
 from ..agents.invoke import invoke
+from ..db.ids import ordered_ulids
 from ..db.repository import Repository
 from ..providers.base import Reasoner
 from ..telemetry.recorder import Recorder
@@ -124,15 +125,27 @@ def raise_questions(
         context=facts_for(briefing.nights),
     )
 
+    # Identifiers minted as one ordered batch, because the order the interviewer
+    # asked in is a judgment — the prompt's own words are "the smallest number
+    # of questions that would have unblocked the most work" — and a whole turn's
+    # questions land in the same millisecond. With plain ULIDs the briefing's
+    # `ORDER BY raised_at_ms, id` then returned them in whichever order their
+    # random bits fell, which was observed reversing them between two runs of
+    # the same seed. On a screen that asks one question at a time, that is the
+    # difference between the first question being the important one or not.
+    pairs = parse_questions(turn.text)
+    ids = ordered_ulids(len(pairs))
+
     raised: list[RaisedQuestion] = []
-    for question, rationale in parse_questions(turn.text):
-        decision_id = repo.insert_decision(
+    for decision_id, (question, rationale) in zip(ids, pairs, strict=True):
+        repo.insert_decision(
             entry_id=entry_id,
             question=question,
             rationale=rationale,
             status="open",
             raised_by_run_id=run_id,
             raised_by_invocation_id=turn.invocation_id,
+            decision_id=decision_id,
         )
         raised.append(RaisedQuestion(decision_id, question, rationale))
     return raised

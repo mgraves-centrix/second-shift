@@ -1,0 +1,171 @@
+/* The interview.
+ *
+ * No color of its own — every value comes from `app/tokens.css`. The `frontend`
+ * change made that a rule after `--severe` was found declared inside the
+ * scrubber, where the capture surface could not see it.
+ */
+
+.page {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: var(--s-5) var(--s-4);
+}
+
+.notice { color: var(--muted); font-size: var(--t-small); }
+
+/* -- the agenda ---------------------------------------------------------- */
+
+.interview {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--s-5) var(--s-4);
+}
+
+.agenda {
+  display: flex; align-items: center; gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+
+.count { color: var(--muted); font-size: var(--t-small); }
+
+.dots { display: flex; gap: var(--s-1); }
+
+/* An interview whose end you cannot see is a queue. */
+.dot {
+  width: 0.5rem; height: 0.5rem; border-radius: 50%;
+  background: var(--disabled);
+}
+.dot[data-state="current"] { background: var(--accent); }
+.dot[data-state="done"] { background: var(--muted); }
+
+.question {
+  font-size: var(--t-title);
+  font-weight: 600;
+  margin: 0 0 var(--s-3);
+  color: var(--text);
+}
+
+/* Why the agent could not proceed. A question without it is a quiz. */
+.rationale {
+  color: var(--muted);
+  margin: 0 0 var(--s-4);
+}
+
+/* Principle 2: said before the idea leaves, not after. */
+.egress {
+  color: var(--warn);
+  border-left: 2px solid var(--warn);
+  padding-left: var(--s-3);
+  margin: 0 0 var(--s-4);
+  font-size: var(--t-small);
+}
+
+.field { display: block; margin-bottom: var(--s-3); }
+.label {
+  display: block;
+  color: var(--muted); font-size: var(--t-small);
+  margin-bottom: var(--s-1);
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--s-1);
+  padding: var(--s-3);
+  font: inherit;
+  resize: vertical;
+}
+.input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* This screen writes. A failed submission is not "nothing was lost". */
+.failed {
+  color: var(--severe);
+  font-size: var(--t-small);
+  margin: 0 0 var(--s-3);
+}
+
+.outcomes { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+
+.outcome {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--s-1);
+  padding: var(--s-2) var(--s-3);
+  font: inherit;
+  cursor: pointer;
+}
+.outcome:hover:not(:disabled) { border-color: var(--muted); }
+.outcome:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.outcome:disabled { color: var(--disabled); cursor: default; }
+/* All four are equal, deliberately. An accent on `Decided` was tried and read
+ * as the recommended answer — a person in a hurry clicks the highlighted
+ * button, which biases the record away from `Defer`. Deferring being a
+ * first-class outcome has to be true of the pixels or it is only true of the
+ * schema. Found by looking at the render, not by a test. */
+
+.done { color: var(--accent); margin: 0; }
+
+/* -- what the night did -------------------------------------------------- */
+
+.record { margin-top: var(--s-5); }
+
+/* The section had only a date on it, which does not say what the section is.
+ * `aria-label` said so and nothing rendered it. */
+.recordHeading {
+  font-size: var(--t-small);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 0 0 var(--s-4);
+}
+
+.night { margin-bottom: var(--s-5); }
+
+.nightOf {
+  display: flex; align-items: baseline; gap: var(--s-3);
+  font-size: var(--t-body); font-weight: 600;
+  margin: 0 0 var(--s-3);
+  color: var(--text);
+}
+
+.policy { color: var(--muted); font-size: var(--t-small); font-weight: 400; }
+
+.stages { list-style: none; margin: 0; padding: 0; }
+
+.stage {
+  display: grid;
+  grid-template-columns: 5.5rem 4.5rem 1fr;
+  gap: var(--s-3);
+  padding: var(--s-1) 0;
+  font-size: var(--t-small);
+  border-bottom: 1px solid var(--line);
+}
+
+.stageName { color: var(--text); }
+
+/* Skipped and failed must not collapse into "did not run": the distinction is
+ * the half that says whether anything is wrong. */
+.stageStatus { color: var(--muted); }
+.stageStatus[data-status="complete"] { color: var(--accent); }
+.stageStatus[data-status="failed"] { color: var(--severe); }
+.stageStatus[data-status="skipped"] { color: var(--warn); }
+
+.stageDetail {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* Three columns survives a phone now that the artifact label is a file name
+ * rather than a path carrying the night and the run's ULID. Collapsing to one
+ * column made six stages into eighteen lines, and a briefing you scroll is not
+ * one you read standing up. */
+@media (max-width: 24rem) {
+  .stage { grid-template-columns: 4.5rem 1fr; gap: var(--s-2); }
+  .stageDetail { grid-column: 2; color: var(--muted); }
+}
