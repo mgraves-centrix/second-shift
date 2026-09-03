@@ -16,8 +16,10 @@ judge it.
 >
 > So **the server half shipped and the screen did not** — briefing assembly,
 > the interviewer raising decisions, answering with a modality, and the policy
-> upgrade. All of it is exercised through the API and tests rather than through
-> a rendered page. The screen is `FRONTEND.md`'s to unblock, and the report
+> upgrade, reachable at `GET /morning` and `POST /decisions/{id}/answer` and
+> exercised by tests rather than through a rendered page. (Those routes were
+> missing when this first shipped and a later audit added them — the package had
+> no caller at all.) The screen is `FRONTEND.md`'s to unblock, and the report
 > item asking whether the interview *felt* like an interview is unanswerable
 > until it exists.
 

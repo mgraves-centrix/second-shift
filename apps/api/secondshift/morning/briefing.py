@@ -52,10 +52,6 @@ class StageLine:
     reason: str | None = None
     artifacts: tuple[str, ...] = ()
 
-    @property
-    def ran(self) -> bool:
-        return self.status in {"complete", "failed"}
-
 
 @dataclass(frozen=True, slots=True)
 class NightLine:
@@ -71,10 +67,6 @@ class NightLine:
     @property
     def completed(self) -> tuple[StageLine, ...]:
         return tuple(s for s in self.stages if s.status == "complete")
-
-    @property
-    def produced(self) -> int:
-        return sum(len(s.artifacts) for s in self.stages)
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +121,12 @@ def assemble(repo: Repository, *, include_synthetic: bool = False) -> Briefing:
     Runs no model. A briefing that needed one would be a briefing that could
     fail, and the one morning it failed would be the morning after the night it
     was most needed for.
+
+    `include_synthetic` is principle 5's hook and the judge instance is what
+    passes it: that deployment runs this same code over seeded rows, and a
+    briefing that filtered them would show a judge an empty morning. It is set
+    from the deployment's own `is_synthetic`, never from a request — the same
+    rule capture already follows, and for the same reason.
     """
     since = boundary_ms(repo)
     synthetic = "" if include_synthetic else "AND r.is_synthetic = 0"

@@ -547,10 +547,24 @@ wrong reason.
 first — its own prompt says so, and the reason is checkable: `/` and `/night/`
 have no navigation between them and design tokens are drifting across
 `app/globals.css` and `components/scrubber/scrubber.module.css`. A third surface
-on that foundation makes the drift worse. So the server half is reachable through
-the API and exercised by tests, and **the prompt's best report item — whether the
-interview feels like being interviewed or like filling in a form — is
-unanswerable and stays open** rather than answered badly. Voice is deferred
+on that foundation makes the drift worse. So the server half is reachable at
+`GET /morning` and `POST /decisions/{id}/answer`, and **the prompt's best report
+item — whether the interview feels like being interviewed or like filling in a
+form — is unanswerable and stays open** rather than answered badly.
+
+> **Those two routes did not exist when this first shipped, and this section
+> said they did.** The morning package had no caller anywhere in the tree: no
+> route, no CLI, nothing. It imported and tested cleanly and no running system
+> could reach it. Found by auditing the claim rather than re-reading it, and
+> fixed by building what had been asserted — `API_LAYER.md`'s scope says "no new
+> routes; a capability adds its own", so they were always this capability's to
+> add.
+>
+> Two dead properties went with it — `StageLine.ran` and `NightLine.produced`,
+> both defined, both called by nothing — and `include_synthetic` had no caller
+> and no test despite being principle 5's hook: the judge deployment runs this
+> same code over seeded rows, and a briefing that filtered them would show a
+> judge an empty morning. Voice is deferred
 entirely: there is no ASR, and a waveform with no transcription behind it is the
 decoration the prompt names.
 

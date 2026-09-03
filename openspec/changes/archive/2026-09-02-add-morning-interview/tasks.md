@@ -120,3 +120,32 @@ Morning 3 — two nights, no interview between
 After answering
     nights: 1   ← the boundary advanced
 ```
+
+
+## Corrected after archiving, by an audit of this change's own claims
+
+**The proposal says the server half is "reachable through the API". It was not.**
+The morning package had no caller anywhere in the tree — no route, no CLI,
+nothing. It imported and tested cleanly and no running system could reach it.
+The claim is left as written above because it is the record of what was believed;
+what fixed it is here.
+
+- `GET /morning` and `POST /decisions/{id}/answer` now exist.
+  `API_LAYER.md`'s scope says "no new routes; a capability adds its own", so they
+  were always this capability's to add and their absence was an oversight rather
+  than a boundary.
+- **`include_synthetic` had no caller and no test**, despite being principle 5's
+  hook: the judge deployment runs this same code over seeded rows, and a
+  briefing that filtered them would show a judge an empty morning. It is now set
+  from the deployment's own flag — never from a request — and both directions
+  are asserted.
+- **Two dead properties removed**: `StageLine.ran` and `NightLine.produced`,
+  defined and called by nothing.
+- **One test strengthened after a mutation exposed it.** The
+  rendering-does-not-consume test had no open decision in it, so a mutation that
+  consumed decisions on render could not reach it. A test that cannot reach the
+  mechanism it names is testing the absence of data.
+
+Three route mutations were run and each turned its test red: a `GET` that
+consumes its own delta, the judge flag read from the query string instead of the
+deployment, and an unknown decision id accepted rather than refused.

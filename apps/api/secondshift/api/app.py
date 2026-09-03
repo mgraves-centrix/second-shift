@@ -32,11 +32,19 @@ from ..db.repository import Repository
 from ..telemetry.pricing import PricingTable
 from ..telemetry.recorder import Recorder
 from .location import home_location
+from ..morning import assemble
+from ..morning.interview import answer
 from .schemas import (
+    AnswerRequest,
+    AnswerResponse,
+    BriefingResponse,
     CapabilityResponse,
     CaptureRequest,
     EntryResponse,
     EventDetailResponse,
+    NightLineResponse,
+    QuestionResponse,
+    StageLineResponse,
     InvocationNodeResponse,
     ModelCallResponse,
     PolicyAvailabilityResponse,
@@ -311,6 +319,90 @@ def create_app(context: Context) -> FastAPI:
                 )
                 for i in ctx.repo.invocation_tree(run_id)
             ],
+        )
+
+    @app.get("/morning", response_model=BriefingResponse)
+    def morning(ctx: Context = Depends(get_context)) -> BriefingResponse:
+        """What the night did and what it could not decide.
+
+        Covers every run since the last decision a person *acted* on. Fetching
+        this does not advance that boundary — rendering a briefing is not the
+        same as reading one, and a GET that consumed its own delta would lose a
+        morning because somebody opened the app while walking.
+
+        Assembled from rows with no model call, so a night that ran while the
+        interviewer was down still reports what it produced. Principle 3.
+        """
+        briefing = assemble(ctx.repo, include_synthetic=ctx.is_synthetic)
+        return BriefingResponse(
+            nights=[
+                NightLineResponse(
+                    run_id=n.run_id,
+                    entry_id=n.entry_id,
+                    night_of=n.night_of,
+                    outcome=n.outcome,
+                    effective_policy=n.effective_policy,
+                    stages=[
+                        StageLineResponse(
+                            stage=s.stage,
+                            status=s.status,
+                            reason=s.reason,
+                            artifacts=list(s.artifacts),
+                        )
+                        for s in n.stages
+                    ],
+                )
+                for n in briefing.nights
+            ],
+            questions=[
+                QuestionResponse(
+                    decision_id=q.decision_id,
+                    entry_id=q.entry_id,
+                    question=q.question,
+                    rationale=q.rationale,
+                    blocking_stage=q.blocking_stage,
+                    will_leave_the_machine=q.will_leave_the_machine,
+                )
+                for q in briefing.questions
+            ],
+            interviewer_error=briefing.interviewer_error,
+        )
+
+    @app.post("/decisions/{decision_id}/answer", response_model=AnswerResponse)
+    def answer_decision(
+        decision_id: str,
+        body: AnswerRequest,
+        ctx: Context = Depends(get_context),
+    ) -> AnswerResponse:
+        """Answer one question the system asked.
+
+        The path carries the decision id, so there is no route here that takes
+        an instruction with nowhere to attach it. That is the scope boundary in
+        the URL shape rather than in a rule somebody has to remember: a general
+        chat interface is excluded by name, and this is how it stays excluded.
+        """
+        try:
+            answer(
+                ctx.repo,
+                decision_id,
+                text=body.answer,
+                status=body.status,
+                modality=body.modality,
+            )
+        except ValueError as exc:
+            # Unknown or already answered. Refused rather than recorded — an
+            # answer to a question nobody asked has nothing to mean.
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            ) from exc
+
+        row = ctx.repo.connection.execute(
+            "SELECT status, answered_at_ms FROM decisions WHERE id = ?", (decision_id,)
+        ).fetchone()
+        return AnswerResponse(
+            decision_id=decision_id,
+            status=row["status"],
+            answered_at_ms=row["answered_at_ms"],
         )
 
     @app.get("/events/{event_id}", response_model=EventDetailResponse)
