@@ -23,9 +23,10 @@ grouped by that rule, not by how interesting it is.
                              ├──> RESEARCH ✅─────────┤                      ^
    RETRIEVAL ───────────────✅┘                        │                      │
                                                        │       EVAL_SCORING ──┘
-   FRONTEND ──> MORNING_INTERVIEW ─────────────────────┘
+   FRONTEND ✅> MORNING_INTERVIEW ✅────────────────────┘
 
-   ✅ shipped. FRONTEND is now the blocker: it gates MORNING_INTERVIEW's screen.
+   ✅ shipped. API_LAYER is now the blocker: five sessions add routes to one
+   file, and it is the only unshipped prompt that makes the others cheaper.
 
    TEST_HARNESS    OPERATIONS    ASR    NEBIUS_EXECUTOR
    any time        needs the     needs  blocked on
