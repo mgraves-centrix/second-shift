@@ -27,6 +27,17 @@ background.
 Everything else in this project argues the system works. This is what makes it
 look like one product rather than three demos in a trench coat.
 
+> **✅ Shipped 3 Sep — `openspec/changes/archive/2026-09-03-add-frontend`.**
+> Kept as the record of what was asked. Two things to carry forward:
+>
+> 1. **Its open decision was answered by measuring, and the answer was
+>    asymmetric.** A nav bar on capture takes the `local-only` policy option
+>    from 79% visible to 0% at 390×350. Capture gets links below its button;
+>    the desktop surfaces get a nav.
+> 2. **A finding it did not fix:** capture hides that policy option entirely at
+>    390×300, on the shipped screen with no nav involved. The fix reorders the
+>    3am screen, so it is the subject's call.
+
 Right now there are two surfaces and **no way to get from one to the other.**
 `/` is capture, `/night/` is the scrubber, and nothing links them — you have to
 know the URL. A judge who opens the app sees a textarea.

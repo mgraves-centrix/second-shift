@@ -96,3 +96,31 @@ Capture's privacy choice is unchanged by this capability:
 The footer costs nothing above the fold, which is what it was placed below the
 button for. No horizontal overflow at 320px, 390px or 1920px on either surface,
 and both carry links to every built surface.
+
+
+## The follow-up audit, and three more findings
+
+Run after archiving, the same way the 3 Sep audit was: for each public symbol in
+the new code, does anything outside its own module reference it?
+
+- **`DemoLabel` was exported and imported by nothing.** Used only by `Nav` and
+  `Footer` in its own file. Un-exported — a symbol nothing imports is surface
+  with no consumer.
+- **`SURFACES` was exported and only asserted by reading the file's text.** The
+  test grepped `Shell.tsx` for `href: "/night/"`, which passes whatever the
+  symbol is called and fails to notice a rename. Trying to import it properly
+  found the real constraint: `node --test` strips types but does not transform
+  JSX, so nothing in a `.tsx` file can be imported by a test at all. The list is
+  data, so it moved to `lib/surfaces.ts` — which also makes it the extension
+  point the morning session was told to use, one line rather than an edit inside
+  a component.
+- **A test narrowed after it overreached.** `no build-time flag governs the
+  label` forbade `process.env` anywhere in the shell, and failed the moment the
+  shell needed to know where the API is. It now forbids a flag that *decides*
+  the label and requires the served report to be read — and a second test
+  asserts the shell takes no `demo` prop, which is the defect that caused the
+  night surface to ship unlabeled.
+
+A mutation was run on the moved list: dropping the trailing slash from
+`/night/` turns two tests red, which under `trailingSlash: true` and a static
+export is a link the file server cannot follow.

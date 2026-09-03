@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { isDemoProfile } from "@/lib/profile";
+import { SURFACES } from "@/lib/surfaces";
 import styles from "./shell.module.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
@@ -38,12 +39,6 @@ function useDemoProfile(): boolean {
   }, []);
   return demo;
 }
-
-/** Every built surface, in the order a person meets them. */
-export const SURFACES: ReadonlyArray<{ href: string; label: string }> = [
-  { href: "/", label: "Capture" },
-  { href: "/night/", label: "Night" },
-];
 
 function links(pathname: string, className: string) {
   return SURFACES.map((s) => (
@@ -99,8 +94,11 @@ export function Footer() {
  * Principle 5: the judge instance contains zero real data and must be labeled
  * in-UI as a demo. Rendered from the served capability report, so the judge
  * deployment is a caller of this code rather than a fork of it.
+ *
+ * Not exported: `Nav` and `Footer` are the only callers, and a symbol nothing
+ * imports is surface with no consumer.
  */
-export function DemoLabel() {
+function DemoLabel() {
   return (
     <span className={styles.demo} role="status">
       demo

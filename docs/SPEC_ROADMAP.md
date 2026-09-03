@@ -447,8 +447,8 @@ A deferred obligation with no home is a dropped one, so they have a home now.
 order.** Each states the canonical count as of its own ship, so the numbers read
 out of sequence when scanned top to bottom. The order was `retrieval` (11),
 `agents` (12), `configuration` (13), `night-pipeline` (14), `artifacts` (15),
-`research` (16), and `morning-interview` (17) on 3 Sep. Count them rather than
-reading the tally: `npx openspec list --specs`.
+`research` (16), and on 3 Sep `morning-interview` (17) and `frontend` (18).
+Count them rather than reading the tally: `npx openspec list --specs`.
 
 ### `agents` — shipped 2 Sep
 
@@ -567,6 +567,64 @@ form — is unanswerable and stays open** rather than answered badly.
 > judge an empty morning. Voice is deferred
 entirely: there is no ASR, and a waveform with no transcription behind it is the
 decoration the prompt names.
+
+### `frontend` — shipped 3 Sep
+
+Eighteen canonical capabilities. One token file, navigation between every
+surface, and the demo label principle 5 requires.
+
+**The open decision was answered by measurement, and the answer is asymmetric.**
+Rendering the built capture page at keyboard-up viewports, with the shipped nav
+inserted above the content:
+
+| viewport | shipped (no nav) | with a nav bar |
+|---|---|---|
+| 390×300 | 0% | 0% |
+| 390×350 | **79%** | **0%** |
+| 390×390 | **100%** | **71%** |
+| 390×420 | 100% | 100% |
+
+That is the `local-only` policy option — the privacy choice. At 390×350 a nav
+bar is the difference between seeing it and not seeing it at all. The default is
+`cloud-assisted`, so a person who does not scroll takes the wider policy by
+omission: principle 2, not a layout preference. **Capture gets links below its
+button; the desktop surfaces get a nav.** Coherence lives in the tokens and one
+type ramp, not in a bar on the 3am screen.
+
+**A second drift, found by reading the file rather than the prompt.**
+`globals.css` styled bare element selectors — `button`, `textarea`, `main`,
+`h1` — so `button { width: 100% }` was capture's layout applied to every surface
+that would ever exist, and the scrubber was already working around it. Scoped to
+a module, with capture's rendering above the fold measured identical before and
+after.
+
+**Two defects in this capability's own work.**
+
+1. **The first measurement was taken against a mock** — the same stylesheet with
+   invented policy text — and reported different numbers. The conclusion held
+   and got sharper, but a measurement against a stand-in is not a measurement of
+   the thing.
+2. **The demo label shipped on capture and not on the night surface.** The shell
+   took it as a prop and the night page rendered `<Nav />` without one, so the
+   screen a judge is most likely to open was the one not saying it was a demo.
+   The shell fetches the capability report itself now, and a test asserts it
+   takes no such prop — a label every caller has to remember is a label that
+   goes missing.
+
+One test had to be **narrowed** after it overreached: it forbade `process.env`
+anywhere in the shell, which failed the moment the shell needed to know where
+the API is, and would have pushed the label back to the prop that had just
+caused the bug.
+
+**Recorded rather than fixed:** capture hides the privacy choice entirely at
+390×300 on the shipped screen, with no nav involved. That bites on small phones —
+an iPhone SE with a keyboard leaves roughly 308px — and the fix reorders the
+screen a person uses at 3am, so it is the subject's call rather than a
+refactor's.
+
+**What this unblocks:** `app/morning/`. `morning-interview` shipped its server
+half deliberately without a screen because this had not landed. Adding the route
+to `SURFACES` puts it in the nav and the capture footer at once.
 
 ### The audit of 3 Sep — four findings, and the loop that was open
 

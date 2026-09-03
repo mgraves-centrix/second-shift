@@ -39,11 +39,12 @@ describes the target — this table describes the present.
 | Night orchestrator | done — checkpointed six-stage walk, quarantine over downgrade; **never run against the real reasoner** |
 | Artifacts — files on disk, variant groups, outcomes | done — hashed from what landed; `cost_per_accepted_artifact` returns a number once a `keep` is recorded |
 | Research — redaction before egress | done — queries are constructed, never filtered from raw text; `local-only` makes zero calls. **Never run against the live Tavily API**: no credential here |
-| Morning interview | **server half only** — briefing, questions with rationale, answering, policy upgrade. **No screen**: `FRONTEND.md` has to land first |
+| Morning interview | **server half only** — briefing, questions with rationale, answering, policy upgrade. **No screen yet**; `frontend` has now landed, so it is unblocked |
+| Frontend shell and token system | done — one token file, navigation between every surface, demo label from the served profile |
 | Night scrubber UI | done — reads a recorded night, scrubs by pointer or keyboard |
 | Judge demo instance | not started |
 
-Seventeen capabilities have shipped across sixteen OpenSpec changes. Their
+Eighteen capabilities have shipped across seventeen OpenSpec changes. Their
 specifications are in `openspec/specs/`; the changes that built them, with their
 task lists, are in `openspec/changes/archive/`. Both directories are the
 authority on that count — this sentence has been wrong before, so count them

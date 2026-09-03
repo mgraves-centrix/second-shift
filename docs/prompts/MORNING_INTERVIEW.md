@@ -9,10 +9,12 @@ judge it.
 
 > **`FRONTEND.md` had not shipped when this ran, and that split the capability.**
 > Its own prompt says it "must land before `MORNING_INTERVIEW.md`", and the
-> reason is concrete: `/` and `/night/` have no navigation between them, and
-> design tokens are already drifting across `app/globals.css` and
-> `components/scrubber/scrubber.module.css`. Building a third surface on that
-> makes the drift worse, which is the thing `FRONTEND.md` exists to stop.
+> reason was concrete: `/` and `/night/` had no navigation between them, and
+> design tokens were drifting across `app/globals.css` and
+> `components/scrubber/scrubber.module.css`. **`frontend` shipped on 3 Sep and
+> closed both**, so `app/morning/` is unblocked: add the route to
+> `SURFACES` in `components/shell/Shell.tsx` and it appears in the nav and the
+> capture footer at once.
 >
 > So **the server half shipped and the screen did not** — briefing assembly,
 > the interviewer raising decisions, answering with a modality, and the policy
