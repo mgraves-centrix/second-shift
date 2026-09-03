@@ -1,0 +1,44 @@
+/* Every token, declared once.
+ *
+ * Eight of these lived here and six more had been declared inside
+ * `components/scrubber/scrubber.module.css` — including `--severe`, a severity
+ * color the capture surface knew nothing about. That was not carelessness: the
+ * scrubber needed a color and there was nowhere to put it, so the next surface
+ * would have done the same thing for the same reason. One file is the fix that
+ * a convention was not.
+ *
+ * Dark, with no toggle. Capture happens at 3am and that is not a preference.
+ */
+
+:root {
+  /* Surfaces */
+  --bg: #0b0d10;
+  --panel: #14181d;
+  --line: #232a32;
+
+  /* Text */
+  --text: #e6eaef;
+  --muted: #8b96a5;
+
+  /* Meaning. `--accent` is the only affirmative color; everything else is a
+   * state. A fourth surface should need none of its own. */
+  --accent: #7ef0a8;
+  --warn: #f0c97e;
+  --severe: #ff6b6b;
+  --disabled: #4a545f;
+
+  /* Spacing, on a scale rather than by eye. The scrubber's gutter and lane
+   * heights are layout rather than color and stay in its own module. */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+
+  /* One type ramp. */
+  --t-small: 0.8rem;
+  --t-body: 1rem;
+  --t-title: 1.05rem;
+
+  --radius: 0.6rem;
+}

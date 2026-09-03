@@ -31,22 +31,30 @@ around it. Fixing it must not change a pixel of the screen taking real ideas.
 markup and the real stylesheet were rendered at phone viewports, with and
 without a nav bar, at the keyboard-up heights that are the state that matters.
 
-The measurement is what "Local only" — the privacy choice — does as the viewport
-shrinks:
+The measurement is what `local-only` — the privacy choice — does as the viewport
+shrinks. **Measured against the built page**, served with a real capability
+report, with the shipped nav inserted above the content:
 
-| viewport | no shell | with a nav bar |
+| viewport | shipped (no nav) | with a nav bar |
 |---|---|---|
-| 390×300 | **0% visible** | **0% visible** |
-| 390×390 | 81% visible | **10% visible** |
-| 390×450 | 100% | 96% |
-| 390×520 | 100% | 100% |
+| 390×300 | 0% visible | 0% visible |
+| 390×350 | **79% visible** | **0% visible** |
+| 390×390 | **100%** | **71%** |
+| 390×420 | 100% | 100% |
+| 390×450 | 100% | 100% |
 
-**The nav costs capture the privacy choice in the band that matters.** At 390px
-of remaining viewport — a common iOS keyboard-up height — a nav bar is the
-difference between seeing that "Local only" exists and not seeing it. The
-default is `cloud-assisted`, the option that sends the idea off the machine, so
-a person who does not scroll takes the wider policy by omission. That is
-principle 2 territory, not a layout preference.
+**The nav costs capture the privacy choice in the band that matters.** At 350px
+of remaining viewport it is the difference between seeing `local-only` and not
+seeing it at all; at 390px, between whole and clipped. The default is
+`cloud-assisted`, the option that sends the idea off the machine, so a person
+who does not scroll takes the wider policy by omission. That is principle 2
+territory, not a layout preference.
+
+> **The first version of this table was measured against a mock**, built from
+> the same stylesheet but with invented policy text, and it reported 81% / 10%
+> at 390×390. The real page is more compact and the real numbers are different —
+> and sharper. The conclusion did not change, but the figures did, and a
+> measurement taken against a stand-in is not a measurement of the thing.
 
 **So: two shells that share one system.** Capture gets no chrome above the
 content. The desktop surfaces — the night, and the morning when it lands — get a
@@ -60,8 +68,9 @@ scrolling one screen finds it immediately.
 ## A second finding, and it is not this capability's to fix
 
 **Capture already hides the privacy choice with the keyboard up, with no nav
-involved.** At 390×300 the "Local only" option is 0% visible in the *current*
-shipped screen. At 390×390 it is 81% — legible, but only just.
+involved.** At 390×300 the `local-only` option is **0% visible** in the current
+shipped screen. It is whole from 390px up, so this bites on small phones — an
+iPhone SE with a keyboard leaves roughly 308px — rather than on every phone.
 
 This was found while measuring something else and it is a real defect in a live
 screen: the moment a person is deciding whether an idea leaves the machine is
