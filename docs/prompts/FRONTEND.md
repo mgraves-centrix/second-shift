@@ -6,6 +6,14 @@ tailnet, no credentials.
 **Independent. Runs in parallel with `CONFIGURATION.md`, `AGENTS.md`,
 `RETRIEVAL.md` and `TEST_HARNESS.md`. Must land before `MORNING_INTERVIEW.md`.**
 
+> **It did not, and that is now the thing this unblocks.** `morning-interview`
+> shipped its server half on 3 Sep — briefing, questions, answering, policy
+> upgrade, all reachable at `GET /morning` and
+> `POST /decisions/{id}/answer` — and deliberately shipped **no screen**,
+> because this prompt says it must land first and the reason is the drift below.
+> `app/morning/` is still `MORNING_INTERVIEW.md`'s to build; this makes it
+> possible to build without making the drift worse.
+
 ---
 
 Build the frontend shell and design system. Read `openspec/constitution.md`,
@@ -41,6 +49,12 @@ they land, not after.
 - `app/globals.css` — the palette: `--bg #0b0d10`, `--panel`, `--line`, `--text`,
   `--muted`, `--accent #7ef0a8`, `--warn`, `--disabled`. Dark by default, and
   that is not a preference — capture happens at 3am.
+- **And the same file styles bare element selectors** — `main`, `h1`, `button`,
+  `textarea`, `fieldset`, `legend`. `button { width: 100% }` and
+  `main { max-width: 34rem }` are capture's layout, applied globally. That is a
+  second drift underneath the token one and it is worse: a new surface inherits
+  capture's styling whether it wants it or not, and the fix has to happen without
+  changing a pixel of the screen that is taking real ideas.
 - `next.config.mjs` sets `output: "export"` and `trailingSlash: true`, so the API
   serves the PWA as files. **A second running server on the Spark is a second
   thing that can be down at 2am.** Any route you add must survive static export;
@@ -116,7 +130,7 @@ that is not the 3am screen.
 
 ```bash
 git status --short && openspec list && openspec list --specs
-apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 302 pass today
+apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 587 pass today
 npm --prefix apps/web run test && npm --prefix apps/web run typecheck
 npm --prefix apps/web run build                                # must still export
 scripts/check-no-environment.sh && scripts/check-american-english.sh
