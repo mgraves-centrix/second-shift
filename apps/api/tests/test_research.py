@@ -306,3 +306,78 @@ class TestNothingFabricatesResults:
         source = Path(tavily.__file__).read_text()
         assert "class StubTavily" not in source
         assert "example.invalid" not in source
+
+
+class TestTheExtractEndpoint:
+    """`extract` shipped with no test at all — a whole public method on the one
+    provider that talks to the internet. Exercised here against a fake HTTP
+    transport rather than the network, so the suite stays hermetic and spends
+    nothing."""
+
+    @pytest.fixture
+    def provider(self, monkeypatch):
+        from secondshift.providers.tavily import TavilyProvider
+
+        monkeypatch.setenv("TAVILY_API_KEY", "not-a-real-key")
+        return TavilyProvider()
+
+    def _fake_post(self, monkeypatch, payload: dict, captured: dict):
+        from secondshift.providers import tavily
+
+        def _post(self, url, body):
+            captured["url"] = url
+            captured["body"] = body
+            return payload, 7
+
+        monkeypatch.setattr(tavily.TavilyProvider, "_post", _post)
+
+    def test_it_calls_the_extract_endpoint(self, provider, monkeypatch):
+        captured: dict = {}
+        self._fake_post(monkeypatch, {"results": []}, captured)
+
+        provider.extract(["https://example.invalid/a"])
+
+        assert captured["url"].endswith("/extract")
+        assert captured["body"] == {"urls": ["https://example.invalid/a"]}
+
+    def test_it_returns_the_extracted_text(self, provider, monkeypatch):
+        captured: dict = {}
+        self._fake_post(
+            monkeypatch,
+            {"results": [{"url": "https://example.invalid/a", "raw_content": "body"}]},
+            captured,
+        )
+
+        response = provider.extract(["https://example.invalid/a"])
+
+        assert [r.snippet for r in response.results] == ["body"]
+
+    def test_a_malformed_result_is_skipped_rather_than_crashing(
+        self, provider, monkeypatch
+    ):
+        """The provider reads someone else's JSON. A shape it did not expect
+        must not take the night down."""
+        captured: dict = {}
+        self._fake_post(monkeypatch, {"results": ["not a dict", {"url": "u"}]}, captured)
+
+        response = provider.extract(["https://example.invalid/a"])
+
+        assert len(response.results) == 1
+
+    def test_search_and_extract_use_the_recorded_endpoint_names(
+        self, provider, monkeypatch
+    ):
+        """The URL called and the string written to `tool_calls.endpoint` come
+        from the same constants. They were two separate literals until an audit
+        found them, which is one edit away from a row that says `search` about a
+        call that went somewhere else."""
+        from secondshift.providers.tavily import EXTRACT, SEARCH
+
+        captured: dict = {}
+        self._fake_post(monkeypatch, {"results": []}, captured)
+
+        provider.search("a query")
+        assert captured["url"].endswith(f"/{SEARCH}")
+
+        provider.extract(["https://example.invalid/a"])
+        assert captured["url"].endswith(f"/{EXTRACT}")

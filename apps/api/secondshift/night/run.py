@@ -23,6 +23,7 @@ from ..airlock.policy import resolve_policy
 from ..artifacts.store import VARIANT_KINDS, ArtifactWriteFailed, write_artifact
 from ..artifacts.variants import RankingRefused, parse_ordering, rank_group, write_variants
 from ..brain.repo import BrainRepo, BrainUnavailable
+from ..morning.interview import mark_consumed, queued_for_tonight
 from .research import run_research
 from ..db.connection import now_ms
 from ..db.repository import Repository
@@ -83,6 +84,11 @@ class NightResult:
     outcome: str | None
     stages: list[StageResult] = field(default_factory=list)
     quarantine_reason: str | None = None
+    #: What the run actually executed under. Carried out because anything that
+    #: runs *after* the stages — the interviewer, for one — has to honor the
+    #: same policy, and a caller that guessed it could send a `local-only`
+    #: night's facts to a remote provider.
+    effective_policy: str | None = None
 
     @property
     def quarantined(self) -> bool:
@@ -137,6 +143,7 @@ def _run_stage(
     agents: dict[str, str],
     prompts: dict[str, object],
     entry_text: str,
+    answers: str,
     policy: str,
     completed: frozenset[str],
     results: dict[str, StageResult],
@@ -194,6 +201,11 @@ def _run_stage(
         # with no memory behind it reads exactly like one written with memory
         # that had nothing to say, and the morning cannot tell them apart.
         context = retrieved or NO_RETRIEVAL_NOTE
+    if answers:
+        # Prepended, so what the person decided leads rather than trails the
+        # retrieved context. An answer given this morning is the most recent
+        # and most authoritative thing the system knows about this idea.
+        context = f"{answers}\n\n{context}" if context else answers
     try:
         turn = invoke(
             recorder,
@@ -385,6 +397,23 @@ def _variant_bodies(text: str) -> list[str]:
     return bodies or [text]
 
 
+def _take_queued_answers(repo: Repository, run_id: str) -> str:
+    """Answers waiting for tonight, marked consumed and rendered as context.
+
+    Consuming here rather than at answer time is what makes "answering changes
+    tonight" visible in the data: `consumed_by_run_id` names the run that acted
+    on it, so a decision the person answered and a decision the system used are
+    distinguishable.
+    """
+    lines: list[str] = []
+    for row in queued_for_tonight(repo):
+        mark_consumed(repo, row["id"], run_id)
+        lines.append(f"You were asked: {row['question']}\nYou answered: {row['answer']}")
+    if not lines:
+        return ""
+    return "What you decided this morning:\n\n" + "\n\n".join(lines)
+
+
 def _rank_the_builds(
     repo: Repository,
     recorder: Recorder,
@@ -494,6 +523,12 @@ def run_entry(
         brain_sha=brain_sha,
     )
 
+    # Answers the person queued last morning become tonight's input, and are
+    # marked consumed so a decision stops looking pending once a run has taken
+    # it. Without this the `queued-for-tonight` status is a promise the loop
+    # never keeps — the answer sits forever and the night never sees it.
+    answers = _take_queued_answers(repo, run_id)
+
     results: dict[str, StageResult] = {}
     ordered: list[StageResult] = []
     try:
@@ -508,6 +543,7 @@ def run_entry(
                 agents=agents,
                 prompts=prompts,
                 entry_text=entry_text,
+                answers=answers,
                 policy=str(resolution.effective_policy),
                 completed=completed,
                 results=results,
@@ -537,4 +573,10 @@ def run_entry(
             entry_id, to_status="queued" if outcome == "failed" else "answered"
         )
 
-    return NightResult(entry_id=entry_id, run_id=run_id, outcome=outcome, stages=ordered)
+    return NightResult(
+        entry_id=entry_id,
+        run_id=run_id,
+        outcome=outcome,
+        stages=ordered,
+        effective_policy=str(resolution.effective_policy),
+    )

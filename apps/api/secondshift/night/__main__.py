@@ -14,7 +14,9 @@ import sys
 from collections.abc import Sequence
 
 from ..agents.roster import discover, register
+from ..airlock.policy import Policy
 from ..brain.repo import BrainRepo, BrainUnavailable
+from ..morning import assemble, raise_questions
 from ..config import ENV_DB, Profile, resolve_profile
 from ..db.connection import connect
 from ..db.migrate import migrate
@@ -61,6 +63,33 @@ def _retrieve(repo, providers, brain, entry) -> str:
     # Rendered here, with the source on each piece: a brief that cites the brain
     # should be traceable to the file it came from without a join.
     return "\n\n".join(f"### {p.source}\n\n{p.text}" for p in pieces)
+
+
+def _ask_about(repo, recorder, providers, result, agents, prompts, entry_id) -> int:
+    """Run the interviewer over the night just finished. Never fails the run.
+
+    A night that produced work and could not phrase a question is still a night
+    that produced work — principle 3 again. The failure is recorded and the
+    morning shows the facts with nothing to ask.
+    """
+    if result.quarantined or result.run_id is None:
+        return 0
+    try:
+        raised = raise_questions(
+            repo,
+            recorder,
+            providers.reasoner,
+            assemble(repo),
+            agent_id=agents["interviewer"],
+            prompt_path=prompts["interviewer"],
+            entry_id=entry_id,
+            policy=result.effective_policy or str(Policy.LOCAL_ONLY),
+            run_id=result.run_id,
+        )
+    except Exception as exc:  # noqa: BLE001 - recorded, and the night still stands
+        recorder.record_failure(exc, scope="night.interviewer")
+        return 0
+    return len(raised)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -124,6 +153,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f"{result.entry_id}  {result.outcome}  "
                 f"{done}/{len(result.stages)} stages complete  run {result.run_id}"
             )
+
+            # The interviewer runs here, at the end of the night, and this is
+            # what makes the morning have anything to ask. It is not an evening
+            # interview: nobody is spoken to now. The questions sit as `open`
+            # decisions until the person opens the morning, which is exactly the
+            # loop ADR 0005 settled — capture stays instant, the night does the
+            # work, and the asking happens over coffee.
+            #
+            # Without it `raise_questions` had no caller outside its tests, so
+            # the briefing was structurally incapable of containing a question.
+            asked = _ask_about(
+                repo, recorder, providers, result, agents, prompts, row["id"]
+            )
+            if asked:
+                print(f"{' ' * 26}{asked} question(s) raised for the morning")
 
         for row, reason in repo.ineligible_entries():
             print(f"{row['id']}  not dispatched  {reason}")

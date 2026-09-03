@@ -537,3 +537,26 @@ class TestTheScopeBoundary:
             if n.startswith(("chat", "message", "ask_anything", "handle_input"))
         ]
         assert suspicious == []
+
+
+class TestAPlaceholderIsNotAQuestion:
+    """Found by running the real command and reading what landed: the `cloud`
+    profile's `EchoReasoner` returns its own input, so the format instruction
+    came back verbatim and `<the question>` was stored as something to ask a
+    person over coffee. Green tests said nothing about it."""
+
+    def test_an_echoed_template_raises_no_question(self):
+        from secondshift.morning.interview import FORMAT_INSTRUCTION
+
+        assert parse_questions(FORMAT_INSTRUCTION) == []
+
+    def test_a_placeholder_in_the_question_is_discarded(self):
+        assert parse_questions("Q: <the question>\nWhy: because\n") == []
+
+    def test_a_placeholder_in_the_rationale_is_discarded(self):
+        assert parse_questions("Q: Which shape?\nWhy: <what you tried>\n") == []
+
+    def test_a_real_question_still_gets_through(self):
+        assert parse_questions(
+            "Q: Do you read it on a phone?\nWhy: two shapes, could not choose\n"
+        ) == [("Do you read it on a phone?", "two shapes, could not choose")]

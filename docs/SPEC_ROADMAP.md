@@ -568,6 +568,45 @@ form — is unanswerable and stays open** rather than answered badly.
 entirely: there is no ASR, and a waveform with no transcription behind it is the
 decoration the prompt names.
 
+### The audit of 3 Sep — four findings, and the loop that was open
+
+An audit of everything shipped on 2–3 Sep, run by checking claims against the
+tree rather than re-reading what had been written about them.
+
+**The loop did not close.** `raise_questions`, `queued_for_tonight` and
+`mark_consumed` each worked when called, were each tested, and **nothing called
+any of them**. So two of `morning-interview`'s own claims were structurally
+unreachable: the briefing could never contain a question, because nothing ran
+the interviewer; and `queued-for-tonight` was a status the system could write
+and never act on. Both are fixed — the interviewer runs at the end of the night
+(nobody is spoken to then, so ADR 0005 holds: the questions sit as `open`
+decisions until morning), and a run takes the queued answers as input and marks
+them consumed.
+
+**A guard that guarded nothing.** `assert_artifact_kinds_match_schema` was
+written against stage-to-artifact-kind drift and was never called, tested or
+exported. Its sibling `assert_matches_schema` was. Now wired, with a proof it
+can fail.
+
+**Two endpoint literals that could drift.** `SEARCH` and `EXTRACT` were defined
+and then not used — `search()` and `extract()` built their URLs from separate
+string literals, one edit away from a `tool_calls` row that says `search` about
+a call that went somewhere else. `TavilyProvider.extract` also had no test at
+all, on the one provider that talks to the internet.
+
+**A placeholder stored as a question, found by running the thing.** The `cloud`
+profile binds `EchoReasoner`, which returns its own input, so the interviewer's
+format instruction came back verbatim and `<the question>` was written to
+`decisions` as something to ask a person over coffee. Every test was green. It
+was visible only by running the real command and reading what landed — which is
+the argument for doing that, and the reason the report items that ask "read it
+yourself" are in these prompts at all.
+
+**The check that found the first one is worth keeping:** for each public symbol
+in a new module, does anything outside that module reference it? A capability
+can be correct, tested and entirely unreachable, and no test it owns will say
+so. It is worth running on `frontend` when that lands.
+
 ### `research` — shipped 2 Sep
 
 Sixteen canonical capabilities. The first stage that talks outward, and the

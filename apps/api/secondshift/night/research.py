@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from ..airlock.policy import Policy
 from ..airlock.redact import build_query
-from ..providers.tavily import TavilyNotConfigured, TavilyProvider
+from ..providers.tavily import SEARCH, TavilyNotConfigured, TavilyProvider
 from ..telemetry.recorder import Recorder
 
 #: Reasons the stage records when it does not search. Each is written to the
@@ -83,7 +83,7 @@ def run_research(
     # the only place a query reaches telemetry.
     recorder.record_tool_call(
         tool=provider.tool,
-        endpoint="search",
+        endpoint=SEARCH,
         policy=policy,
         query_redacted=query,
         credits=response.credits,

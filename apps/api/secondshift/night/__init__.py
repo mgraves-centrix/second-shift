@@ -6,7 +6,13 @@ caller, so every run the system could record sat permanently in flight.
 """
 
 from .run import NightResult, Quarantined, StageResult, run_entry
-from .stages import BY_NAME, STAGES, Stage, assert_matches_schema
+from .stages import (
+    BY_NAME,
+    STAGES,
+    Stage,
+    assert_artifact_kinds_match_schema,
+    assert_matches_schema,
+)
 
 __all__ = [
     "BY_NAME",
@@ -15,6 +21,7 @@ __all__ = [
     "STAGES",
     "Stage",
     "StageResult",
+    "assert_artifact_kinds_match_schema",
     "assert_matches_schema",
     "run_entry",
 ]

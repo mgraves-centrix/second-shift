@@ -64,14 +64,34 @@ def facts_for(nights: tuple[NightLine, ...]) -> str:
     return "\n".join(lines)
 
 
+#: The shape of an unfilled placeholder in `FORMAT_INSTRUCTION`. A model that
+#: echoes the template back — which the `cloud` profile's `EchoReasoner` does by
+#: construction — would otherwise have `<the question>` stored as something to
+#: ask a person over coffee. Found by running the real command end to end and
+#: reading what landed, not by a test.
+_PLACEHOLDER = re.compile(r"<[^>]+>")
+
+
 def parse_questions(text: str) -> list[tuple[str, str]]:
     """Question and rationale pairs, in order. Half a question is not a question.
 
     A model that emitted a bare `Q:` with no `Why:` produced something this
     refuses to store: the rationale is what separates a question from a quiz,
     and storing the question alone would lose the distinction permanently.
+
+    A pair that still carries a template placeholder is discarded for the same
+    reason the quality bar forbids lorem text — a question nobody wrote is worse
+    than no question, because the morning presents it as if somebody had.
     """
-    return [(m.group("question"), m.group("rationale")) for m in _QUESTION.finditer(text)]
+    pairs = [
+        (m.group("question").strip(), m.group("rationale").strip())
+        for m in _QUESTION.finditer(text)
+    ]
+    return [
+        (q, why)
+        for q, why in pairs
+        if q and why and not _PLACEHOLDER.search(q) and not _PLACEHOLDER.search(why)
+    ]
 
 
 def raise_questions(

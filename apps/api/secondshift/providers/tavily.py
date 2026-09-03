@@ -30,9 +30,15 @@ ENV_TAVILY_KEY = "TAVILY_API_KEY"
 
 _BASE = "https://api.tavily.com"
 
-#: The endpoints the night needs. `crawl` is in the schema's CHECK and is
-#: deliberately unused: crawling the web at large is not what a brief needs, and
-#: it is the endpoint most likely to fetch something nobody asked for.
+#: The endpoints the night needs, and the strings `tool_calls.endpoint` records.
+#: Named rather than repeated, so the recorded endpoint and the URL that was
+#: actually called cannot drift — they were two separate literals until an audit
+#: found them, which is one edit away from a row that says `search` about a call
+#: that went somewhere else.
+#:
+#: `crawl` is in the schema's CHECK and is deliberately unused: crawling the web
+#: at large is not what a brief needs, and it is the endpoint most likely to
+#: fetch something nobody asked for.
 SEARCH = "search"
 EXTRACT = "extract"
 
@@ -100,7 +106,7 @@ class TavilyProvider:
             "max_results": max_results,
             "search_depth": "basic",
         }
-        raw, latency_ms = self._post(f"{_BASE}/search", payload)
+        raw, latency_ms = self._post(f"{_BASE}/{SEARCH}", payload)
         results = [
             SearchResult(
                 title=str(r.get("title", "")),
@@ -115,7 +121,7 @@ class TavilyProvider:
 
     def extract(self, urls: list[str]) -> SearchResponse:
         """Full text for URLs a search already surfaced."""
-        raw, latency_ms = self._post(f"{_BASE}/extract", {"urls": urls})
+        raw, latency_ms = self._post(f"{_BASE}/{EXTRACT}", {"urls": urls})
         results = [
             SearchResult(
                 title=str(r.get("url", "")),
