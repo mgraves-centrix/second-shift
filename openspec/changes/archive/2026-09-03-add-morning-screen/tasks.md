@@ -93,5 +93,25 @@ module and the test asserts behavior.
 
 ## 7. Close out
 
-- [ ] 7.1 Sync specs, archive, drift pass over prompt/roadmap/index.
-- [ ] 7.2 Follow-up audit: the orphan check over every new public symbol.
+- [x] 7.1 Sync specs, archive, drift pass over prompt/roadmap/index.
+- [x] 7.2 Follow-up audit: the orphan check over every new public symbol.
+
+## 8. The follow-up audit — two orphans
+
+The orphan check, run over every public symbol in `lib/morning.ts`: *does
+anything outside this module reference it?*
+
+- [x] 8.1 **`AnswerResult` was exported and imported by nothing.** The same
+      finding the shell's `DemoLabel` produced. Un-exported; a caller that
+      wants the recorded status gets it by inference from `submitAnswer`.
+- [x] 8.2 **`completedStages` had a test and no production caller.** Correct,
+      tested, unreachable — the defect this project keeps producing. It was
+      genuinely wanted, so the fix was a caller rather than a deletion:
+      `nightSummary` renders "5 of 6 complete" beside the date, which is the
+      "short enough to read standing up" the brief asks for and which six rows
+      of status is not.
+
+`StageLine`, `NO_REASON_RECORDED` and `completedStages` are still referenced
+only by tests, and each legitimately: `StageLine` is structural inside
+`NightLine`, `NO_REASON_RECORDED` is named by its test rather than duplicated
+as a string literal, and `completedStages` now has `nightSummary`.

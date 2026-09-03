@@ -622,9 +622,9 @@ an iPhone SE with a keyboard leaves roughly 308px — and the fix reorders the
 screen a person uses at 3am, so it is the subject's call rather than a
 refactor's.
 
-**What this unblocks:** `app/morning/`. `morning-interview` shipped its server
-half deliberately without a screen because this had not landed. Adding the route
-to `SURFACES` puts it in the nav and the capture footer at once.
+**What this unblocked:** `app/morning/`, which shipped the same day as one line
+in `lib/surfaces.ts` — the extension point, used once and now covered by a test
+that every registered surface resolves to a route on disk.
 
 ### The audit of 3 Sep — four findings, and the loop that was open
 
@@ -1084,3 +1084,57 @@ exception to that.
 be restarted. `nebius-executor` before any cloud reasoning, because the pricing
 placeholders make every cloud call fail until it lands. `synthetic-seed` before
 `night-timeline`, because a scrubber cannot be built against three events.
+
+### `app/morning/` — 3 Sep
+
+The interview, which is the product. `morning-interview` shipped its server half
+on 3 Sep with no screen; `frontend` unblocked one later that day and this is it.
+
+**The decision that made it an interview.** One question at a time, with the
+agenda's length visible, rather than a list of questions each with a box under
+it. A list is a form, a form is answered easy-first, and the night's actual
+blocker is rarely the easy one. Every outcome advances, including *Defer*, which
+is what makes deferring first-class in the pixels and not only in the schema.
+It is also the anti-chat argument in layout: with one agenda item on screen,
+whose text box sits inside a specific question and whose submit path carries
+that question's decision id, there is nowhere to put an instruction that is not
+an answer to something the system asked.
+
+**Voice deferred, and stated.** ADR 0006 binds an end-of-utterance detector that
+has never been run. The surface references no microphone API at all, asserted by
+name in a test — a stronger form of principle 4 than mocking a denial, because
+code that never asks cannot be refused.
+
+**Two fields that were never set**, found by reading the server half before
+building on it. `will_leave_the_machine` had never once been `true`:
+`_open_questions` built every question without it, so the default rode out
+through the API while `morning-interview`'s spec claimed the briefing marks the
+questions whose answer sends an idea off the machine. The test that named the
+field asserted the *key was present in the JSON*, which a permanently `false`
+value satisfies — which is how a suite at 587 passing missed it. It is now set
+from the entry's policy, over-warning deliberately, because the narrower rule is
+not derivable and principle 2 picks the safe direction. `blocking_stage` is
+still always `NULL`; no spec claims otherwise, so it is recorded.
+
+**Four defects came out of rendering the page and reading it**, with the suite
+green throughout — the fifth capability in a row where looking beat testing:
+
+| what | why it mattered |
+|---|---|
+| every artifact rendered its full path | the run's ULID six times, making the night's record three times taller than the interview |
+| `Decided` carried the accent | reads as the recommended answer; a person in a hurry clicks the highlighted button, biasing the record away from `Defer` |
+| the empty morning claimed the night got stuck on nothing | on a morning with **no night at all** — the state you land in right after an interview, because acting advances the delta boundary past the run you just discussed |
+| the interviewer's question order was lost to a ULID tiebreak | a turn's questions land in the same millisecond, so `ORDER BY raised_at_ms, id` sorted them by random bits; observed reversing between two runs of the same seed |
+
+The last is the one the design created. On a list, random order is untidy; on a
+screen that asks one question at a time, it spends the interviewer's judgment
+about which question matters most. Fixed with `ordered_ulids`, additive and used
+only where the caller knows the order — making *every* identifier monotonic
+would put shared mutable state under every table's primary key.
+
+**Recorded, not built:** no answer has ever actually widened a policy —
+`run_entry` never passes `upgrade_decision_id`, and `decisions` has no column
+separating "yes, take this one to the cloud" from any other queued answer, so
+treating a queued answer as authorization would send a local-only idea off the
+machine on an answer that said the opposite. That is a migration and a Privacy
+Airlock decision, not a wiring change.

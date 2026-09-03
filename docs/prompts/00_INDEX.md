@@ -47,8 +47,8 @@ all three cases differs from the prompt in at least one decision.
 | 5 | ~~`RESEARCH.md`~~ | ✅ shipped 2 Sep | — | — |
 | 6 | ~~`ARTIFACTS.md`~~ | ✅ shipped 2 Sep | — | — |
 | 7 | `NEBIUS_EXECUTOR.md` | `providers/nebius*`, ingest route | credentials | anything |
-| 8 | `FRONTEND.md` | `components/`, `app/globals.css` | — | 0, 1, 2, 3, 10 |
-| 9 | `MORNING_INTERVIEW.md` | ~~`secondshift/morning/`~~ ✅ 3 Sep · `app/morning/` still owed | **8 — `FRONTEND.md`** | 4, 10 |
+| 8 | ~~`FRONTEND.md`~~ | ✅ shipped 3 Sep | — | — |
+| 9 | ~~`MORNING_INTERVIEW.md`~~ | ✅ shipped 3 Sep — server half and `app/morning/` | — | — |
 | 10 | `TEST_HARNESS.md` | `.github/`, `scripts/gates/` | — | everything |
 | 11 | `JUDGE_MODE.md` | `deploy/judge/` | 4, 6, 9 | 12 |
 | 12 | `EVAL_SCORING.md` | `eval_runs` rows, the curve | a judge | 11 |

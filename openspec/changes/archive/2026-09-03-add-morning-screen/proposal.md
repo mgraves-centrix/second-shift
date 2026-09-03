@@ -108,7 +108,7 @@ The principle-4 test this implies is stronger than a mocked permission denial:
 **assert the morning surface references no microphone API at all.** Code that
 never asks for a microphone cannot be affected by a person refusing one.
 
-## What ships
+## What Changes
 
 - `app/morning/` — the interview, on the `Nav` shell, registered in `SURFACES`
   so it appears in the nav and capture's footer at once.

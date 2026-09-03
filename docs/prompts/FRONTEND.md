@@ -11,7 +11,7 @@ tailnet, no credentials.
 > upgrade, all reachable at `GET /morning` and
 > `POST /decisions/{id}/answer` — and deliberately shipped **no screen**,
 > because this prompt says it must land first and the reason is the drift below.
-> `app/morning/` is still `MORNING_INTERVIEW.md`'s to build; this makes it
+> `app/morning/` was still `MORNING_INTERVIEW.md`'s to build; this made it
 > possible to build without making the drift worse.
 
 ---
@@ -120,6 +120,8 @@ that is not the 3am screen.
 - **No CSS framework.** No Tailwind. CSS modules and custom properties, matching
   what is there.
 - **No morning interview.** `MORNING_INTERVIEW.md` owns `app/morning/`.
+  It shipped on 3 Sep, added as one line in `lib/surfaces.ts`, which is the
+  extension point this change existed to create.
 - **No judge mode.** Same components, different caller, later.
 - **No rewrite of the scrubber.** It is measured and it works. You may move its
   tokens into the system; do not touch its render path.

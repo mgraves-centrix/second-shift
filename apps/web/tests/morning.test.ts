@@ -19,6 +19,7 @@ import {
   NO_REASON_RECORDED,
   OUTCOMES,
   completedStages,
+  nightSummary,
   stageReason,
   submitAnswer,
   type NightLine,
@@ -145,6 +146,20 @@ test("a half-failed night still reports what it produced", () => {
     ["brief"],
   );
   assert.equal(night.stages.length, 3, "a failed stage was dropped from the record");
+  assert.equal(nightSummary(night), "1 of 3 complete");
+});
+
+test("the night summary counts what completed, not what ran", () => {
+  const night: NightLine = {
+    run_id: "r",
+    entry_id: "e",
+    night_of: "2026-09-02",
+    outcome: "complete",
+    effective_policy: "local-only",
+    stages: [stage(), stage({ stage: "research", status: "skipped" })],
+  };
+
+  assert.equal(nightSummary(night), "1 of 2 complete");
 });
 
 test("an artifact label drops the night and run already on screen", () => {

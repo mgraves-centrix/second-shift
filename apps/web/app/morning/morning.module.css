@@ -136,6 +136,9 @@
 
 .policy { color: var(--muted); font-size: var(--t-small); font-weight: 400; }
 
+/* The night at a glance, so six rows of status are not the only way to see it. */
+.summary { color: var(--muted); font-size: var(--t-small); font-weight: 400; }
+
 .stages { list-style: none; margin: 0; padding: 0; }
 
 .stage {

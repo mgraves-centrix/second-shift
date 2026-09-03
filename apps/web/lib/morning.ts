@@ -142,7 +142,28 @@ export function completedStages(night: NightLine): StageLine[] {
   return night.stages.filter((s) => s.status === "complete");
 }
 
-export interface AnswerResult {
+/**
+ * "5 of 6 complete" — the night at a glance, above the stage-by-stage record.
+ *
+ * The brief asks for a briefing short enough to read standing up, and six rows
+ * of status is not a glance. This existed as `completedStages` with a test and
+ * no caller until the orphan check found it: a function that is correct, tested
+ * and unreachable is the defect this project keeps producing, and the fix is a
+ * caller rather than a deletion where the capability was genuinely wanted.
+ */
+export function nightSummary(night: NightLine): string {
+  return `${completedStages(night).length} of ${night.stages.length} complete`;
+}
+
+/**
+ * What the server says it recorded.
+ *
+ * Not exported: `submitAnswer` is the only thing that names it, and a symbol
+ * nothing imports is surface with no consumer — the same finding the shell's
+ * `DemoLabel` produced. A caller that wants the recorded status gets it by
+ * inference from `submitAnswer`'s return type.
+ */
+interface AnswerResult {
   decision_id: string;
   status: string;
   answered_at_ms: number;

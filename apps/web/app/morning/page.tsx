@@ -27,6 +27,7 @@ import {
   LEAVES_THE_MACHINE,
   OUTCOMES,
   artifactLabel,
+  nightSummary,
   nothingWaiting,
   type Briefing,
   type NightLine,
@@ -274,6 +275,7 @@ function Record({ nights }: { nights: NightLine[] }) {
           <h3 className={styles.nightOf}>
             {night.night_of}
             <span className={styles.policy}>{night.effective_policy}</span>
+            <span className={styles.summary}>{nightSummary(night)}</span>
           </h3>
           <ul className={styles.stages}>
             {night.stages.map((stage) => {

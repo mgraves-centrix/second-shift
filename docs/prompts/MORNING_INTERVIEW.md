@@ -7,23 +7,23 @@ judge it.
 `TEST_HARNESS.md`; must not be in `apps/web/app/` at the same time as
 `FRONTEND.md`.**
 
-> **`FRONTEND.md` had not shipped when this ran, and that split the capability.**
-> Its own prompt says it "must land before `MORNING_INTERVIEW.md`", and the
-> reason was concrete: `/` and `/night/` had no navigation between them, and
-> design tokens were drifting across `app/globals.css` and
-> `components/scrubber/scrubber.module.css`. **`frontend` shipped on 3 Sep and
-> closed both**, so `app/morning/` is unblocked: add the route to
-> `SURFACES` in `components/shell/Shell.tsx` and it appears in the nav and the
-> capture footer at once.
+> **Both halves have shipped. This prompt is a record, not a queue.**
 >
-> So **the server half shipped and the screen did not** — briefing assembly,
-> the interviewer raising decisions, answering with a modality, and the policy
-> upgrade, reachable at `GET /morning` and `POST /decisions/{id}/answer` and
-> exercised by tests rather than through a rendered page. (Those routes were
-> missing when this first shipped and a later audit added them — the package had
-> no caller at all.) The screen is `FRONTEND.md`'s to unblock, and the report
-> item asking whether the interview *felt* like an interview is unanswerable
-> until it exists.
+> The server half landed on 3 Sep — briefing assembly, the interviewer raising
+> decisions, answering with a modality, the policy upgrade — reachable at
+> `GET /morning` and `POST /decisions/{id}/answer`. Those two routes were
+> missing when it first shipped and a later audit added them: the package had no
+> caller at all.
+>
+> The screen was blocked on `FRONTEND.md`, which had not landed. `/` and
+> `/night/` had no navigation between them and design tokens were drifting
+> across `app/globals.css` and `components/scrubber/scrubber.module.css`.
+> `frontend` shipped later the same day and closed both, and `app/morning/`
+> followed — registered as one line in `lib/surfaces.ts`, which is where
+> `SURFACES` lives now that the web suite needs to import it.
+>
+> **What was shipped, and what was left, is at the end of this file.** Read it
+> before proposing anything further against this capability.
 
 ---
 
@@ -213,3 +213,75 @@ Stop, record the question with your recommendation, and move on:
    Honestly. If it did not, say so.
 5. Anything blocked, with your recommendation.
 6. What you would do next, and why that rather than the alternative.
+
+
+---
+
+## What shipped, 3 Sep
+
+**The server half.** Briefing assembly with no model call, so a night that ran
+while the interviewer was down still reports what it produced. The delta
+boundary is the most recently *answered* decision — rendering consumes nothing,
+only acting does. The interviewer raises questions at the end of the night, so
+nobody is spoken to in the evening and ADR 0005 holds.
+
+**The screen.** `app/morning/`, one question at a time with the agenda's length
+visible, four outcomes that all advance, the partial-night record with skipped
+and failed kept distinct, and the egress warning on the questions whose answer
+could authorize sending an idea off the machine.
+
+**Voice: deferred, not half-built.** ADR 0006 binds a Parakeet Realtime EOU
+detector that has never been run, and a waveform with no transcription behind it
+is decoration on the one screen that is the product. The surface references no
+microphone API at all, and a test asserts that by name — a stronger statement of
+principle 4 than mocking a permission denial, because code that never asks
+cannot be refused. `answer_modality` already accepts `voice`, and `text` is
+passed explicitly rather than defaulted, so the column has a caller today.
+
+### Did it feel like an interview?
+
+Yes — and the reason is one decision. A list of questions each with a box under
+it is a form, and a form gets answered easy-first while the night's actual
+blocker stays open. One question at a time, with "1 of 2" and a dot per
+question, reads as an agenda somebody set. Every outcome advances, so *Defer* is
+a disposal rather than the thing you do by scrolling past.
+
+The rationale is what does the work. "I built the grouping and both readings
+produce a coherent digest, but they diverge on the notes that matter most" is a
+colleague explaining where they got to. Without it the same screen would be a
+quiz.
+
+Two things still read as a form. There is no way to say *"ask me that again
+after you have tried X"* — the four outcomes are dispositions, not a
+conversation, which is the correct trade against the excluded chat interface but
+is felt. And the screen does not show what an answer changed: a
+`queued-for-tonight` answer disappears, and it is tomorrow before anything says
+a run took it.
+
+### Recorded, not built
+
+- **No answer has ever widened a policy.** `resolve_policy` widens `local-only`
+  with an attributable decision and `quarantine.py` threads the parameter, but
+  `run_entry` never supplies one. It is not a wiring change: `decisions` has no
+  column separating *"yes, take this one to the cloud"* from any other
+  `queued-for-tonight` answer, and treating a queued answer as authorization
+  would send a local-only idea off the machine on an answer that said the
+  opposite. **Recommendation:** a migration adding
+  `authorizes_widening INTEGER NOT NULL DEFAULT 0`, set by an explicit control
+  on this screen and consumed by `_take_queued_answers`.
+- **`blocking_stage` is always `NULL`.** `insert_decision` accepts it;
+  `raise_questions` never passes it. **Recommendation:** a third line in
+  `FORMAT_INSTRUCTION`, which is safe for the eight-week curve because it
+  deliberately lives outside the prompt file and does not enter `prompt_sha`.
+- **`run_stages` has no reason column**, so a skipped stage reports *that* and
+  not *why*. The screen says "no reason recorded" rather than leaving a blank,
+  because a blank reads as *no reason* when the truth is *not stored*. Closing
+  it is a migration.
+- **`new_ulid` is not monotonic within a millisecond**, so every
+  `ORDER BY <ts>, id` in the repository is a stable tiebreak only across
+  milliseconds. `ordered_ulids` fixes it where the caller knows the order; the
+  general case is a `persistence` decision, because making every identifier
+  monotonic puts shared mutable state under every table's primary key.
+- **Nothing has run against a real reasoner.** The Spark has been unreachable
+  since 2 Sep. The night, the interviewer and both screens have only ever seen
+  scripted output.
