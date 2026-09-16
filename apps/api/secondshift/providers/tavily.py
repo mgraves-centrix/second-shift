@@ -150,6 +150,8 @@ class TavilyProvider:
             with urllib.request.urlopen(request, timeout=self._timeout_s) as response:
                 body = json.load(response)
         except urllib.error.HTTPError as exc:
+            # The error holds the open response; nothing here reads its body.
+            exc.close()
             if exc.code in _QUOTA_STATUSES:
                 # The message carries "quota" so `classify()` maps it even if the
                 # typed exception is ever lost in translation across a boundary.

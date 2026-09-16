@@ -22,6 +22,7 @@ from ..config import LocalEmbedderSettings, local_embedder_settings
 from ..telemetry.failures import BadOutput
 from ..telemetry.recorder import Recorder
 from .base import Embedder
+from .vllm import _describe
 
 EMBEDDINGS_PATH = "/v1/embeddings"
 
@@ -112,15 +113,6 @@ class VllmEmbedder(Embedder):
                 f"{type(parsed).__name__}, not an object"
             )
         return parsed
-
-
-def _describe(exc: urllib.error.HTTPError) -> str:
-    """The server's error body, or its reason if the body is unreadable."""
-    try:
-        detail = exc.read().decode(errors="replace").strip()
-    except OSError:
-        detail = ""
-    return (detail or str(exc.reason))[:500]
 
 
 def _read_embeddings(
