@@ -13,4 +13,4 @@
 ## 2. Gates
 
 - [x] 2.1 Full API suite, web suite, typecheck and build, both check scripts, strict validation.
-- [ ] 2.2 `systemd-analyze --user verify` on the night unit, on the always-on machine. Not runnable on the development laptop; owed.
+- [x] 2.2 `systemd-analyze --user verify` on the night unit and timer, on the always-on machine: exit 0 under systemd 255, 16 Sep.

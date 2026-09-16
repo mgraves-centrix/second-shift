@@ -21,14 +21,20 @@ Checked off in an archived change while recording that they were not done. They
 are listed here because a checkbox in an archive is not where anyone looks for
 work remaining, and every one of them needs the always-on machine.
 
-- **A real night on the Spark** against the live reasoner and a real queued
-  entry (`add-night-pipeline` 7.2). Nothing in the night has met the live model.
 - **A live search** through the research stage with a real credential
-  (`add-research` 5.1).
-- **The leak list against the four real entries** (`add-research` 5.2). The
-  corpus in `test_redaction.py` is synthetic by necessity.
-- **`systemd-analyze --user verify`** on the night unit's retry settings
-  (`fix-week-one-review` 2.2).
+  (`add-research` 5.1). Both real nights ran without the credential loaded, so
+  research skipped.
+- **The leak list against the real entries** (`add-research` 5.2). The corpus
+  in `test_redaction.py` is synthetic by necessity.
+
+**Closed 16 Sep.** Two real nights ran on the Spark against the live reasoner
+(`add-night-pipeline` 7.2). The first, at a 4096-token budget, completed five
+stages and produced nothing usable: three turns ran out of tokens inside their
+deliberation, and later stages copied the unfinished notes forward, so three
+stages wrote the same file. The second, after the fix, completed five stages
+in 192 seconds with no truncation, clean and distinct artifacts, and one real
+question. `systemd-analyze --user verify` passes on the night unit and timer
+(`fix-week-one-review` 2.2).
 
 Each entry lists what is **already decided** — so the proposal has material to
 draw on rather than re-deriving it — and what is **still open**, which becomes
