@@ -133,24 +133,18 @@ class TestAQueuedAnswerReachesTheNight:
             entry_id=entry, question="q", rationale="r", status="open"
         )
         answer(repo, decision, text="yes", status="queued-for-tonight")
-        assert len(queued_for_tonight(repo)) == 1
+        assert len(queued_for_tonight(repo, entry)) == 1
 
         _run(repo, recorder, entry, roster, tmp_path)
 
-        assert queued_for_tonight(repo) == []
+        assert queued_for_tonight(repo, entry) == []
 
     def test_an_answer_is_taken_once_not_every_night(
         self, repo, recorder, entry, roster, tmp_path
     ):
         """`mark_consumed` refuses a second claim, so an answer feeds one night
-        and not every night after it.
-
-        Tested across two entries rather than by re-queueing one: the schema
-        permits `running -> answered` and `answered -> archived` and nothing
-        else, so an entry the night worked can never return to `queued`. That
-        is a real constraint and the test respects it rather than routing
-        around it.
-        """
+        and not every night after it — and a second idea never sees it at all,
+        because answers are taken by the entry they were asked about."""
         decision = repo.insert_decision(
             entry_id=entry, question="q", rationale="r", status="open"
         )
@@ -180,6 +174,170 @@ class TestAQueuedAnswerReachesTheNight:
         _run(repo, recorder, entry, roster, tmp_path, reasoner)
 
         assert not any("What you decided this morning" in s for s in reasoner.seen)
+
+
+class Failing(Recorder_):
+    """Every turn raises, so every stage fails and the run's outcome is `failed`."""
+
+    def _do_complete(self, messages, *, effort):
+        self.seen.append("\n".join(m.content for m in messages))
+        raise RuntimeError("the reasoner fell over")
+
+
+def _entry(repo, *, policy: str, text: str) -> str:
+    return repo.insert_entry(
+        created_at_ms=now_ms(),
+        captured_tz="UTC",
+        tz_offset_min=0,
+        modality="text",
+        default_policy=policy,
+        status="queued",
+        capture_profile="spark",
+        raw_text=text,
+    )
+
+
+def _queue_answer(repo, entry_id: str, text: str) -> str:
+    decision = repo.insert_decision(
+        entry_id=entry_id, question="q", rationale="r", status="open"
+    )
+    answer(repo, decision, text=text, status="queued-for-tonight")
+    return decision
+
+
+class TestAnswersBelongToTheirIdea:
+    """Found by three reviewers independently. Answers were taken by whichever
+    entry ran first, whatever idea they were about — so one idea's answer became
+    another idea's context, under the other idea's policy."""
+
+    def test_another_idea_s_answer_is_not_handed_to_this_run(
+        self, repo, recorder, roster, tmp_path
+    ):
+        private = _entry(repo, policy="local-only", text="a private idea")
+        _queue_answer(repo, private, "the private detail")
+        shared = _entry(repo, policy="cloud-assisted", text="a shareable idea")
+        reasoner = Recorder_(recorder)
+
+        _run(repo, recorder, shared, roster, tmp_path, reasoner)
+
+        assert not any("the private detail" in seen for seen in reasoner.seen)
+
+    def test_another_idea_s_answer_is_left_for_that_idea(
+        self, repo, recorder, roster, tmp_path
+    ):
+        private = _entry(repo, policy="local-only", text="a private idea")
+        decision = _queue_answer(repo, private, "the private detail")
+        shared = _entry(repo, policy="cloud-assisted", text="a shareable idea")
+
+        _run(repo, recorder, shared, roster, tmp_path)
+
+        assert [r["id"] for r in queued_for_tonight(repo, private)] == [decision]
+
+    def test_a_failed_run_does_not_consume_the_answer(
+        self, repo, recorder, entry, roster, tmp_path
+    ):
+        """A run that produced nothing did not act on the answer. Consuming it
+        anyway lost the answer for the retry and made `consumed_by_run_id` name
+        a run that never used it."""
+        decision = _queue_answer(repo, entry, "phone, always")
+
+        result = _run(repo, recorder, entry, roster, tmp_path, Failing(recorder))
+
+        assert result.outcome == "failed"
+        row = repo.connection.execute(
+            "SELECT consumed_by_run_id FROM decisions WHERE id = ?", (decision,)
+        ).fetchone()
+        assert row["consumed_by_run_id"] is None
+        assert [r["id"] for r in queued_for_tonight(repo, entry)] == [decision]
+
+
+class TestTheLoopClosesInTheOrderItHappens:
+    """The earlier tests answered a question *before* the first run, an order
+    that cannot happen: questions are raised at the end of a night, after the
+    run has already moved its entry to `answered`, and nothing moved it back. An
+    answer queued for tonight therefore had no night to reach."""
+
+    def test_queuing_an_answer_returns_its_idea_to_the_night(
+        self, repo, recorder, entry, roster, tmp_path
+    ):
+        _run(repo, recorder, entry, roster, tmp_path)
+        assert repo.get_entry(entry)["status"] == "answered"
+
+        _queue_answer(repo, entry, "phone, always")
+
+        assert repo.get_entry(entry)["status"] == "queued"
+        assert entry in [r["id"] for r in repo.dispatch_eligible_entries()]
+
+    def test_the_second_night_sees_the_first_morning_s_answer(
+        self, repo, recorder, entry, roster, tmp_path
+    ):
+        from secondshift.night import __main__ as cli
+
+        agents, prompts = roster
+        first = _run(repo, recorder, entry, roster, tmp_path)
+        asker = Providers(
+            reasoner=Recorder_(recorder, text=QUESTIONS),
+            transcriber=None,  # type: ignore[arg-type]
+            embedder=None,  # type: ignore[arg-type]
+            executor=None,  # type: ignore[arg-type]
+        )
+        cli._ask_about(repo, recorder, asker, first, agents, prompts, entry)
+        question = assemble(repo).questions[0]
+        answer(repo, question.decision_id, text="phone, always", status="queued-for-tonight")
+        reasoner = Recorder_(recorder)
+
+        second = _run(repo, recorder, entry, roster, tmp_path, reasoner)
+
+        assert any("phone, always" in seen for seen in reasoner.seen)
+        row = repo.connection.execute(
+            "SELECT consumed_by_run_id FROM decisions WHERE id = ?",
+            (question.decision_id,),
+        ).fetchone()
+        assert row["consumed_by_run_id"] == second.run_id
+
+    def test_other_outcomes_leave_the_idea_where_it_is(
+        self, repo, recorder, entry, roster, tmp_path
+    ):
+        """Only an answer meant for tonight has anything for tonight to do."""
+        _run(repo, recorder, entry, roster, tmp_path)
+        for status in ("decided", "deferred", "obsolete"):
+            decision = repo.insert_decision(
+                entry_id=entry, question="q", rationale="r", status="open"
+            )
+            answer(repo, decision, text="", status=status)
+
+        assert repo.get_entry(entry)["status"] == "answered"
+
+
+class TestTheInterviewerSeesOnlyItsNight:
+    """It was handed every run since the last answered decision, across every
+    entry, once per entry — so a `local-only` night's stages and failure text
+    went out under another run's policy, and each night was asked about N
+    times."""
+
+    def test_another_run_s_facts_are_not_in_the_interview(
+        self, repo, recorder, roster, tmp_path
+    ):
+        from secondshift.night import __main__ as cli
+
+        agents, prompts = roster
+        private = _entry(repo, policy="local-only", text="a private idea")
+        shared = _entry(repo, policy="cloud-assisted", text="a shareable idea")
+        first = _run(repo, recorder, private, roster, tmp_path)
+        second = _run(repo, recorder, shared, roster, tmp_path)
+        interviewer = Recorder_(recorder, text=QUESTIONS)
+        providers = Providers(
+            reasoner=interviewer,
+            transcriber=None,  # type: ignore[arg-type]
+            embedder=None,  # type: ignore[arg-type]
+            executor=None,  # type: ignore[arg-type]
+        )
+
+        cli._ask_about(repo, recorder, providers, second, agents, prompts, shared)
+
+        assert interviewer.seen, "the interviewer was never called"
+        assert not any(first.run_id in seen for seen in interviewer.seen)
+        assert any(second.run_id in seen for seen in interviewer.seen)
 
 
 class TestTheNightRaisesTheQuestions:

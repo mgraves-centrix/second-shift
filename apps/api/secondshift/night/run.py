@@ -397,18 +397,12 @@ def _variant_bodies(text: str) -> list[str]:
     return bodies or [text]
 
 
-def _take_queued_answers(repo: Repository, run_id: str) -> str:
-    """Answers waiting for tonight, marked consumed and rendered as context.
-
-    Consuming here rather than at answer time is what makes "answering changes
-    tonight" visible in the data: `consumed_by_run_id` names the run that acted
-    on it, so a decision the person answered and a decision the system used are
-    distinguishable.
-    """
-    lines: list[str] = []
-    for row in queued_for_tonight(repo):
-        mark_consumed(repo, row["id"], run_id)
-        lines.append(f"You were asked: {row['question']}\nYou answered: {row['answer']}")
+def _render_answers(rows) -> str:
+    """This idea's queued answers, as context for its stages."""
+    lines = [
+        f"You were asked: {row['question']}\nYou answered: {row['answer']}"
+        for row in rows
+    ]
     if not lines:
         return ""
     return "What you decided this morning:\n\n" + "\n\n".join(lines)
@@ -523,11 +517,13 @@ def run_entry(
         brain_sha=brain_sha,
     )
 
-    # Answers the person queued last morning become tonight's input, and are
-    # marked consumed so a decision stops looking pending once a run has taken
-    # it. Without this the `queued-for-tonight` status is a promise the loop
-    # never keeps — the answer sits forever and the night never sees it.
-    answers = _take_queued_answers(repo, run_id)
+    # Answers the person queued last morning about *this* idea become tonight's
+    # input. They are marked consumed only once the run has closed having done
+    # something with them: a run that failed, or was killed before closing, did
+    # not act on an answer, and consuming it anyway would lose it for the retry
+    # while `consumed_by_run_id` named a run that never used it.
+    queued = queued_for_tonight(repo, entry_id)
+    answers = _render_answers(queued)
 
     results: dict[str, StageResult] = {}
     ordered: list[StageResult] = []
@@ -566,6 +562,9 @@ def run_entry(
             (r.stage for r in reversed(ordered) if r.status == COMPLETE), None
         )
         repo.close_run(run_id, outcome=outcome, furthest_stage=furthest)
+        if outcome != "failed":
+            for row in queued:
+                mark_consumed(repo, row["id"], run_id)
         # A failed night returns the entry to `queued`: there is no failed state
         # for an entry, which is a decision the schema already took. An idea
         # that could not be worked on tonight is one to work on tomorrow.

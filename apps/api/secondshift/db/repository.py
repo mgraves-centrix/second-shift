@@ -699,6 +699,8 @@ class Repository:
         ("queued", "running"),
         ("running", "answered"),
         ("running", "queued"),
+        # An answer queued for tonight gives the idea another night.
+        ("answered", "queued"),
         ("answered", "archived"),
         ("queued", "archived"),
     }

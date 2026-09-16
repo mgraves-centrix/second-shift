@@ -16,7 +16,7 @@ from collections.abc import Sequence
 from ..agents.roster import discover, register
 from ..airlock.policy import Policy
 from ..brain.repo import BrainRepo, BrainUnavailable
-from ..morning import assemble, raise_questions
+from ..morning import for_run, raise_questions
 from ..config import ENV_DB, Profile, resolve_profile
 from ..db.connection import connect
 from ..db.migrate import migrate
@@ -79,7 +79,7 @@ def _ask_about(repo, recorder, providers, result, agents, prompts, entry_id) -> 
             repo,
             recorder,
             providers.reasoner,
-            assemble(repo),
+            for_run(repo, result.run_id),
             agent_id=agents["interviewer"],
             prompt_path=prompts["interviewer"],
             entry_id=entry_id,

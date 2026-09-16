@@ -6,7 +6,7 @@ interviewer cannot run. `interview` turns those facts into questions and records
 answers against them.
 """
 
-from .briefing import Briefing, NightLine, Question, StageLine, assemble, boundary_ms
+from .briefing import Briefing, NightLine, Question, StageLine, assemble, boundary_ms, for_run
 from .interview import (
     RaisedQuestion,
     answer,
@@ -27,6 +27,7 @@ __all__ = [
     "assemble",
     "boundary_ms",
     "facts_for",
+    "for_run",
     "mark_consumed",
     "parse_questions",
     "queued_for_tonight",

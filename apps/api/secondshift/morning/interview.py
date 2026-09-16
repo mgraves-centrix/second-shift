@@ -164,17 +164,39 @@ def answer(
     Takes a decision id, never an instruction. `answer_decision` already refuses
     an unknown or already-answered decision, so a submission against something
     the system never asked cannot be recorded.
+
+    An answer queued for tonight returns its idea to the queue. Questions are
+    raised at the end of a night, after the run has moved its entry to
+    `answered`, so without this the answer had no night to reach: the entry was
+    ineligible for dispatch and `queued-for-tonight` was a promise nothing kept.
     """
     repo.answer_decision(
         decision_id, answer=text, status=status, answer_modality=modality
     )
+    if status != "queued-for-tonight":
+        return
+    row = repo.connection.execute(
+        "SELECT e.id, e.status FROM decisions d JOIN entries e ON e.id = d.entry_id "
+        "WHERE d.id = ?",
+        (decision_id,),
+    ).fetchone()
+    if row is not None and row["status"] == "answered":
+        repo.transition_entry(row["id"], to_status="queued")
 
 
-def queued_for_tonight(repo: Repository) -> list:
-    """Answers waiting to be taken by a run, oldest first."""
+def queued_for_tonight(repo: Repository, entry_id: str) -> list:
+    """This idea's answers waiting to be taken by a run, oldest first.
+
+    Scoped to one entry, and deliberately with no unscoped form. An answer is
+    about the idea its question was raised against; handed to another idea's
+    run it becomes that idea's context under that idea's policy, which is how a
+    `local-only` answer would reach a remote reasoner with a row that correctly
+    says `cloud-assisted`.
+    """
     return repo.connection.execute(
-        "SELECT * FROM decisions WHERE status = 'queued-for-tonight' "
-        "AND consumed_by_run_id IS NULL ORDER BY answered_at_ms, id"
+        "SELECT * FROM decisions WHERE entry_id = ? AND status = 'queued-for-tonight' "
+        "AND consumed_by_run_id IS NULL ORDER BY answered_at_ms, id",
+        (entry_id,),
     ).fetchall()
 
 

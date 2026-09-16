@@ -89,7 +89,10 @@ def night(repo, entry):
             effective_policy="cloud-assisted",
             policy_source="entry-default",
             compute_profile="spark",
-            started_at_ms=started_at_ms or (now_ms() + counter["n"]),
+            # In the past, and ordered by call. Started at `now + n` a run began
+            # in the future, so an answer given in the same millisecond landed
+            # before it and the boundary tests failed about one run in six.
+            started_at_ms=started_at_ms or (now_ms() - 1_000 + counter["n"]),
         )
         for seq, (stage, status) in enumerate(
             [
@@ -443,7 +446,10 @@ class TestAnswering:
     def test_queued_for_tonight_is_readable_as_pending_input(self, repo, decision):
         answer(repo, decision, text="try the phone shape", status="queued-for-tonight")
 
-        pending = queued_for_tonight(repo)
+        entry_id = repo.connection.execute(
+            "SELECT entry_id FROM decisions WHERE id = ?", (decision,)
+        ).fetchone()["entry_id"]
+        pending = queued_for_tonight(repo, entry_id)
 
         assert [r["id"] for r in pending] == [decision]
 
@@ -454,7 +460,10 @@ class TestAnswering:
 
         mark_consumed(repo, decision, run_id)
 
-        assert queued_for_tonight(repo) == []
+        entry_id = repo.connection.execute(
+            "SELECT entry_id FROM decisions WHERE id = ?", (decision,)
+        ).fetchone()["entry_id"]
+        assert queued_for_tonight(repo, entry_id) == []
         row = repo.connection.execute(
             "SELECT * FROM decisions WHERE id = ?", (decision,)
         ).fetchone()

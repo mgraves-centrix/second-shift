@@ -156,6 +156,21 @@ def assemble(repo: Repository, *, include_synthetic: bool = False) -> Briefing:
     return Briefing(nights=nights, questions=questions)
 
 
+def for_run(repo: Repository, run_id: str) -> Briefing:
+    """One run's night and nothing else — what the interviewer is shown.
+
+    Not `assemble`: that covers every run since the last acted-on decision,
+    across every entry, and handing it to an interviewer that runs under one
+    run's policy sent other nights' stages and failure text out under that
+    policy. It carries no questions, because the interviewer is asked to raise
+    them rather than to read them.
+    """
+    run = repo.connection.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
+    if run is None:
+        raise ValueError(f"run {run_id!r} is unknown")
+    return Briefing(nights=(_night_line(repo, run),))
+
+
 def _night_line(repo: Repository, run) -> NightLine:
     by_stage: dict[str, list[str]] = {}
     for artifact in repo.artifacts_for_run(run["id"]):
