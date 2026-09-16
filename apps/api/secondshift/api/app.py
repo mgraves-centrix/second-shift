@@ -390,15 +390,28 @@ def create_app(context: Context) -> FastAPI:
                 modality=body.modality,
             )
         except ValueError as exc:
-            # Unknown or already answered. Refused rather than recorded — an
-            # answer to a question nobody asked has nothing to mean.
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-            ) from exc
-
-        row = ctx.repo.connection.execute(
-            "SELECT status, answered_at_ms FROM decisions WHERE id = ?", (decision_id,)
-        ).fetchone()
+            row = ctx.repo.connection.execute(
+                "SELECT answer, status, answered_at_ms FROM decisions WHERE id = ?",
+                (decision_id,),
+            ).fetchone()
+            if row is None:
+                # An answer to a question nobody asked has nothing to mean.
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+                ) from exc
+            if row["answer"] != body.answer or row["status"] != body.status:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"decision {decision_id!r} was already answered differently",
+                ) from exc
+            # The same answer again: a retry after a response that never
+            # arrived. Refusing it told the screen the answer was not recorded,
+            # and the person could not get past a question they had answered.
+        else:
+            row = ctx.repo.connection.execute(
+                "SELECT status, answered_at_ms FROM decisions WHERE id = ?",
+                (decision_id,),
+            ).fetchone()
         return AnswerResponse(
             decision_id=decision_id,
             status=row["status"],

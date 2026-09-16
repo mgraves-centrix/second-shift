@@ -210,6 +210,19 @@ class TestAnsweringOverHttp:
 
         assert response.status_code == 404
 
+    def test_resubmitting_the_same_answer_is_not_an_error(self, client, repo, decision):
+        """A phone that lost the response to an answer the server recorded
+        retries, and the retry must succeed. It got a 404, which the screen
+        reads as "not recorded", so the person could never get past the
+        question they had already answered."""
+        body = {"answer": "phone", "status": "queued-for-tonight"}
+        first = client.post(f"/decisions/{decision}/answer", json=body)
+
+        retry = client.post(f"/decisions/{decision}/answer", json=body)
+
+        assert retry.status_code == 200
+        assert retry.json() == first.json()
+
     def test_answering_twice_is_refused(self, client, decision):
         client.post(
             f"/decisions/{decision}/answer",
@@ -221,7 +234,9 @@ class TestAnsweringOverHttp:
             json={"answer": "second", "status": "decided"},
         )
 
-        assert second.status_code == 404
+        # A conflict rather than not-found: the question exists and was
+        # answered differently, which is not the same claim as "no such question".
+        assert second.status_code == 409
 
     def test_an_unknown_status_is_rejected_by_the_schema(self, client, decision):
         """The state machine is the schema's, not free text."""
