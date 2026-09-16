@@ -92,9 +92,10 @@ class Quarantined(RuntimeError):
 def _outcome_for(results: list[StageResult]) -> str:
     """Derive the run's outcome from what its stages actually did.
 
-    `degraded` is the expected outcome of every night today, because `research`
-    has no provider and is skipped. Reporting that as `complete` would hide a
-    gap the morning is supposed to be able to name.
+    `degraded` is the expected outcome of any night whose `research` stage is
+    skipped — every `local-only` night, and every night on a deployment with no
+    search credential. Reporting that as `complete` would hide a gap the morning
+    is supposed to be able to name.
     """
     completed = [r for r in results if r.status == COMPLETE]
     if not completed:

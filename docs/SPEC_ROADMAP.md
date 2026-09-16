@@ -15,6 +15,21 @@ the header was written once and the body was appended to. The count and the
 archive are both derivable in a second; a number typed here is a number that
 goes stale the next time something ships.
 
+## Owed verification
+
+Checked off in an archived change while recording that they were not done. They
+are listed here because a checkbox in an archive is not where anyone looks for
+work remaining, and every one of them needs the always-on machine.
+
+- **A real night on the Spark** against the live reasoner and a real queued
+  entry (`add-night-pipeline` 7.2). Nothing in the night has met the live model.
+- **A live search** through the research stage with a real credential
+  (`add-research` 5.1).
+- **The leak list against the four real entries** (`add-research` 5.2). The
+  corpus in `test_redaction.py` is synthetic by necessity.
+- **`systemd-analyze --user verify`** on the night unit's retry settings
+  (`fix-week-one-review` 2.2).
+
 Each entry lists what is **already decided** — so the proposal has material to
 draw on rather than re-deriving it — and what is **still open**, which becomes
 `[NEEDS CLARIFICATION]` markers rather than assumptions. Headings are marked
@@ -300,10 +315,12 @@ because a deferred obligation with no home is a dropped one.**
 telemetry.
 
 **Proposed 2 Sep, not implemented.** `2026-09-02-add-nebius-executor` carries the
-proposal, the design and the delta spec. No Nebius credential exists in a
-development window, and nothing is stubbed: a stub executor returning plausible
-job results would be indistinguishable in `model_calls` from the real fan-out
-that is the whole evidence for the Nebius argument.
+proposal, the design and the delta spec. Both Nebius credentials — Token Factory
+and a Cloud IAM service account — were verified live against the real API on
+2 Sep and are held on the always-on machine; see that change's tasks. Nothing is
+implemented and nothing is stubbed: a stub executor returning plausible job
+results would be indistinguishable in `model_calls` from the real fan-out that is
+the whole evidence for the Nebius argument.
 
 **All four markers resolved 2 Sep**, and none by assumption.
 
