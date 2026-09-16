@@ -326,6 +326,29 @@ class TestTheLoopClosesInTheOrderItHappens:
         ).fetchone()
         assert row["consumed_by_run_id"] == second.run_id
 
+    def test_an_answer_given_while_the_idea_is_running_gets_a_night(
+        self, repo, recorder, entry, roster, tmp_path
+    ):
+        """The entry is `running` while a night works it, so queuing an answer
+        then does not re-queue it — and the run, which read its answers before
+        its first stage, closed the entry `answered`. The answer sat queued on
+        an idea no night would pick up."""
+        open_question = repo.insert_decision(
+            entry_id=entry, question="q", rationale="r", status="open"
+        )
+
+        class AnswersMidRun(Recorder_):
+            def _do_complete(self, messages, *, effort):
+                if not getattr(self, "answered", False):
+                    self.answered = True
+                    answer(repo, open_question, text="mid-run", status="queued-for-tonight")
+                return super()._do_complete(messages, effort=effort)
+
+        _run(repo, recorder, entry, roster, tmp_path, AnswersMidRun(recorder))
+
+        assert repo.get_entry(entry)["status"] == "queued"
+        assert [r["id"] for r in queued_for_tonight(repo, entry)] == [open_question]
+
     def test_other_outcomes_leave_the_idea_where_it_is(
         self, repo, recorder, entry, roster, tmp_path
     ):

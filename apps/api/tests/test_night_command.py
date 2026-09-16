@@ -161,6 +161,36 @@ class TestANightRuns:
         assert first in out.err and "embedding dimension mismatch" in out.err
 
 
+class TestAnEntryFailureNamesItsRun:
+    def test_a_failure_after_the_run_opened_is_attributed_to_it(
+        self, db_path, command, monkeypatch
+    ):
+        """What escapes `run_entry` after its run opened — an error while
+        closing it, say — was recorded with no run, so the morning could not
+        explain it."""
+        def broken(*args, **kwargs):
+            raise ValueError("could not mark the answer consumed")
+
+        monkeypatch.setattr(night_run, "mark_consumed", broken)
+        entry = _queue(db_path)
+        conn, repo = _open(db_path)
+        try:
+            decision = repo.insert_decision(
+                entry_id=entry, question="q", rationale="r", status="open"
+            )
+            repo.answer_decision(decision, answer="yes", status="queued-for-tonight")
+        finally:
+            conn.close()
+
+        assert cli.main(["run", "--db", str(db_path)]) == 1
+
+        assert _scalar(
+            db_path,
+            "SELECT COUNT(*) FROM failures WHERE signature LIKE '%night.entry%' "
+            "AND run_id IS NOT NULL",
+        ) == 1
+
+
 class TestNoSilentSubstitute:
     """On `cloud` the registry binds an echo reasoner labeled `local-vllm`. The
     night ran every `cloud-assisted` idea against it, closed the stages
@@ -248,6 +278,18 @@ class TestAnInterruptedNight:
         assert _scalar(
             db_path, "SELECT COUNT(*) FROM runs WHERE entry_id = ?", entry
         ) == 2
+
+    def test_a_night_that_refuses_to_start_still_recovers(self, db_path, command):
+        """Recovery needs no reasoner. Placed after the refusal, a crash followed
+        by a reboot with the model servers down left the idea `running` through
+        every retry."""
+        command(Profile.CLOUD)
+        entry, run = self._interrupt(db_path)
+
+        assert cli.main(["run", "--db", str(db_path)]) == 2
+
+        assert _status(db_path, entry) == "queued"
+        assert _scalar(db_path, "SELECT outcome FROM runs WHERE id = ?", run) == "failed"
 
     def test_a_night_already_running_is_not_recovered_out_from_under_itself(
         self, db_path, command, capsys

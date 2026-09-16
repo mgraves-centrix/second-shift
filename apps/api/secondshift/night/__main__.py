@@ -154,35 +154,39 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _night(args: argparse.Namespace) -> int:
-    resolved = resolve_profile()
-    if resolved.profile is Profile.CLOUD:
-        # No cloud reasoner exists until `nebius-executor` lands, and the
-        # registry binds an echo in its place. A night run against it closed
-        # every stage `complete` with the prompt echoed back as the artifact and
-        # moved each idea to `answered` — so the first night after a reboot,
-        # before the model servers came up, could consume every idea with
-        # fabricated work. Refusing leaves them queued for a night that can do
-        # them.
-        reason = resolved.degradation_reason or "the profile resolved to cloud"
-        print(
-            f"not starting a night: no reasoner can do the work ({reason})",
-            file=sys.stderr,
-        )
-        return EXIT_NO_REASONER
-
     conn = connect(args.db)
     try:
         migrate(conn)
         repo = Repository(conn)
-        recorder = Recorder(
-            repo, pricing=PricingTable.load(), compute_profile=str(resolved.profile)
-        )
+        # Before anything that can refuse. Recovery needs no reasoner, and
+        # placed after the refusal it never ran on the night that needed it
+        # most: a crash, then a reboot with the model servers still down, left
+        # the idea `running` through every retry.
         for recovered in recover_interrupted(repo):
             print(
                 f"{recovered.entry_id}  interrupted  run {recovered.run_id} closed "
                 "as failed; the idea is queued again"
             )
 
+        resolved = resolve_profile()
+        if resolved.profile is Profile.CLOUD:
+            # No cloud reasoner exists until `nebius-executor` lands, and the
+            # registry binds an echo in its place. A night run against it closed
+            # every stage `complete` with the prompt echoed back as the artifact
+            # and moved each idea to `answered` — so the first night after a
+            # reboot, before the model servers came up, could consume every idea
+            # with fabricated work. Refusing leaves them queued for a night that
+            # can do them.
+            reason = resolved.degradation_reason or "the profile resolved to cloud"
+            print(
+                f"not starting a night: no reasoner can do the work ({reason})",
+                file=sys.stderr,
+            )
+            return EXIT_NO_REASONER
+
+        recorder = Recorder(
+            repo, pricing=PricingTable.load(), compute_profile=str(resolved.profile)
+        )
         try:
             providers = Registry(recorder).bind(str(resolved.profile))
         except (LocalReasonerNotConfigured, LocalEmbedderNotConfigured) as exc:
@@ -210,7 +214,9 @@ def _night(args: argparse.Namespace) -> int:
                 # One entry's defect must not cost every entry after it its night.
                 # `run_entry` closes its own run on every path, so what reaches
                 # here failed before a run opened or after it closed.
-                recorder.record_failure(exc, scope="night.entry")
+                recorder.record_failure(
+                    exc, scope="night.entry", run_id=getattr(exc, "run_id", None)
+                )
                 print(f"{row['id']}  error  {exc}", file=sys.stderr)
                 code = EXIT_ENTRY_FAILED
 

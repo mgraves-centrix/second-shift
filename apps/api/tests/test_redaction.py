@@ -194,6 +194,42 @@ REVIEW_LEAKS: list[tuple[str, str, str]] = [
         "Contoso wants billing ledgers reconciled nightly.",
         "contoso",
     ),
+    # Found by the review of the fixes above, also by running `build_query`.
+    (
+        "password written as key:value",
+        "password:hunter-twentytwo for scraping pricing pages",
+        "hunter-twentytwo",
+    ),
+    (
+        "mixed-case key under the length floor",
+        "webhook secret ghpAbcdefGhijkLmnop used by deploy pipeline",
+        "ghpabcdefghijklmnop",
+    ),
+    (
+        "username in a path",
+        "sync photos from /srv/jdoe/private-photos to the archive",
+        "jdoe",
+    ),
+    (
+        "username in a windows path",
+        "clean up C:\\Users\\mgraves\\scratch before the demo",
+        "mgraves",
+    ),
+    (
+        "repository slug",
+        "tidy the repo someone-org/second-shift before launch",
+        "someone-org",
+    ),
+    (
+        "host in a share path",
+        "copy renders to \\\\nas-box\\media overnight",
+        "nas-box",
+    ),
+    (
+        "host in an assignment",
+        "retry uploads (host=nas-box) when the queue stalls",
+        "nas-box",
+    ),
 ]
 
 

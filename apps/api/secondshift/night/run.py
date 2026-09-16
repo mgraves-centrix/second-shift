@@ -346,65 +346,90 @@ def run_entry(
         brain_sha=brain_sha,
     )
 
-    # Answers the person queued last morning about *this* idea become tonight's
-    # input. They are marked consumed only once the run has closed having done
-    # something with them: a run that failed, or was killed before closing, did
-    # not act on an answer, and consuming it anyway would lose it for the retry
-    # while `consumed_by_run_id` named a run that never used it.
-    queued = queued_for_tonight(repo, entry_id)
-    answers = _render_answers(queued)
-
-    results: dict[str, StageResult] = {}
-    ordered: list[StageResult] = []
     try:
-        for stage in STAGES:
-            completed = frozenset(n for n, r in results.items() if r.status == COMPLETE)
-            result = _run_stage(
-                repo,
-                recorder,
-                providers,
-                stage,
-                run_id=run_id,
-                agents=agents,
-                prompts=prompts,
-                entry_text=entry_text,
-                answers=answers,
-                policy=str(resolution.effective_policy),
-                completed=completed,
-                results=results,
-                retrieved=retrieved,
-                brain=brain,
-                entry_id=entry_id,
-                night_of=resolved_night,
-                artifact_root=artifact_root,
-            )
-            results[stage.name] = result
-            ordered.append(result)
-            if stage.name == "critique" and result.status == COMPLETE:
-                _rank_the_builds(repo, recorder, results, result.text, run_id=run_id)
-    finally:
-        # Every terminal path, including the exception one. `close_run` had no
-        # caller at all before this capability, which is why every recorded run
-        # looked permanently in flight.
-        outcome = _outcome_for(ordered)
-        furthest = next(
-            (r.stage for r in reversed(ordered) if r.status == COMPLETE), None
-        )
-        repo.close_run(run_id, outcome=outcome, furthest_stage=furthest)
-        if outcome != "failed":
-            for row in queued:
-                mark_consumed(repo, row["id"], run_id)
-        # A failed night returns the entry to `queued`: there is no failed state
-        # for an entry, which is a decision the schema already took. An idea
-        # that could not be worked on tonight is one to work on tomorrow.
-        repo.transition_entry(
-            entry_id, to_status="queued" if outcome == "failed" else "answered"
-        )
+        # Answers the person queued last morning about *this* idea become
+        # tonight's input. They are marked consumed only once the run has closed
+        # having done something with them: a run that failed, or was killed
+        # before closing, did not act on an answer, and consuming it anyway
+        # would lose it for the retry while `consumed_by_run_id` named a run
+        # that never used it.
+        queued = queued_for_tonight(repo, entry_id)
+        answers = _render_answers(queued)
 
-    return NightResult(
-        entry_id=entry_id,
-        run_id=run_id,
-        outcome=outcome,
-        stages=ordered,
-        effective_policy=str(resolution.effective_policy),
+        results: dict[str, StageResult] = {}
+        ordered: list[StageResult] = []
+        try:
+            for stage in STAGES:
+                completed = frozenset(
+                    n for n, r in results.items() if r.status == COMPLETE
+                )
+                result = _run_stage(
+                    repo,
+                    recorder,
+                    providers,
+                    stage,
+                    run_id=run_id,
+                    agents=agents,
+                    prompts=prompts,
+                    entry_text=entry_text,
+                    answers=answers,
+                    policy=str(resolution.effective_policy),
+                    completed=completed,
+                    results=results,
+                    retrieved=retrieved,
+                    brain=brain,
+                    entry_id=entry_id,
+                    night_of=resolved_night,
+                    artifact_root=artifact_root,
+                )
+                results[stage.name] = result
+                ordered.append(result)
+                if stage.name == "critique" and result.status == COMPLETE:
+                    _rank_the_builds(repo, recorder, results, result.text, run_id=run_id)
+        finally:
+            # Every terminal path, including the exception one. `close_run` had
+            # no caller at all before this capability, which is why every
+            # recorded run looked permanently in flight.
+            outcome = _outcome_for(ordered)
+            furthest = next(
+                (r.stage for r in reversed(ordered) if r.status == COMPLETE), None
+            )
+            try:
+                repo.close_run(run_id, outcome=outcome, furthest_stage=furthest)
+                if outcome != "failed":
+                    for row in queued:
+                        mark_consumed(repo, row["id"], run_id)
+            finally:
+                _release_entry(repo, entry_id, outcome)
+
+        return NightResult(
+            entry_id=entry_id,
+            run_id=run_id,
+            outcome=outcome,
+            stages=ordered,
+            effective_policy=str(resolution.effective_policy),
+        )
+    except Exception as exc:
+        # Anything escaping after the run opened belongs to that run. The night
+        # command records it, and without this it recorded it with no run, so
+        # the morning could not explain it.
+        exc.run_id = run_id  # type: ignore[attr-defined]
+        raise
+
+
+def _release_entry(repo: Repository, entry_id: str, outcome: str) -> None:
+    """Move the entry out of `running`, on every path out of its run.
+
+    A failed night returns the entry to `queued`: there is no failed state for an
+    entry, which is a decision the schema already took. An idea that could not be
+    worked on tonight is one to work on tomorrow.
+
+    So does an answer still waiting once the run closes — one queued *during*
+    the run, or one a failure left unconsumed. The entry was `running` when it was
+    answered, so answering could not re-queue it, and closing `answered` would
+    leave the answer queued on an idea no night picks up.
+    """
+    waiting = bool(queued_for_tonight(repo, entry_id))
+    repo.transition_entry(
+        entry_id, to_status="queued" if outcome == "failed" or waiting else "answered"
     )

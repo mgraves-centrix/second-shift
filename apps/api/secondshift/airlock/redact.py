@@ -12,8 +12,9 @@ name.
 So the raw text is never a candidate to become a query. A token has to *earn its
 way in*: it must be lowercase in the source (or an ordinary word opening a
 sentence), not a stopword, not shaped like a credential, address or
-identifier, and long enough to be a topic rather than grammar. An unrecognized codename is dropped for being capitalized, not for
-being on a list, which is what makes this fail closed.
+identifier, and long enough to be a topic rather than grammar. An unrecognized
+codename is dropped for being capitalized, not for being on a list, which is
+what makes this fail closed.
 
 **The cost, stated rather than hidden:** dropping every capitalized token loses
 real search terms. "Rust", "Kubernetes" and "SQLite" go too. Queries are worse
@@ -55,7 +56,7 @@ _STOPWORDS = frozenset(
 #: A token that is mostly not-a-word — long, mixed case, digits or symbols. The
 #: shape of an API key, a token, a hash or a path. Refused outright: this is the
 #: one category where the right answer is that nothing about it is searchable.
-_CREDENTIAL_SHAPED = re.compile(r"^(?=.*\d)[\w\-./+=]{16,}$|^[\w\-]*(?:key|token|secret|pw|pass)[\w\-]*[-_=][\w\-]{8,}$", re.I)
+_CREDENTIAL_SHAPED = re.compile(r"^(?=.*\d)[\w\-./+=]{16,}$|^[\w\-]*(?:key|token|secret|pw|pass)[\w\-]*[-_=:][\w\-]{8,}$", re.I)
 
 #: Anything with an `@`, a scheme, or a dotted host, with or without a port or a
 #: path. Addresses and locations never become search terms. Surrounding
@@ -68,11 +69,20 @@ _CONTACT_SHAPED = re.compile(
     re.I,
 )
 
-#: A span that is an identifier rather than a word: it has a digit or an
-#: underscore in it, or it is a hyphenated run too long to be vocabulary. The
-#: credential pattern above needs a digit or a key-like prefix and misses a key
-#: made only of letters; this does not ask what the span is for.
-_IDENTIFIER_SHAPED = re.compile(r"[\d_]|^[A-Za-z-]{20,}$")
+#: A span that is an identifier rather than a word. Any of:
+#:
+#: - a digit or an underscore;
+#: - a path or assignment character (`/`, `\\`, `=`), because a path carries a
+#:   username or a host segment and an assignment carries a value, and neither
+#:   is ever a topic — `/srv/jdoe/...`, `\\\\nas-box\\media` and `host=nas-box`
+#:   all leaked one segment at a time;
+#: - a lowercase letter followed by an uppercase one, which vocabulary does not
+#:   do and generated keys routinely do;
+#: - a hyphenated run too long to be vocabulary.
+#:
+#: The credential pattern above needs a digit or a key-like prefix and misses a
+#: key made only of letters; this does not ask what the span is for.
+_IDENTIFIER_SHAPED = re.compile(r"[\d_/\\=]|[a-z][A-Z]|^[A-Za-z-]{20,}$")
 
 #: Ordinary words an entry opens with. A capital at the start of a sentence is
 #: punctuation *or* a name, and nothing in the text says which — "Build a

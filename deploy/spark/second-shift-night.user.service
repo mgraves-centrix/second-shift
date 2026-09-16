@@ -1,7 +1,8 @@
 [Unit]
 Description=Second Shift night pipeline (work the queued entries)
 After=network.target
-# Retried for up to an hour: six attempts, five minutes apart.
+# Six attempts, ten minutes apart: the last starts fifty minutes after the
+# first, inside the hour the limit is counted over.
 StartLimitIntervalSec=3600
 StartLimitBurst=6
 
@@ -19,8 +20,8 @@ ExecStart=%h/second-shift/apps/api/.venv/bin/python -m secondshift.night run
 # After a reboot the persistent timer fires before the model servers answer, and
 # the night refuses (exit 2) rather than run against a placeholder. Without a
 # retry that refusal would cost the whole night the timer persisted. Exit 1 (an
-# entry's defect) and 3 (a night already running) are not retried: waiting five
-# minutes fixes neither.
+# entry's defect, and also any unhandled crash) and 3 (a night already running)
+# are not retried: waiting fixes neither.
 Restart=on-failure
-RestartSec=300
+RestartSec=600
 RestartPreventExitStatus=1 3
