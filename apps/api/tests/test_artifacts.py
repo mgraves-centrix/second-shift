@@ -598,7 +598,7 @@ class TestSplittingACompletionIntoVariants:
     """
 
     def test_a_completion_with_headings_splits(self):
-        from secondshift.night.run import _variant_bodies
+        from secondshift.night.output import variant_bodies as _variant_bodies
 
         bodies = _variant_bodies(
             "## Variant 1\n\nFirst approach.\n\n## Variant 2\n\nSecond approach.\n"
@@ -609,7 +609,7 @@ class TestSplittingACompletionIntoVariants:
     def test_prose_with_no_heading_is_one_variant_not_zero(self):
         """A model that ignored a format still produced something worth
         keeping. Dropping it would lose real work to a formatting miss."""
-        from secondshift.night.run import _variant_bodies
+        from secondshift.night.output import variant_bodies as _variant_bodies
 
         assert _variant_bodies("A single plan, in prose.") == ["A single plan, in prose."]
 

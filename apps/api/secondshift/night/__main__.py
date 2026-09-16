@@ -9,9 +9,12 @@ is wrong.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
+from pathlib import Path
 
 from ..agents.roster import discover, register
 from ..airlock.policy import Policy
@@ -22,12 +25,53 @@ from ..db.connection import connect
 from ..db.migrate import migrate
 from ..db.repository import Repository
 from ..artifacts.store import artifact_root
-from ..providers.registry import LocalEmbedderNotConfigured, Registry
+from ..providers.registry import (
+    LocalEmbedderNotConfigured,
+    LocalReasonerNotConfigured,
+    Registry,
+)
 from ..providers.vllm_embed import EmbedderUnavailable
 from ..retrieval.index import RetrievalIndex, assemble_context, collect_documents
 from ..telemetry.pricing import PricingTable
 from ..telemetry.recorder import Recorder
+from .recovery import recover_interrupted
 from .run import run_entry
+
+#: Exit codes, so a timer's journal says which of these happened.
+EXIT_OK = 0
+EXIT_ENTRY_FAILED = 1
+EXIT_NO_REASONER = 2
+EXIT_ALREADY_RUNNING = 3
+
+
+class NightAlreadyRunning(RuntimeError):
+    """Another night holds the lock on this database."""
+
+
+@contextmanager
+def night_lock(db: str | Path) -> Iterator[None]:
+    """Hold the one-night-at-a-time lock for this database.
+
+    An advisory lock on a file beside the database, released by the kernel when
+    the process exits however it exits — which is the property that matters,
+    since the case this guards is a night that was killed. It is what makes
+    recovery safe: with it held, an open run cannot belong to a live night.
+    """
+    path = Path(f"{db}.night.lock")
+    handle = path.open("a")
+    try:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise NightAlreadyRunning(
+                f"a night is already running against {db}"
+            ) from exc
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+    finally:
+        handle.close()
 
 
 def _default_db() -> str:
@@ -101,15 +145,49 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(list(argv) if argv is not None else None)
 
+    try:
+        with night_lock(args.db):
+            return _night(args)
+    except NightAlreadyRunning as exc:
+        print(str(exc), file=sys.stderr)
+        return EXIT_ALREADY_RUNNING
+
+
+def _night(args: argparse.Namespace) -> int:
+    resolved = resolve_profile()
+    if resolved.profile is Profile.CLOUD:
+        # No cloud reasoner exists until `nebius-executor` lands, and the
+        # registry binds an echo in its place. A night run against it closed
+        # every stage `complete` with the prompt echoed back as the artifact and
+        # moved each idea to `answered` — so the first night after a reboot,
+        # before the model servers came up, could consume every idea with
+        # fabricated work. Refusing leaves them queued for a night that can do
+        # them.
+        reason = resolved.degradation_reason or "the profile resolved to cloud"
+        print(
+            f"not starting a night: no reasoner can do the work ({reason})",
+            file=sys.stderr,
+        )
+        return EXIT_NO_REASONER
+
     conn = connect(args.db)
     try:
         migrate(conn)
         repo = Repository(conn)
-        resolved = resolve_profile()
         recorder = Recorder(
             repo, pricing=PricingTable.load(), compute_profile=str(resolved.profile)
         )
-        providers = Registry(recorder).bind(str(resolved.profile))
+        for recovered in recover_interrupted(repo):
+            print(
+                f"{recovered.entry_id}  interrupted  run {recovered.run_id} closed "
+                "as failed; the idea is queued again"
+            )
+
+        try:
+            providers = Registry(recorder).bind(str(resolved.profile))
+        except (LocalReasonerNotConfigured, LocalEmbedderNotConfigured) as exc:
+            print(f"not starting a night: {exc}", file=sys.stderr)
+            return EXIT_NO_REASONER
         agents = register(repo)
         prompts = {role: p.path for role, p in discover().items()}
         # Passed only when it is genuinely there. `distill` writing to a brain
@@ -122,58 +200,62 @@ def main(argv: Sequence[str] | None = None) -> int:
             rows = [r for r in rows if r["id"] == args.entry]
             if not rows:
                 print(f"{args.entry} is not eligible for dispatch", file=sys.stderr)
-                return 1
+                return EXIT_ENTRY_FAILED
 
-        # `local-only` is honored only where the probe confirmed a local stack.
-        # On `cloud` the registry binds a placeholder reasoner, so treating it
-        # as available would run a local-only idea against a stub.
-        local_available = resolved.profile is not Profile.CLOUD
-
+        code = EXIT_OK
         for row in rows:
-            result = run_entry(
-                repo,
-                recorder,
-                providers,
-                row,
-                profile=str(resolved.profile),
-                agents=agents,
-                prompts=prompts,
-                local_available=local_available,
-                unavailable_reason=resolved.degradation_reason,
-                brain=brain,
-                brain_sha=brain.head() if brain else None,
-                retrieved=_retrieve(repo, providers, brain, row),
-                artifact_root=artifact_root(),
-            )
-            if result.quarantined:
-                print(f"{result.entry_id}  quarantined  {result.quarantine_reason}")
-                continue
-            done = sum(1 for s in result.stages if s.status == "complete")
-            print(
-                f"{result.entry_id}  {result.outcome}  "
-                f"{done}/{len(result.stages)} stages complete  run {result.run_id}"
-            )
-
-            # The interviewer runs here, at the end of the night, and this is
-            # what makes the morning have anything to ask. It is not an evening
-            # interview: nobody is spoken to now. The questions sit as `open`
-            # decisions until the person opens the morning, which is exactly the
-            # loop ADR 0005 settled — capture stays instant, the night does the
-            # work, and the asking happens over coffee.
-            #
-            # Without it `raise_questions` had no caller outside its tests, so
-            # the briefing was structurally incapable of containing a question.
-            asked = _ask_about(
-                repo, recorder, providers, result, agents, prompts, row["id"]
-            )
-            if asked:
-                print(f"{' ' * 26}{asked} question(s) raised for the morning")
+            try:
+                _work(repo, recorder, providers, row, resolved, agents, prompts, brain)
+            except Exception as exc:  # noqa: BLE001 - recorded; the night goes on
+                # One entry's defect must not cost every entry after it its night.
+                # `run_entry` closes its own run on every path, so what reaches
+                # here failed before a run opened or after it closed.
+                recorder.record_failure(exc, scope="night.entry")
+                print(f"{row['id']}  error  {exc}", file=sys.stderr)
+                code = EXIT_ENTRY_FAILED
 
         for row, reason in repo.ineligible_entries():
             print(f"{row['id']}  not dispatched  {reason}")
-        return 0
+        return code
     finally:
         conn.close()
+
+
+def _work(repo, recorder, providers, row, resolved, agents, prompts, brain) -> None:
+    """One entry: retrieve, run the stages, then raise the morning's questions."""
+    result = run_entry(
+        repo,
+        recorder,
+        providers,
+        row,
+        profile=str(resolved.profile),
+        agents=agents,
+        prompts=prompts,
+        # `local-only` is honored only where the probe confirmed a local stack.
+        local_available=resolved.profile is not Profile.CLOUD,
+        unavailable_reason=resolved.degradation_reason,
+        brain=brain,
+        brain_sha=brain.head() if brain else None,
+        retrieved=_retrieve(repo, providers, brain, row),
+        artifact_root=artifact_root(),
+    )
+    if result.quarantined:
+        print(f"{result.entry_id}  quarantined  {result.quarantine_reason}")
+        return
+    done = sum(1 for s in result.stages if s.status == "complete")
+    print(
+        f"{result.entry_id}  {result.outcome}  "
+        f"{done}/{len(result.stages)} stages complete  run {result.run_id}"
+    )
+
+    # The interviewer runs here, at the end of the night, and this is what makes
+    # the morning have anything to ask. It is not an evening interview: nobody is
+    # spoken to now. The questions sit as `open` decisions until the person opens
+    # the morning, which is exactly the loop ADR 0005 settled — capture stays
+    # instant, the night does the work, and the asking happens over coffee.
+    asked = _ask_about(repo, recorder, providers, result, agents, prompts, row["id"])
+    if asked:
+        print(f"{' ' * 26}{asked} question(s) raised for the morning")
 
 
 if __name__ == "__main__":

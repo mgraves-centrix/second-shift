@@ -524,6 +524,11 @@ class TestDispatchingTwice:
 class TestTheManualEntryPoint:
     """A pipeline you cannot run on demand is one you cannot debug at 2am."""
 
+    # `spark` rather than `cloud`: these ran as `cloud` because it was the one
+    # profile that bound without a model server, which is exactly the echo
+    # substitute the command now refuses. `spark` binds from the models config
+    # without contacting a server, and an empty queue never calls one.
+
     def test_it_runs_against_an_empty_database_and_reports_nothing_to_do(
         self, tmp_path
     ):
@@ -532,7 +537,7 @@ class TestTheManualEntryPoint:
             capture_output=True,
             text=True,
             cwd=REPO_ROOT / "apps" / "api",
-            env={**os.environ, "SECOND_SHIFT_PROFILE": "cloud"},
+            env={**os.environ, "SECOND_SHIFT_PROFILE": "spark"},
         )
 
         assert completed.returncode == 0, completed.stderr
@@ -546,11 +551,23 @@ class TestTheManualEntryPoint:
             capture_output=True,
             text=True,
             cwd=REPO_ROOT / "apps" / "api",
-            env={**os.environ, "SECOND_SHIFT_PROFILE": "cloud"},
+            env={**os.environ, "SECOND_SHIFT_PROFILE": "spark"},
         )
 
         assert completed.returncode == 1
         assert "not eligible" in completed.stderr
+
+    def test_a_cloud_deployment_refuses_rather_than_echoing(self, tmp_path):
+        completed = subprocess.run(
+            [sys.executable, "-m", "secondshift.night", "run", "--db", str(tmp_path / "n.db")],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT / "apps" / "api",
+            env={**os.environ, "SECOND_SHIFT_PROFILE": "cloud"},
+        )
+
+        assert completed.returncode == 2
+        assert "no reasoner can do the work" in completed.stderr
 
 
 class TestTheDeployUnits:
@@ -568,6 +585,21 @@ class TestTheDeployUnits:
         ).read_text()
 
         assert "-m secondshift.night run" in service
+
+    def test_a_night_refused_for_want_of_a_reasoner_is_retried(self):
+        """After a reboot the persistent timer fires before the model servers
+        are up. The command refuses with exit 2 rather than echoing, and a
+        oneshot that simply failed would not run again until the next night —
+        losing exactly the night the timer persisted. Only that exit retries:
+        a night already running (3) or an entry's defect (1) would not be fixed
+        by trying again five minutes later."""
+        service = (
+            REPO_ROOT / "deploy" / "spark" / "second-shift-night.user.service"
+        ).read_text()
+
+        assert "Restart=on-failure" in service
+        assert "RestartPreventExitStatus=1 3" in service
+        assert "StartLimitBurst=" in service
 
     def test_the_timer_persists_a_missed_night(self):
         """An idea captured on Tuesday must not be skipped because the box was
