@@ -347,6 +347,22 @@ class TestRaisingQuestions:
     def test_a_rationale_without_a_question_is_discarded(self):
         assert parse_questions("Why: because of a thing\n") == []
 
+    def test_a_question_with_no_words_in_it_is_discarded(self):
+        """The first real night stored `...` as a question with `...` as its
+        rationale — a truncated completion's ellipsis, asked over coffee."""
+        assert parse_questions("Q: ...\nWhy: ...\n") == []
+
+    def test_the_same_question_twice_is_asked_once(self):
+        """Also from the first real night: two identical questions, which the
+        one-at-a-time screen would have asked back to back."""
+        text = (
+            "Q: Do you read it on a phone?\nWhy: two layouts diverge.\n"
+            "Q: Do you read it on a phone?\nWhy: two layouts diverge.\n"
+        )
+        assert parse_questions(text) == [
+            ("Do you read it on a phone?", "two layouts diverge.")
+        ]
+
     def test_the_interviewer_is_not_handed_the_raw_entry_text(
         self, repo, recorder, night, roster, entry
     ):

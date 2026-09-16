@@ -32,7 +32,10 @@
 reasoner_model = "nemotron-3.5-lightning"
 reasoner_host = "127.0.0.1"
 reasoner_port = 8200
-reasoner_max_tokens = 4096
+# 16000, from the model card's own examples. The first real night ran at 4096
+# and the reasoner spent the whole budget thinking: three of six turns stopped
+# inside their deliberation with no answer written.
+reasoner_max_tokens = 16000
 reasoner_temperature = 0.7
 reasoner_timeout_s = 300
 

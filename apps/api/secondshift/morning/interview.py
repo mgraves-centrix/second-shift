@@ -72,6 +72,9 @@ def facts_for(nights: tuple[NightLine, ...]) -> str:
 #: reading what landed, not by a test.
 _PLACEHOLDER = re.compile(r"<[^>]+>")
 
+#: A question has to have words in it.
+_WORDS = re.compile(r"[A-Za-z]{2,}")
+
 
 def parse_questions(text: str) -> list[tuple[str, str]]:
     """Question and rationale pairs, in order. Half a question is not a question.
@@ -88,11 +91,21 @@ def parse_questions(text: str) -> list[tuple[str, str]]:
         (m.group("question").strip(), m.group("rationale").strip())
         for m in _QUESTION.finditer(text)
     ]
-    return [
-        (q, why)
-        for q, why in pairs
-        if q and why and not _PLACEHOLDER.search(q) and not _PLACEHOLDER.search(why)
-    ]
+    kept: list[tuple[str, str]] = []
+    for q, why in pairs:
+        if not (_WORDS.search(q) and _WORDS.search(why)):
+            # `Q: ...` / `Why: ...` — a truncated completion's ellipsis. The
+            # first real night stored exactly that.
+            continue
+        if _PLACEHOLDER.search(q) or _PLACEHOLDER.search(why):
+            continue
+        if any(q == seen for seen, _ in kept):
+            # Asked once. The screen asks one at a time, and the same question
+            # twice in a row is the interviewer repeating itself, not a second
+            # thing to decide.
+            continue
+        kept.append((q, why))
+    return kept
 
 
 def raise_questions(

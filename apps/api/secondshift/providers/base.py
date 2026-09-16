@@ -66,6 +66,9 @@ class Completion:
     model_call_id: str
     prompt_tokens: int
     completion_tokens: int
+    #: Carried through so a caller can refuse a turn that did not finish. The
+    #: warning event records the stop; it cannot stop anything using the text.
+    finish_reason: str = STOPPED_CLEANLY
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +187,7 @@ class Reasoner(Provider):
             model_call_id=call_id,
             prompt_tokens=raw.prompt_tokens,
             completion_tokens=raw.completion_tokens,
+            finish_reason=raw.finish_reason,
         )
 
     @abstractmethod

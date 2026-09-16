@@ -267,6 +267,69 @@ class TestInvokingAnAgent:
         assert list(repo.connection.execute("SELECT * FROM model_calls")) == []
 
 
+class TestATurnThatDidNotFinish:
+    """Found by the first real night. The reasoner spent its whole token budget
+    thinking, stopped on `length` before closing its reasoning, and the brief
+    stage recorded the half-finished deliberation as a complete brief. Every
+    later stage was handed that fragment as context and copied it forward, so
+    three different stages wrote the same file. The stop was already recorded
+    as a warning event; nothing acted on it."""
+
+    def _truncated(self, recorder):
+        class Truncated(StubReasoner):
+            def _do_complete(self, messages, *, effort):
+                return RawCompletion(
+                    text="Here's a thinking process: 1. Analyze",
+                    prompt_tokens=5,
+                    completion_tokens=4096,
+                    finish_reason="length",
+                )
+
+        return Truncated(recorder)
+
+    def test_a_turn_cut_off_at_the_token_limit_is_refused(
+        self, repo, recorder, prompts, run_id
+    ):
+        from secondshift.agents.invoke import TurnDidNotFinish
+
+        agents = register(repo, directory=prompts)
+
+        with pytest.raises(TurnDidNotFinish, match="length"):
+            invoke(
+                recorder,
+                self._truncated(recorder),
+                role="researcher",
+                agent_id=agents["researcher"],
+                prompt_path=prompts / "researcher.v1.md",
+                task="summarize this",
+                policy="cloud-assisted",
+                run_id=run_id,
+            )
+
+    def test_the_refused_turn_is_still_accounted(self, repo, recorder, prompts, run_id):
+        """Refusing the text does not unspend the tokens: the call is recorded,
+        and the invocation closes as a failure rather than a success."""
+        from secondshift.agents.invoke import TurnDidNotFinish
+
+        agents = register(repo, directory=prompts)
+        with pytest.raises(TurnDidNotFinish):
+            invoke(
+                recorder,
+                self._truncated(recorder),
+                role="researcher",
+                agent_id=agents["researcher"],
+                prompt_path=prompts / "researcher.v1.md",
+                task="summarize this",
+                policy="cloud-assisted",
+                run_id=run_id,
+            )
+
+        calls = list(repo.connection.execute("SELECT completion_tokens FROM model_calls"))
+        assert [r["completion_tokens"] for r in calls] == [4096]
+        (invocation,) = repo.connection.execute("SELECT outcome FROM agent_invocations")
+        assert invocation["outcome"] != "success"
+
+
 class TestVisibleReasoning:
     def test_deliberation_before_the_close_is_dropped(self):
         raw = "<think>weighing it up</think>\n\nThe answer."
