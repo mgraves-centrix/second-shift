@@ -2,9 +2,9 @@
 
 import { RouteError } from "@/components/route-error/RouteError";
 
-export default function NightError(props: {
+export default function MorningError(props: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  return <RouteError surface="The night view" {...props} />;
+  return <RouteError surface="The morning" {...props} />;
 }

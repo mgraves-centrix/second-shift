@@ -155,6 +155,37 @@ export function nightSummary(night: NightLine): string {
   return `${completedStages(night).length} of ${night.stages.length} complete`;
 }
 
+/** What reading the briefing came to. `null` means the read was abandoned. */
+export type BriefingLoad =
+  | { status: "ready"; briefing: Briefing }
+  | { status: "unreachable" };
+
+/**
+ * Read the morning's briefing.
+ *
+ * Every way it can fail resolves to `unreachable` rather than rejecting,
+ * because the page's only other state is "loading" and a rejection it
+ * swallowed left the screen there permanently — on precisely the morning the
+ * orchestrator or the tailnet was down. A body that does not parse counts too:
+ * a service worker that answered with the cached shell hands back HTML with a
+ * 200, and that is not a briefing.
+ *
+ * An aborted read returns `null` so an unmounted page is not updated.
+ */
+export async function loadBriefing(
+  options: { apiBase?: string; signal?: AbortSignal } = {},
+): Promise<BriefingLoad | null> {
+  try {
+    const response = await fetch(`${options.apiBase ?? ""}/morning`, {
+      signal: options.signal,
+    });
+    if (!response.ok) return { status: "unreachable" };
+    return { status: "ready", briefing: (await response.json()) as Briefing };
+  } catch {
+    return options.signal?.aborted ? null : { status: "unreachable" };
+  }
+}
+
 /**
  * What the server says it recorded.
  *

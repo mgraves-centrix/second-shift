@@ -27,6 +27,7 @@ import {
   LEAVES_THE_MACHINE,
   OUTCOMES,
   artifactLabel,
+  loadBriefing,
   nightSummary,
   nothingWaiting,
   type Briefing,
@@ -52,19 +53,11 @@ export default function MorningPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`${API_BASE}/morning`, { signal: controller.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((body: Briefing | null) => {
-        if (!body) {
-          setStatus("unreachable");
-          return;
-        }
-        setBriefing(body);
-        setStatus("ready");
-      })
-      .catch(() => {
-        /* Aborted by unmount, or the API went away. */
-      });
+    void loadBriefing({ apiBase: API_BASE, signal: controller.signal }).then((load) => {
+      if (!load) return;
+      if (load.status === "ready") setBriefing(load.briefing);
+      setStatus(load.status);
+    });
     return () => controller.abort();
   }, []);
 

@@ -15,6 +15,7 @@ import { join } from "node:path";
 import {
   LEAVES_THE_MACHINE,
   artifactLabel,
+  loadBriefing,
   nothingWaiting,
   NO_REASON_RECORDED,
   OUTCOMES,
@@ -29,6 +30,7 @@ import { SURFACES } from "../lib/surfaces.ts";
 
 const APP = join(import.meta.dirname, "..", "app");
 const MORNING = readFileSync(join(APP, "morning", "page.tsx"), "utf8");
+const LIB = readFileSync(join(import.meta.dirname, "..", "lib", "morning.ts"), "utf8");
 
 function stage(over: Partial<StageLine> = {}): StageLine {
   return { stage: "brief", status: "complete", reason: null, artifacts: [], ...over };
@@ -87,17 +89,96 @@ test("every submission carries a decision id", async () => {
 });
 
 test("the surface posts to no route but the answer route", () => {
-  const posts = MORNING.match(/fetch\(/g) ?? [];
+  /** Both requests live in `lib/morning.ts`, where their failure handling can
+   * be exercised; the page itself makes none. Counted there, so a second path
+   * cannot be added in either file without this noticing. */
   assert.equal(
-    posts.length,
-    1,
+    (MORNING.match(/fetch\(/g) ?? []).length,
+    0,
+    "the page made a request of its own instead of going through lib/morning.ts",
+  );
+  const requests = LIB.match(/fetch\(/g) ?? [];
+  assert.equal(
+    requests.length,
+    2,
     "the interview grew a second request path; the only write is an answer " +
       "against a question, and the only read is the briefing",
   );
-  assert.ok(
-    !/\/(chat|message|ask|instruct)/.test(MORNING),
-    "a route appeared that takes an instruction with nowhere to attach it",
+  for (const source of [MORNING, LIB]) {
+    assert.ok(
+      !/\/(chat|message|ask|instruct)/.test(source),
+      "a route appeared that takes an instruction with nowhere to attach it",
+    );
+  }
+});
+
+// -- reading the briefing ----------------------------------------------------
+
+async function withFetch<T>(stub: typeof fetch, body: () => Promise<T>): Promise<T> {
+  const original = globalThis.fetch;
+  globalThis.fetch = stub;
+  try {
+    return await body();
+  } finally {
+    globalThis.fetch = original;
+  }
+}
+
+const BRIEFING = { nights: [], questions: [], interviewer_error: null };
+
+test("a briefing that arrives is ready", async () => {
+  const result = await withFetch(
+    (async () => Response.json(BRIEFING)) as typeof fetch,
+    () => loadBriefing(),
   );
+  assert.deepEqual(result, { status: "ready", briefing: BRIEFING });
+});
+
+test("an orchestrator that cannot be reached is unreachable, not loading", async () => {
+  /** The page used to swallow a rejected fetch and stay on "Reading last
+   * night…" forever — a permanent loading state on exactly the morning the
+   * tailnet dropped. */
+  const result = await withFetch(
+    (async () => {
+      throw new TypeError("Failed to fetch");
+    }) as typeof fetch,
+    () => loadBriefing(),
+  );
+  assert.deepEqual(result, { status: "unreachable" });
+});
+
+test("an error status is unreachable", async () => {
+  const result = await withFetch(
+    (async () => new Response("down", { status: 502 })) as typeof fetch,
+    () => loadBriefing(),
+  );
+  assert.deepEqual(result, { status: "unreachable" });
+});
+
+test("a body that is not a briefing is unreachable", async () => {
+  /** What a cached HTML shell looks like to a reader expecting JSON. */
+  const result = await withFetch(
+    (async () =>
+      new Response("<!doctype html><html></html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      })) as typeof fetch,
+    () => loadBriefing(),
+  );
+  assert.deepEqual(result, { status: "unreachable" });
+});
+
+test("an aborted read reports nothing, so an unmounted page is not updated", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  const result = await withFetch(
+    (async (_url: string | URL, init?: RequestInit) => {
+      if (init?.signal?.aborted) throw new DOMException("aborted", "AbortError");
+      return Response.json(BRIEFING);
+    }) as typeof fetch,
+    () => loadBriefing({ signal: controller.signal }),
+  );
+  assert.equal(result, null);
 });
 
 test("the four outcomes are the four decision states", () => {
