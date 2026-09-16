@@ -251,8 +251,13 @@ class Recorder:
         cached: bool = False,
         outcome: str | None = "success",
         is_synthetic: bool = False,
+        run_id: str | None = None,
     ) -> str:
-        """Record an external tool call. Only the redacted query is stored."""
+        """Record an external tool call. Only the redacted query is stored.
+
+        `run_id` as for `record_failure`: a tool call made outside an invocation
+        would otherwise belong to no run, and a run's spend is summed by run.
+        """
         active = ctx.current()
         with self._lock:
             return self._repo.insert_tool_call(
@@ -266,7 +271,7 @@ class Recorder:
                 cached=cached,
                 outcome=outcome,
                 agent_invocation_id=active.invocation_id if active else None,
-                run_id=active.run_id if active else None,
+                run_id=run_id or (active.run_id if active else None),
                 is_synthetic=is_synthetic,
             )
 
@@ -307,8 +312,15 @@ class Recorder:
         scope: str = "",
         context_json: str | None = None,
         is_synthetic: bool = False,
+        run_id: str | None = None,
     ) -> str:
-        """Classify and record a failure outside an invocation boundary."""
+        """Classify and record a failure outside an invocation boundary.
+
+        `run_id` is for exactly that case. Outside an invocation there is no
+        context to read the run from, and a failure recorded with no run is
+        invisible to everything that reads failures by run — the morning's
+        stage reasons first among them. An explicit value wins over the context.
+        """
         active = ctx.current()
         failure_type: FailureType = classify(exc)
         with self._lock:
@@ -317,7 +329,7 @@ class Recorder:
                 signature=signature(failure_type, exc, scope=scope),
                 message=str(exc) or type(exc).__name__,
                 context_json=context_json,
-                run_id=active.run_id if active else None,
+                run_id=run_id or (active.run_id if active else None),
                 agent_invocation_id=active.invocation_id if active else None,
                 is_synthetic=is_synthetic,
             )

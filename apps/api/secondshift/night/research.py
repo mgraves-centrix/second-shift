@@ -50,6 +50,7 @@ def run_research(
     entry_text: str,
     provider: TavilyProvider | None = None,
     max_results: int = 5,
+    run_id: str | None = None,
 ) -> ResearchResult:
     """Search for what this idea needs, or say why nothing was searched.
 
@@ -91,6 +92,7 @@ def run_research(
         latency_ms=response.latency_ms,
         cached=response.cached,
         outcome="success",
+        run_id=run_id,
     )
     return ResearchResult(
         searched=True,

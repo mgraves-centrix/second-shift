@@ -222,7 +222,7 @@ def _run_stage(
     except Exception as exc:  # noqa: BLE001 - recorded, classified, not swallowed
         # Recorded before the stage closes, so the failure and the stage row
         # cannot disagree about whether this stage failed.
-        recorder.record_failure(exc, scope=f"night.{stage.name}")
+        recorder.record_failure(exc, scope=f"night.{stage.name}", run_id=run_id)
         repo.complete_run_stage(stage_id, status=FAILED)
         return StageResult(stage.name, FAILED, reason=str(exc) or type(exc).__name__)
 
@@ -245,7 +245,7 @@ def _run_stage(
             root=artifact_root,
         )
     except ArtifactWriteFailed as exc:
-        recorder.record_failure(exc, scope=f"night.{stage.name}.artifact")
+        recorder.record_failure(exc, scope=f"night.{stage.name}.artifact", run_id=run_id)
         repo.complete_run_stage(stage_id, status=FAILED)
         return StageResult(stage.name, FAILED, reason=str(exc))
 
@@ -286,9 +286,11 @@ def _run_research_stage(
     that does not exist. A quota refusal *is* a failure, and a typed one.
     """
     try:
-        outcome = run_research(recorder, policy=policy, entry_text=entry_text)
+        outcome = run_research(
+            recorder, policy=policy, entry_text=entry_text, run_id=run_id
+        )
     except Exception as exc:  # noqa: BLE001 - classified and recorded, not swallowed
-        recorder.record_failure(exc, scope="night.research")
+        recorder.record_failure(exc, scope="night.research", run_id=run_id)
         repo.complete_run_stage(stage_id, status=FAILED)
         return StageResult(stage.name, FAILED, reason=str(exc) or type(exc).__name__)
 
@@ -311,7 +313,7 @@ def _run_research_stage(
             root=artifact_root,
         )
     except ArtifactWriteFailed as exc:
-        recorder.record_failure(exc, scope="night.research.artifact")
+        recorder.record_failure(exc, scope="night.research.artifact", run_id=run_id)
         repo.complete_run_stage(stage_id, status=FAILED)
         return StageResult(stage.name, FAILED, reason=str(exc))
 
@@ -413,6 +415,8 @@ def _rank_the_builds(
     recorder: Recorder,
     results: dict[str, StageResult],
     critique: str,
+    *,
+    run_id: str,
 ) -> None:
     """Apply the critic's ordering to the build group. Never raises.
 
@@ -430,7 +434,7 @@ def _rank_the_builds(
     except RankingRefused as exc:
         # Recorded rather than swallowed: an unrankable critique is evidence
         # about the critic's prompt, and the prompt is what is being measured.
-        recorder.record_failure(exc, scope="night.critique.ranking")
+        recorder.record_failure(exc, scope="night.critique.ranking", run_id=run_id)
 
 
 def _write_to_brain(
@@ -552,7 +556,7 @@ def run_entry(
             results[stage.name] = result
             ordered.append(result)
             if stage.name == "critique" and result.status == COMPLETE:
-                _rank_the_builds(repo, recorder, results, result.text)
+                _rank_the_builds(repo, recorder, results, result.text, run_id=run_id)
     finally:
         # Every terminal path, including the exception one. `close_run` had no
         # caller at all before this capability, which is why every recorded run

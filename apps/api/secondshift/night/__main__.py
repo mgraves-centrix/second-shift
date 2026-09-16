@@ -87,7 +87,7 @@ def _ask_about(repo, recorder, providers, result, agents, prompts, entry_id) -> 
             run_id=result.run_id,
         )
     except Exception as exc:  # noqa: BLE001 - recorded, and the night still stands
-        recorder.record_failure(exc, scope="night.interviewer")
+        recorder.record_failure(exc, scope="night.interviewer", run_id=result.run_id)
         return 0
     return len(raised)
 

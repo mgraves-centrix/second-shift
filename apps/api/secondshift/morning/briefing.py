@@ -153,7 +153,32 @@ def assemble(repo: Repository, *, include_synthetic: bool = False) -> Briefing:
 
     nights = tuple(_night_line(repo, run) for run in runs)
     questions = tuple(_open_questions(repo))
-    return Briefing(nights=nights, questions=questions)
+    return Briefing(
+        nights=nights,
+        questions=questions,
+        interviewer_error=_interviewer_error(repo, [n.run_id for n in nights]),
+    )
+
+
+def _interviewer_error(repo: Repository, run_ids: list[str]) -> str | None:
+    """Why the interviewer could not run over these nights, or None.
+
+    Read from the ledger like the stage reasons, keyed on the `night.interviewer`
+    scope the night records it under. The most recent one wins: it is the
+    interview this morning is missing.
+    """
+    if not run_ids:
+        return None
+    placeholders = ",".join("?" for _ in run_ids)
+    for row in repo.connection.execute(
+        f"SELECT signature, message FROM failures WHERE run_id IN ({placeholders}) "
+        "ORDER BY ts_ms DESC, id DESC",
+        run_ids,
+    ):
+        parts = row["signature"].split(":")
+        if len(parts) > 1 and parts[1] == "night.interviewer":
+            return row["message"]
+    return None
 
 
 def for_run(repo: Repository, run_id: str) -> Briefing:

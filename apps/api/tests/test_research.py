@@ -213,17 +213,22 @@ class TestRecordingTheCall:
         assert row["credits"] == 1.0
         assert row["outcome"] == "success"
 
-    def test_a_run_s_spend_is_the_sum_of_its_calls(self, repo, recorder):
+    def test_a_run_s_spend_is_the_sum_of_its_calls(self, repo, recorder, run_id):
+        """Summed per run, as the run summary view sums it. The earlier version
+        summed the whole table, which passed while every call's `run_id` was
+        null — the research stage runs outside any invocation, so the context it
+        read the run from was empty."""
         for credits in (1.0, 2.0, 0.5):
             run_research(
                 recorder,
                 policy="cloud-assisted",
                 entry_text=ENTRY,
                 provider=StubTavily(credits=credits),
+                run_id=run_id,
             )
 
         total = repo.connection.execute(
-            "SELECT SUM(credits) s FROM tool_calls"
+            "SELECT SUM(credits) s FROM tool_calls WHERE run_id = ?", (run_id,)
         ).fetchone()["s"]
         assert total == 3.5
 

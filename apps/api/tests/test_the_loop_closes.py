@@ -251,6 +251,37 @@ class TestAnswersBelongToTheirIdea:
         assert [r["id"] for r in queued_for_tonight(repo, entry)] == [decision]
 
 
+class TestAFailedStageSaysWhyInTheMorning:
+    """`record_failure` read the run from the invocation context, and the night
+    records a stage's failure after its invocation has closed — so every real
+    failure was stored with no run, and the morning, which reads reasons by
+    run, showed none. The tests that covered reasons inserted the rows by hand."""
+
+    def test_the_reason_reaches_the_briefing(
+        self, repo, recorder, entry, roster, tmp_path
+    ):
+        from secondshift.morning import for_run
+
+        result = _run(repo, recorder, entry, roster, tmp_path, Failing(recorder))
+
+        stages = {s.stage: s for s in for_run(repo, result.run_id).nights[0].stages}
+        assert stages["brief"].status == "failed"
+        assert stages["brief"].reason == "the reasoner fell over"
+
+    def test_the_failure_row_names_the_run(
+        self, repo, recorder, entry, roster, tmp_path
+    ):
+        result = _run(repo, recorder, entry, roster, tmp_path, Failing(recorder))
+
+        orphans = repo.connection.execute(
+            "SELECT COUNT(*) n FROM failures WHERE run_id IS NULL"
+        ).fetchone()["n"]
+        assert orphans == 0
+        assert repo.connection.execute(
+            "SELECT COUNT(*) n FROM failures WHERE run_id = ?", (result.run_id,)
+        ).fetchone()["n"] > 0
+
+
 class TestTheLoopClosesInTheOrderItHappens:
     """The earlier tests answered a question *before* the first run, an order
     that cannot happen: questions are raised at the end of a night, after the
@@ -411,6 +442,45 @@ class TestTheNightRaisesTheQuestions:
 
         assert raised == 0
         assert len(assemble(repo).nights) == 1
+
+    def test_an_interviewer_that_fails_says_so_in_the_morning(
+        self, repo, recorder, entry, roster, tmp_path
+    ):
+        """`interviewer_error` was declared, passed through the API and rendered
+        by the screen, and never set — so a morning after a broken interviewer
+        read "the night got stuck on nothing", which is false."""
+        from secondshift.night import __main__ as cli
+
+        agents, prompts = roster
+        result = _run(repo, recorder, entry, roster, tmp_path)
+        providers = Providers(
+            reasoner=Failing(recorder),
+            transcriber=None,  # type: ignore[arg-type]
+            embedder=None,  # type: ignore[arg-type]
+            executor=None,  # type: ignore[arg-type]
+        )
+
+        cli._ask_about(repo, recorder, providers, result, agents, prompts, entry)
+
+        assert assemble(repo).interviewer_error == "the reasoner fell over"
+
+    def test_a_working_interviewer_reports_no_error(
+        self, repo, recorder, entry, roster, tmp_path
+    ):
+        from secondshift.night import __main__ as cli
+
+        agents, prompts = roster
+        result = _run(repo, recorder, entry, roster, tmp_path)
+        providers = Providers(
+            reasoner=Recorder_(recorder, text=QUESTIONS),
+            transcriber=None,  # type: ignore[arg-type]
+            embedder=None,  # type: ignore[arg-type]
+            executor=None,  # type: ignore[arg-type]
+        )
+
+        cli._ask_about(repo, recorder, providers, result, agents, prompts, entry)
+
+        assert assemble(repo).interviewer_error is None
 
     def test_a_quarantined_entry_raises_nothing(self, repo, recorder, roster):
         """No run happened, so there is nothing to be asked about."""
