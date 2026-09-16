@@ -158,6 +158,70 @@ class TestTheLeakList:
         assert len(build_query(entry).split()) < 2
 
 
+#: Found by the security review by running `build_query`, each of these leaked.
+#: The token boundary was a single space, so a newline, a tab or a parenthesis
+#: hid a host or a key from the shape checks; a port defeated the host pattern;
+#: and a capitalized word after any period — or at the very start of an entry —
+#: was taken to be sentence punctuation rather than a name.
+REVIEW_LEAKS: list[tuple[str, str, str]] = [
+    (
+        "host after a newline",
+        "Notes on planning\nbuild-box.lab.example.net keeps dropping the queue.",
+        "build-box",
+    ),
+    (
+        "host in parentheses",
+        "move the queue (build-box.lab.example.net) to postgres",
+        "build-box",
+    ),
+    (
+        "host with a port",
+        "Deploy to spark-box.lan:8000 before the demo.",
+        "spark-box",
+    ),
+    (
+        "key after a tab",
+        "sk-live-abcdefghijklmnopqrstuv\tbilling ledgers migration",
+        "abcdefghijklmnopqrstuv",
+    ),
+    (
+        "name after an abbreviation",
+        "Talked with Dr. Okonkwo about triage dashboards.",
+        "okonkwo",
+    ),
+    (
+        "name that opens the entry",
+        "Contoso wants billing ledgers reconciled nightly.",
+        "contoso",
+    ),
+]
+
+
+class TestTheReviewLeaks:
+    @pytest.mark.parametrize(
+        ("case", "entry", "must_not_survive"),
+        REVIEW_LEAKS,
+        ids=[c for c, _, _ in REVIEW_LEAKS],
+    )
+    def test_it_does_not_reach_the_query(self, case, entry, must_not_survive):
+        query = build_query(entry)
+
+        assert must_not_survive.lower() not in query.lower(), (
+            f"{case}: {must_not_survive!r} survived into {query!r}"
+        )
+
+    def test_no_part_of_a_host_survives_as_its_own_term(self):
+        """A host split at its dots leaked one label at a time."""
+        query = build_query("move the queue (build-box.lab.example.net) to postgres")
+
+        assert not {"build-box", "lab", "example", "net"} & set(query.split())
+
+    def test_an_opening_word_that_is_an_ordinary_verb_still_counts(self):
+        """The trade in the other direction, pinned so it is not overcorrected:
+        the first word is usually the verb the search is about."""
+        assert "figure" in build_query("Figure out retention cohorts for churn.")
+
+
 class TestRedactionCannotBeDisabled:
     def test_build_query_takes_exactly_one_parameter(self):
         """Principle 2 names a redaction that configuration can disable as a

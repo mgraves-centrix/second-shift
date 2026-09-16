@@ -10,9 +10,9 @@ words are enough to identify who wrote something, and none of them need to be a
 name.
 
 So the raw text is never a candidate to become a query. A token has to *earn its
-way in*: it must be lowercase in the source (or sentence-initial), not a
-stopword, not credential-shaped, and long enough to be a topic rather than
-grammar. An unrecognized codename is dropped for being capitalized, not for
+way in*: it must be lowercase in the source (or an ordinary word opening a
+sentence), not a stopword, not shaped like a credential, address or
+identifier, and long enough to be a topic rather than grammar. An unrecognized codename is dropped for being capitalized, not for
 being on a list, which is what makes this fail closed.
 
 **The cost, stated rather than hidden:** dropping every capitalized token loses
@@ -57,12 +57,50 @@ _STOPWORDS = frozenset(
 #: one category where the right answer is that nothing about it is searchable.
 _CREDENTIAL_SHAPED = re.compile(r"^(?=.*\d)[\w\-./+=]{16,}$|^[\w\-]*(?:key|token|secret|pw|pass)[\w\-]*[-_=][\w\-]{8,}$", re.I)
 
-#: Anything with an `@`, a scheme, or a dotted host. Addresses and locations
-#: never become search terms. Trailing punctuation is stripped before this is
-#: applied — a private hostname at the end of a sentence leaked past an earlier
-#: version of this pattern, which anchored on `$` and so never matched the span
-#: while it still carried a trailing period.
-_CONTACT_SHAPED = re.compile(r"@|^https?://|^[\w-]+(?:\.[\w-]+){1,}$", re.I)
+#: Anything with an `@`, a scheme, or a dotted host, with or without a port or a
+#: path. Addresses and locations never become search terms. Surrounding
+#: punctuation is stripped before this is applied — a private hostname at the
+#: end of a sentence leaked past an earlier version of this pattern, which
+#: anchored on `$` and so never matched the span while it still carried a
+#: trailing period, and `spark-box.lan:8000` leaked because the port did too.
+_CONTACT_SHAPED = re.compile(
+    r"@|^[a-z][a-z0-9+.\-]*://|^[\w-]+(?:\.[\w-]+)+(?::\d+)?(?:/\S*)?$|^[\w-]+:\d+$",
+    re.I,
+)
+
+#: A span that is an identifier rather than a word: it has a digit or an
+#: underscore in it, or it is a hyphenated run too long to be vocabulary. The
+#: credential pattern above needs a digit or a key-like prefix and misses a key
+#: made only of letters; this does not ask what the span is for.
+_IDENTIFIER_SHAPED = re.compile(r"[\d_]|^[A-Za-z-]{20,}$")
+
+#: Ordinary words an entry opens with. A capital at the start of a sentence is
+#: punctuation *or* a name, and nothing in the text says which — "Build a
+#: pipeline" and "Contoso wants a pipeline" have the same shape. So an opening
+#: capital earns its way in only by being one of these; an unlisted one is
+#: dropped as a name would be.
+#:
+#: This is the module's rule applied to the one position it had exempted.
+#: Treating every sentence-initial capital as punctuation let a name that
+#: opened an entry through, and let any capital after a period through — "Dr.
+#: Okonkwo" ends a sentence as far as punctuation can tell. It fails closed: a
+#: good opening word missing from this list costs a search term, never a leak.
+_OPENERS = frozenset(
+    """
+    add adapt allow analyze automate avoid build bundle cache change check
+    choose clean collect combine compare compute consider convert count create
+    cut debug decide define deploy design detect draft estimate evaluate explain
+    explore export figure find finish fix follow generate group handle help
+    idea ideas improve import index investigate keep learn list load look make
+    managing map measure merge migrate model monitor move need notes plan
+    prototype publish reduce refactor remove rename render replace report
+    research review rewrite run schedule score search send set ship show
+    simplify sketch sort split start stop store stream summarize support
+    sync test track train try turn update upgrade use validate write
+    how what why when where which who should could would can does is are
+    maybe perhaps possibly probably
+    """.split()
+)
 
 #: Topics where a lowercase common word is itself the disclosure. This is the
 #: one place the module filters rather than constructs, and **it fails open** —
@@ -103,9 +141,9 @@ _MIN_LENGTH = 3
 def _sentence_initial_positions(text: str) -> set[int]:
     """Word indices that begin a sentence.
 
-    A capital there is punctuation, not a proper noun, so it must not be the
-    reason a legitimate topic word is dropped. Without this, the first word of
-    every entry is discarded — including the one that is usually the subject.
+    A capital there may be punctuation rather than a proper noun, and the
+    opening word is usually the subject. It is still only a candidate: see
+    `_OPENERS` for what it must also be before it is kept.
     """
     positions: set[int] = set()
     index = 0
@@ -136,10 +174,11 @@ def build_query(text: str) -> str:
     for index, match in enumerate(_TOKEN.finditer(text)):
         raw = match.group()
 
-        # A capital that does not begin a sentence is a name, an organization, a
-        # product or a codename. Dropped without asking which — that is what
-        # makes an unknown one as safe as a known one.
-        if raw[0].isupper() and index not in initial:
+        # A capital is a name, an organization, a product or a codename, and is
+        # dropped without asking which — that is what makes an unknown one as
+        # safe as a known one. At the start of a sentence it may be punctuation
+        # instead, and it is kept only where it is an ordinary opening word.
+        if raw[0].isupper() and not (index in initial and raw.lower() in _OPENERS):
             continue
 
         lowered = raw.lower()
@@ -153,7 +192,11 @@ def build_query(text: str) -> str:
         # Checked against the surrounding source token, not the word-only match,
         # so a key's digits and symbols are still visible to the pattern.
         surrounding = _surrounding_token(text, match.start())
-        if _CREDENTIAL_SHAPED.match(surrounding) or _CONTACT_SHAPED.search(surrounding):
+        if (
+            _CREDENTIAL_SHAPED.match(surrounding)
+            or _CONTACT_SHAPED.search(surrounding)
+            or _IDENTIFIER_SHAPED.search(surrounding)
+        ):
             continue
 
         seen.add(lowered)
@@ -221,12 +264,18 @@ def _surrounding_token(text: str, at: int) -> str:
     `_TOKEN` matches letters only, so `sk-live-9f2b...` reaches the loop as
     `sk`. Credential and contact shapes live in the digits and symbols that
     match strips, so they have to be judged against the original span.
+
+    Delimited by any whitespace. An earlier version looked only for a space, so
+    a host after a newline or a key before a tab was judged as part of a larger
+    span that matched no shape, and reached the query one label at a time.
     """
-    start = text.rfind(" ", 0, at) + 1
-    end = text.find(" ", at)
-    span = text[start : end if end != -1 else len(text)].strip()
-    # Trailing sentence punctuation, stripped before the shape patterns run.
-    # `_CONTACT_SHAPED` anchors on `$`, so a host at the end of a sentence
-    # arrived with its trailing period still attached and did not match — the
-    # private hostname then reached the query one token at a time.
-    return span.rstrip(".,;:!?)\"'")
+    start = at
+    while start > 0 and not text[start - 1].isspace():
+        start -= 1
+    end = at
+    while end < len(text) and not text[end].isspace():
+        end += 1
+    # Surrounding punctuation, stripped before the shape patterns run. The
+    # patterns anchor on both ends, so a host in parentheses or at the end of a
+    # sentence arrived with its punctuation attached and matched nothing.
+    return text[start:end].strip(".,;:!?()[]{}<>\"'`")
