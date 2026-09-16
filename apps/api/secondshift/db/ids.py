@@ -37,3 +37,37 @@ def timestamp_ms(ulid: str) -> int:
     for char in ulid[:10]:
         value = (value << 5) | _ALPHABET.index(char)
     return value
+
+
+def ordered_ulids(count: int, now_ms: int | None = None) -> list[str]:
+    """`count` ULIDs that sort in the order they were asked for.
+
+    `new_ulid` draws fresh randomness every call, so two identifiers minted in
+    the same millisecond sort at random. Every `ORDER BY <ts>, id` in the
+    repository is a stable tiebreak only across milliseconds, which is fine
+    where the rows are seconds apart and wrong where a loop writes several at
+    once.
+
+    That was found on the morning surface: the interviewer raises its questions
+    in one turn, in the order it judged most useful to ask them, and two
+    questions written in the same millisecond arrived in the briefing in
+    whichever order their random bits fell. On a list that is untidy; on a
+    screen that shows one question at a time it discards the interviewer's
+    judgment about which one matters, because the first is the one a person
+    with thirty seconds answers.
+
+    Implemented as the ULID specification's monotonic rule — one random draw,
+    then increment — so the sequence is unguessable at its start and ordered
+    within itself. It is deliberately *not* what `new_ulid` does: making every
+    identifier in the process monotonic would put shared mutable state under
+    every table's primary key, and only the callers that hold ordering
+    information need this.
+    """
+    if count < 0:
+        raise ValueError("count must not be negative")
+    ts = now_ms if now_ms is not None else int(time.time() * 1000)
+    randomness = int.from_bytes(os.urandom(10), "big")
+    # Leave headroom so the increments below cannot carry into the timestamp.
+    # A batch large enough to exhaust it would need 2**80 identifiers.
+    randomness = min(randomness, (1 << 80) - 1 - count)
+    return [_encode(ts, 10) + _encode(randomness + i, 16) for i in range(count)]

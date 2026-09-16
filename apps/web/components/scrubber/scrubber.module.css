@@ -13,7 +13,6 @@
   /* Severity is its own color, and deliberately not one of the lane hues. A
      lane that reads as failed when nothing failed makes the view dishonest at
      rest, which is the one thing it must not be. */
-  --severe: #ff6b6b;
   --lane-h: 30px;
   --mark-h: 9px;
   --tick: 7px;

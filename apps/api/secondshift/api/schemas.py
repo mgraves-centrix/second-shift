@@ -8,6 +8,8 @@ merge.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -212,3 +214,76 @@ class EventDetailResponse(BaseModel):
     agent_invocation_id: str | None
     payload: dict | None
     model_calls: list[ModelCallResponse]
+
+
+class StageLineResponse(BaseModel):
+    """One stage, as the morning reports it.
+
+    `reason` is present for a failed stage and null for a skipped one, because
+    `run_stages` has no reason column and the night persists only failures. A
+    null here means "not recorded", never "no reason" — see
+    `morning/briefing.py`.
+    """
+
+    stage: str
+    status: str
+    reason: str | None
+    artifacts: list[str]
+
+
+class NightLineResponse(BaseModel):
+    run_id: str
+    entry_id: str
+    night_of: str
+    outcome: str | None
+    effective_policy: str
+    stages: list[StageLineResponse]
+
+
+class QuestionResponse(BaseModel):
+    """One open decision.
+
+    `will_leave_the_machine` travels with the question rather than being a
+    screen's job to remember. A warning that lives only in a component is one
+    the next component does not inherit.
+    """
+
+    decision_id: str
+    entry_id: str
+    question: str
+    rationale: str | None
+    blocking_stage: str | None
+    will_leave_the_machine: bool
+
+
+class BriefingResponse(BaseModel):
+    """What the night did and what it could not decide.
+
+    Deliberately not a chat transcript. `NOT_BUILDING.md` excludes a general
+    chat interface by name, and the shape of this response is part of that
+    boundary: nights and questions, no free-form turns.
+    """
+
+    nights: list[NightLineResponse]
+    questions: list[QuestionResponse]
+    interviewer_error: str | None
+
+
+class AnswerRequest(BaseModel):
+    """An answer to one question the system asked.
+
+    There is no `message` field and no free-text instruction path. An answer is
+    always *against a decision id*, which is the scope boundary made structural:
+    an endpoint that accepted arbitrary text and routed it would be the chat
+    interface the constitution excludes, under a different name.
+    """
+
+    answer: str
+    status: Literal["decided", "deferred", "queued-for-tonight", "obsolete"]
+    modality: Literal["text", "voice"] = "text"
+
+
+class AnswerResponse(BaseModel):
+    decision_id: str
+    status: str
+    answered_at_ms: int

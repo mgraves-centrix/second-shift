@@ -143,11 +143,18 @@ class VllmReasoner(Reasoner):
 
 
 def _describe(exc: urllib.error.HTTPError) -> str:
-    """The server's error body, or its reason if the body is unreadable."""
+    """The server's error body, or its reason if the body is unreadable.
+
+    Closes the error on the way out. An `HTTPError` holds the open response, and
+    reading its body does not release it: every refused request leaked a file
+    handle, which Python 3.14 reports and a long-running night accumulates.
+    """
     try:
         detail = exc.read().decode(errors="replace").strip()
     except OSError:
         detail = ""
+    finally:
+        exc.close()
     return (detail or str(exc.reason))[:500]
 
 

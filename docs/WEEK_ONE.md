@@ -16,6 +16,27 @@ Text capture needs no microphone, therefore no HTTPS, therefore no dependency on
 the Tailscale spike. Real dogfooding starts Sat 29 Aug and the memory history
 gains a full extra week. Voice upgrades the same path later without changing it.
 
+## Spike letters
+
+The letters below are the ones the harnesses in `scripts/spikes/` actually
+carry, which is what `docs/SPEC_ROADMAP.md` and the prompts in `docs/prompts/`
+cite. They are not the letters this plan assigned on 27 Aug: spikes ran out of
+order, two of the planned four were never run, and two that were not in the plan
+were. C and D were reassigned by what got built rather than by what was
+scheduled, so the two planned entries they displaced are now E and F.
+
+| | Question | Where |
+|---|---|---|
+| **A** | Secure context over Tailscale Serve | `scripts/spikes/spike-a-secure-context/` — passed 27 Aug |
+| **B** | Serving Nemotron 3.5 Lightning on the Spark | `scripts/spikes/spike-b-local-inference/` — passed 27 Aug |
+| **C** | MagpieTTS on aarch64 + Blackwell | `scripts/spikes/spike-c-tts-magpie/` — passed 28 Aug |
+| **D** | DOM or canvas for the night scrubber | `scripts/spikes/spike-d-scrubber-rendering/` — DOM, 2 Sep |
+| **E** | Nebius round trip + judge-target resolution | day 5 below — **1 of 3**: the target is resolved (`docs/decisions/0009`); credentials reach the real API, but no completion and no job have been recorded |
+| **F** | Nemotron Speech (ASR) on aarch64 | day 6 below — **not run**. The other half of day 6, the synthetic night generator, shipped as `packages/seed/` |
+
+A letter with no directory under `scripts/spikes/` was not run. Do not read a
+plan entry as evidence that its spike happened.
+
 ---
 
 ## Day 1 — Thu 27 Aug — Foundations ✅ COMPLETE
@@ -65,7 +86,7 @@ Telemetry is written before the first agent exists, because telemetry retrofitte
 in week six has gaps exactly where the eight-week trend needs continuity.
 
 **Pass gate**
-- `schema.sql` applies clean; a test writes a `run` with nested
+- the migrations apply clean; a test writes a `run` with nested
   `agent_invocations` (depth ≥ 2) and attached `model_calls`.
 - The Airlock `CHECK` rejects a `local-only` + `token-factory` insert. *(Done —
   verified at design time.)*
@@ -172,10 +193,17 @@ holds captured ideas and a personal profile. Decide before day 3 whether it is
 GitHub-private or local-only with its own backup — publishing it by accident is
 not a recoverable mistake.
 
-### 3. The five eval prompts and the rubric do not exist
+### 3. The eval prompts and the rubric do not exist — resolved, five days late
 
-Day 3's gate requires them fixed and committed. They measure getting better at
-being *you*, so they need your judgment rather than a plausible draft.
+`config/evals/rubric.md` and `config/evals/candidates.md` are committed. Ten
+candidates were loaded and **six activated on 30 Aug** — not the five this plan
+expected; five was an expectation, never a requirement, and six is what the
+baseline pins. The rubric hashes to `b4decd6fe774` on disk and on the always-on
+machine, byte-identical.
+
+The baseline itself was not recorded until **2 Sep** — `seed` and `activate` ran
+on 30 Aug, `baseline` did not. See the day-3 gate below for what that cost and
+what could not be recovered.
 
 ### 4. Nothing runs the API persistently — resolved
 
@@ -216,17 +244,30 @@ Wire capture to the brain repo: every entry appends to the dated journal and
 commits. Record the eval baseline's **inputs** — no model exists yet, so this
 records what cannot be reconstructed later and defers scoring to day 5.
 
-**Pass gate**
-- Every idea from today forward is captured in the real system. No exceptions,
-  no notes app.
-- The held-out prompts and the rubric are fixed and committed. (Six were
-  activated, not five; the number was an expectation, not a requirement.)
-- An `eval_runs` row exists pinning `rubric_sha` and the day-3 `brain_sha`.
-- The brain's topic files exist and are non-empty, so week 1 is a real baseline
-  rather than an empty one.
+**Pass gate — two of four met on the day, one met late, one unrecoverable.**
+- ✅ Every idea from today forward is captured in the real system. No exceptions,
+  no notes app. Capture went live 28 Aug and has taken real entries since.
+- ✅ The held-out prompts and the rubric are fixed and committed. (Six were
+  activated on 30 Aug, not five; the number was an expectation, not a
+  requirement.)
+- ❌ **An `eval_runs` row exists pinning `rubric_sha` and the day-3 `brain_sha`.**
+  No such row was written on day 3, or for five days after: `seed` and
+  `activate` ran on 30 Aug and `baseline` did not, which nothing surfaced
+  because nothing was reading `eval_runs`. A baseline was finally recorded on
+  **2 Sep** — `01M1FYFECEXC5ZJEWHNP7WZMXB`, `week_of 2026-08-31`, rubric
+  `b4decd6fe774`, brain `ad17b3bcddb6`, awaiting scoring. **It pins the 2 Sep
+  brain, not the day-3 one.** The day-3 brain state is gone; the journal and the
+  topic files moved on, and there is no honest way to reconstruct what they held
+  on 29 Aug. The eight-week delta therefore measures seven weeks and change from
+  a later floor, and the row says so rather than carrying a `week_of` that
+  pretends otherwise.
+- ✅ The brain's topic files exist and are non-empty, so week 1 is a real
+  baseline rather than an empty one.
 
 **Abort criteria** — none. If this slips, the whole submission thesis slips with
-it. Everything below yields to it.
+it. Everything below yields to it. *It slipped by five days and the thesis
+survived, narrower: the comparison is still real, its floor is just later than
+planned. That is the cost of a gate nothing was checking.*
 
 ---
 
@@ -354,7 +395,7 @@ forward — it unblocks the most downstream work.
 
 ---
 
-## Day 5 — Mon 31 Aug — Spike C: Nebius round trip + judge-target resolution
+## Day 5 — Mon 31 Aug — Spike E: Nebius round trip + judge-target resolution
 
 Three deliverables, all small, all load-bearing:
 1. One Token Factory completion with real token accounting written to
@@ -365,14 +406,19 @@ Three deliverables, all small, all load-bearing:
    target is required. This is a submission-blocking assumption and it does not
    get to sit unexamined until week seven.
 
-**Also on day 5 — score the week-1 eval baseline.** Generate and score the five
-prompts against the `brain_sha` recorded on day 3, not against HEAD. Pinning to
-the recorded SHA is the entire point of splitting the baseline, and it is the
-one step that can silently go wrong and quietly weaken the eight-week delta.
+**Also on day 5 — score the week-1 eval baseline.** Generate and score the six
+held-out prompts against the `brain_sha` the baseline run recorded, not against
+HEAD. Pinning to the recorded SHA is the entire point of splitting the baseline,
+and it is the one step that can silently go wrong and quietly weaken the
+eight-week delta. *Not done on day 5: there was no baseline row to score against
+until 2 Sep, and scoring still waits on a judge — `local-inference` and
+`nebius-executor`, not this capability.*
 
 **Pass gate** — both calls succeed with telemetry rows; the judge-hosting
 question has a written answer in `docs/decisions/`; `eval_results` rows exist
-for 5 prompts × 3 samples, linked to the day-3 `brain_sha`.
+for 6 prompts × 3 samples, linked to the `brain_sha` the baseline run pinned.
+*The judge-hosting question is answered — `docs/decisions/0009`. The
+`eval_results` rows do not exist; `eval_results` is empty.*
 
 **Abort criteria** — if Serverless Jobs are unusable, the build stage runs local
 and Nebius usage narrows to Token Factory. That still satisfies the rules but
@@ -381,7 +427,7 @@ redesign; knowing in week 6 does not.
 
 ---
 
-## Day 6 — Tue 1 Sep — Spike D: Nemotron Speech on aarch64 + synthetic night generator
+## Day 6 — Tue 1 Sep — Spike F: Nemotron Speech on aarch64 + synthetic night generator
 
 **ASR** — timebox half a day. Target is
 `nvidia/nemotron-speech-streaming-en-0.6b`, not Parakeet TDT 1.1B: it is the
@@ -409,7 +455,7 @@ same code. Not throwaway.
 
 ---
 
-## Day 7 — Wed 2 Sep — Night scrubber v0 + write-up
+## Day 7 — Wed 2 Sep — Spike D + night scrubber v0 + write-up
 
 The signature component, built once and used three times (my night view, judge
 mode's "run the night", the trend overlay's shared time axis).

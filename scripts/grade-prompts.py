@@ -17,12 +17,16 @@ from pathlib import Path
 
 PROMPTS = Path(__file__).resolve().parents[1] / "docs" / "prompts"
 
-#: Not prompts. The first three set the bar rather than being measured against
-#: it; the last two describe the set. Grading the report card is how this script
+#: Not prompts. `00_INDEX.md` and `GRADES.md` describe the set rather than
+#: being a member of it. `NIGHT_SCRUBBER.md` predates this rubric and was
+#: consumed as-is by `night-timeline`; it is historical, not maintained
+#: against this bar. `OVERNIGHT.md` was excluded for the same reason once —
+#: written before the rubric, never held to it — until its rewrite on 2 Sep,
+#: which was built to satisfy every criterion on the merits rather than
+#: written and then exempted. Grading the report card is how this script
 #: first reported a failure against itself.
 NOT_PROMPTS = {
     "00_INDEX.md",
-    "OVERNIGHT.md",
     "NIGHT_SCRUBBER.md",
     "GRADES.md",
 }

@@ -6,6 +6,14 @@ tailnet, no credentials.
 **Independent. Runs in parallel with `CONFIGURATION.md`, `AGENTS.md`,
 `RETRIEVAL.md` and `TEST_HARNESS.md`. Must land before `MORNING_INTERVIEW.md`.**
 
+> **It did not, and that is now the thing this unblocks.** `morning-interview`
+> shipped its server half on 3 Sep — briefing, questions, answering, policy
+> upgrade, all reachable at `GET /morning` and
+> `POST /decisions/{id}/answer` — and deliberately shipped **no screen**,
+> because this prompt says it must land first and the reason is the drift below.
+> `app/morning/` was still `MORNING_INTERVIEW.md`'s to build; this made it
+> possible to build without making the drift worse.
+
 ---
 
 Build the frontend shell and design system. Read `openspec/constitution.md`,
@@ -18,6 +26,17 @@ background.
 "a complete, coherent product experience, not just a technical proof of concept."
 Everything else in this project argues the system works. This is what makes it
 look like one product rather than three demos in a trench coat.
+
+> **✅ Shipped 3 Sep — `openspec/changes/archive/2026-09-03-add-frontend`.**
+> Kept as the record of what was asked. Two things to carry forward:
+>
+> 1. **Its open decision was answered by measuring, and the answer was
+>    asymmetric.** A nav bar on capture takes the `local-only` policy option
+>    from 79% visible to 0% at 390×350. Capture gets links below its button;
+>    the desktop surfaces get a nav.
+> 2. **A finding it did not fix:** capture hides that policy option entirely at
+>    390×300, on the shipped screen with no nav involved. The fix reorders the
+>    3am screen, so it is the subject's call.
 
 Right now there are two surfaces and **no way to get from one to the other.**
 `/` is capture, `/night/` is the scrubber, and nothing links them — you have to
@@ -41,6 +60,12 @@ they land, not after.
 - `app/globals.css` — the palette: `--bg #0b0d10`, `--panel`, `--line`, `--text`,
   `--muted`, `--accent #7ef0a8`, `--warn`, `--disabled`. Dark by default, and
   that is not a preference — capture happens at 3am.
+- **And the same file styles bare element selectors** — `main`, `h1`, `button`,
+  `textarea`, `fieldset`, `legend`. `button { width: 100% }` and
+  `main { max-width: 34rem }` are capture's layout, applied globally. That is a
+  second drift underneath the token one and it is worse: a new surface inherits
+  capture's styling whether it wants it or not, and the fix has to happen without
+  changing a pixel of the screen that is taking real ideas.
 - `next.config.mjs` sets `output: "export"` and `trailingSlash: true`, so the API
   serves the PWA as files. **A second running server on the Spark is a second
   thing that can be down at 2am.** Any route you add must survive static export;
@@ -95,6 +120,8 @@ that is not the 3am screen.
 - **No CSS framework.** No Tailwind. CSS modules and custom properties, matching
   what is there.
 - **No morning interview.** `MORNING_INTERVIEW.md` owns `app/morning/`.
+  It shipped on 3 Sep, added as one line in `lib/surfaces.ts`, which is the
+  extension point this change existed to create.
 - **No judge mode.** Same components, different caller, later.
 - **No rewrite of the scrubber.** It is measured and it works. You may move its
   tokens into the system; do not touch its render path.
@@ -116,7 +143,7 @@ that is not the 3am screen.
 
 ```bash
 git status --short && openspec list && openspec list --specs
-apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 302 pass today
+apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 587 pass today
 npm --prefix apps/web run test && npm --prefix apps/web run typecheck
 npm --prefix apps/web run build                                # must still export
 scripts/check-no-environment.sh && scripts/check-american-english.sh

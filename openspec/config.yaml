@@ -37,8 +37,11 @@ context: |
     - Time is INTEGER epoch milliseconds UTC everywhere; local framing lives in
       entries.captured_tz / tz_offset_min.
     - Tables are append-only. Counters are views, never stored columns.
-    - The schema in apps/api/secondshift/db/schema.sql is the authority;
-      docs/DATA_MODEL.md explains the non-obvious choices.
+    - apps/api/secondshift/db/migrations/ is the authority on the data model;
+      0001_initial.sql is the base schema. docs/DATA_MODEL.md explains the
+      non-obvious choices. There is no db/schema.sql — it became
+      0001_initial.sql on 2026-08-27 and this line said otherwise until 2 Sep,
+      injecting a dead path into every proposal written in between.
 
 rules:
   proposal:

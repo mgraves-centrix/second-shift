@@ -1,0 +1,29 @@
+.page {
+  padding: var(--s-5);
+  max-width: 34rem;
+  margin: 0 auto;
+}
+
+.title {
+  font-size: var(--t-title);
+  margin: 0;
+}
+
+.note {
+  color: var(--muted);
+  font-size: var(--t-small);
+}
+
+.detail {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--s-3);
+  font-size: var(--t-small);
+}
+
+.retry {
+  margin-top: var(--s-4);
+}

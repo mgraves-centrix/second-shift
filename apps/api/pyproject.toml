@@ -7,6 +7,10 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.34",
     "pydantic>=2.9",
+    # Retrieval only. ADR 0002 chose brute-force cosine over an in-memory array
+    # rather than a vector database, and this is the array. It is the one
+    # numeric dependency; nothing else in the orchestrator imports it.
+    "numpy>=2.1",
 ]
 
 [project.optional-dependencies]

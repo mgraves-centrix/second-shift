@@ -81,7 +81,13 @@ as a side effect.
   something, and what it destroys is reproducible from git.
 - The reasoner's unit and the running container agree, and the port matches
   `config/models.toml` — which the capability probe checks and which has already
-  been wrong once.
+  been wrong once. `python -m secondshift.config show` is how you check it
+  without reading Python: it prints every setting, its resolved value and the
+  file or layer it came from, and exits non-zero on a malformed file or an
+  unresolved required setting. **It has never been run on the always-on
+  machine** — only in a container, where it reports that container's home
+  directory. Running it there is this capability's, and the first thing worth
+  doing after a deploy.
 - Nothing on that machine is reachable from the public internet.
 
 ## Scope — what NOT to build
@@ -138,6 +144,10 @@ destroys it. `python -m venv` plus `pip` with pinned constraints.
   real host.
 - The capability probe reports the reasoner available afterward, by name, on the
   port `config/models.toml` allocates.
+- `python -m secondshift.config show` exits zero on that machine, and the paths
+  it prints are the service account's rather than root's. A `/root/...` database
+  path in that output means the unit is running as the wrong user, which has
+  broken the WAL before.
 - Capture works from the phone after everything above. **It is live and taking
   real ideas**; if it breaks and you cannot fix it in ten minutes, revert to the
   last known-good commit, redeploy, verify, and stop.

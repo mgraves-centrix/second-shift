@@ -457,6 +457,65 @@ class Repository:
             },
         )
 
+    def insert_outcome(
+        self,
+        *,
+        entry_id: str,
+        artifact_id: str | None = None,
+        label: str | None = None,
+        signal: str | None = None,
+        note: str | None = None,
+        ts_ms: int | None = None,
+        outcome_id: str | None = None,
+        is_synthetic: bool = False,
+    ) -> str:
+        """Record what happened to an artifact, or to an entry.
+
+        `label` is the person's explicit judgement — keep, kill, revise.
+        `signal` is implicit — opened, iterated, used, exported, ignored. The
+        schema requires at least one, and this refuses before the database does
+        so the message names the caller's mistake rather than a constraint.
+
+        Nothing derives an outcome. `cost_per_accepted_artifact` counts
+        `label = 'keep'`, so an outcome inferred from a rank would make the
+        submission's headline chart measure the critic agreeing with itself.
+        The chart is only worth showing because a person put the keep there.
+        """
+        if label is None and signal is None:
+            raise ValueError(
+                "an outcome needs a label (keep/kill/revise) or a signal "
+                "(opened/iterated/used/exported/ignored), or both"
+            )
+        ts = ts_ms if ts_ms is not None else now_ms()
+        oid = self._id(outcome_id, ts)
+        self._insert(
+            "outcomes",
+            {
+                "id": oid,
+                "entry_id": entry_id,
+                "artifact_id": artifact_id,
+                "ts_ms": ts,
+                "label": label,
+                "signal": signal,
+                "note": note,
+                "is_synthetic": int(is_synthetic),
+            },
+        )
+        return oid
+
+    def artifacts_for_run(self, run_id: str) -> list[sqlite3.Row]:
+        """Everything a run produced, variants grouped and in rank order.
+
+        Ranked variants first within a group, then unranked ones — a null rank
+        is "the critic did not order this", never "last".
+        """
+        return self._conn.execute(
+            "SELECT * FROM artifacts WHERE run_id = ? "
+            "ORDER BY stage, variant_group IS NULL, variant_group, "
+            "variant_rank IS NULL, variant_rank, variant_index",
+            (run_id,),
+        ).fetchall()
+
     def insert_artifact(
         self,
         *,
@@ -640,6 +699,8 @@ class Repository:
         ("queued", "running"),
         ("running", "answered"),
         ("running", "queued"),
+        # An answer queued for tonight gives the idea another night.
+        ("answered", "queued"),
         ("answered", "archived"),
         ("queued", "archived"),
     }
@@ -737,6 +798,37 @@ class Repository:
             "SELECT * FROM entries WHERE id = ?", (entry_id,)
         ).fetchone()
 
+    def get_agent(self, name: str, version: int) -> sqlite3.Row | None:
+        """One roster row. `UNIQUE(name, version)` makes this at most one."""
+        return self._conn.execute(
+            "SELECT * FROM agents WHERE name = ? AND version = ?", (name, version)
+        ).fetchone()
+
+    def active_agents(self) -> list[sqlite3.Row]:
+        """The roster in effect: everything not retired."""
+        return self._conn.execute(
+            "SELECT * FROM agents WHERE retired_at_ms IS NULL "
+            "ORDER BY role, name, version"
+        ).fetchall()
+
+    def entries_for_index(self) -> list[sqlite3.Row]:
+        """Every entry with text, for the retrieval index.
+
+        Not screened on status: an archived idea is still memory, and excluding
+        it would make the system forget precisely what it has already acted on.
+
+        Not screened on `is_synthetic` either, which is the exception to the
+        rule that surrounds it. That flag keeps seeded data out of
+        *measurements* — the eval trend, the cost curves — and retrieval is not
+        a measurement. The judge instance's entire corpus is synthetic, so
+        filtering it here would ship a demo whose assistant remembers nothing.
+        """
+        return self._conn.execute(
+            "SELECT id, raw_text, default_policy, created_at_ms, is_synthetic "
+            "FROM entries WHERE COALESCE(TRIM(raw_text), '') != '' "
+            "ORDER BY created_at_ms, id"
+        ).fetchall()
+
     def entry_history(self, entry_id: str) -> list[sqlite3.Row]:
         """Events naming this entry, including those with no run."""
         return self._conn.execute(
@@ -800,12 +892,19 @@ class Repository:
         """What each stage reached, in order.
 
         "No empty mornings" is a query, and this is the query: a run whose
-        `outcome` is null — which is every run, because nothing closes one yet —
-        still says exactly how far it got here. A timeline that read only the run
-        row would render an unfinished night as a blank verdict.
+        `outcome` is null still says exactly how far it got here. A timeline that
+        read only the run row would render an unfinished night as a blank
+        verdict. (This said "which is every run, because nothing closes one yet"
+        until `night-pipeline` gave `close_run` its first caller. An open run is
+        now a process that died, not the normal case.)
+
+        `commit_sha` and `committed_at_ms` are selected because `distill` writes
+        them. Both are scalars, so this stays within the timeline's rule that
+        frame data carries no payload to parse.
         """
         return self._conn.execute(
-            "SELECT stage, seq, status, started_at_ms, ended_at_ms "
+            "SELECT stage, seq, status, started_at_ms, ended_at_ms, "
+            "committed_at_ms, commit_sha "
             "FROM run_stages WHERE run_id = ? ORDER BY seq",
             (run_id,),
         ).fetchall()

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { newUlid } from "@/lib/ulid";
 import { drain, enqueue, pendingCount, type PendingEntry } from "@/lib/queue";
+import { Footer } from "@/components/shell/Shell";
+import styles from "./capture.module.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
@@ -111,13 +113,13 @@ export default function Capture() {
   ];
 
   return (
-    <main>
-      <div className="bar">
+    <main className={styles.page}>
+      <div className={styles.bar}>
         <h1>Second Shift</h1>
         {/* A count, deliberately. There is no per-item surface for a retry or
             delete control to attach to — that is the scope boundary, enforced
             by what does not exist. */}
-        <span className="pending" data-zero={waiting === 0}>
+        <span className={styles.pending} data-zero={waiting === 0}>
           {waiting === 0 ? "all synced" : `${waiting} waiting to sync`}
         </span>
       </div>
@@ -134,7 +136,7 @@ export default function Capture() {
         <fieldset>
           <legend>Privacy</legend>
           {policies.map((p) => (
-            <label key={p.policy} className="policy" data-available={p.available}>
+            <label key={p.policy} className={styles.policy} data-available={p.available}>
               <input
                 type="radio"
                 name="policy"
@@ -144,9 +146,9 @@ export default function Capture() {
                 onChange={() => setPolicy(p.policy)}
               />
               <span>
-                <span className="policy-name">{p.policy}</span>
+                <span className={styles.policyName}>{p.policy}</span>
                 {!p.available && p.reason ? (
-                  <span className="policy-reason">unavailable — {p.reason}</span>
+                  <span className={styles.policyReason}>unavailable — {p.reason}</span>
                 ) : null}
               </span>
             </label>
@@ -158,9 +160,11 @@ export default function Capture() {
         </button>
       </form>
 
-      <div className="status" data-kind={status?.kind ?? "ok"} role="status">
+      <div className={styles.status} data-kind={status?.kind ?? "ok"} role="status">
         {status?.message ?? ""}
       </div>
+
+      <Footer />
     </main>
   );
 }

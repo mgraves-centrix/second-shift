@@ -210,11 +210,23 @@ UI, so "why did this idea cost 40x that one" always has an answer on screen.
   and punctuates.
 - **Any non-NVIDIA LLM in the runtime path** — rules, and scoring.
 
-## To verify in week one
+## Open questions — status at the end of week one (2 Sep)
 
-- License terms for Nemotron 3 Super and Ultra as served by Token Factory.
-- Whether `nemotron-speech-streaming-en-0.6b` and the reasoner can be co-resident
-  on the Spark under sustained load without contention.
-- Current Token Factory catalog and per-token pricing, for
-  `model_calls.estimated_cost_usd`. Pricing must be read from a config file,
-  never hardcoded — the cost curve is a scored artifact.
+This was headed "to verify in week one." Week one is over and two of the three
+are still open, so the heading now says what is true rather than what was hoped.
+
+- ❌ **License terms for Nemotron 3 Super and Ultra as served by Token Factory.**
+  Not read. The credentials reach the API; the terms attached to serving those
+  checkpoints have not been checked, and the submission asserts a rules-compliant
+  model stack.
+- ❌ **Whether `nemotron-speech-streaming-en-0.6b` and the reasoner can be
+  co-resident on the Spark under sustained load without contention.** Open —
+  Spike F did not run. The *reasoner + embedder* pair is a different question
+  and it is closed: both serving, 69 of 121 GiB still free. That does not answer
+  this one.
+- ⚠️ **Current Token Factory catalog and per-token pricing**, for
+  `model_calls.estimated_cost_usd`. Read from the console on 27 Aug for
+  `eu-north1` and recorded in `docs/decisions/0006`; the account now targets
+  `us-central1`, whose rates were not re-read. Pricing is in `config/pricing.toml`
+  and never hardcoded — the cost curve is a scored artifact — but the numbers in
+  that file are the wrong region's until somebody checks.

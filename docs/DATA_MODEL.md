@@ -61,16 +61,26 @@ the system stop repeating mistakes rather than merely logging them.
 **Evals pin the judge.** `eval_runs` records `judge_model`,
 `judge_model_version` and `rubric_sha`. If the scoring model drifts, an
 improving curve measures the judge, not the brain. `eval_results.sample_index`
-exists so each prompt is sampled repeatedly and reported as mean ± spread —
-five prompts scored once a week is 45 points of noise with no error bars.
+exists so each prompt is sampled repeatedly and reported as mean ± spread. The
+held-out set is six prompts, scored on five dimensions at 1-5 for 25 points a
+sample; scoring each once a week gives one sample per prompt and no way to
+separate a real gain from sampling variance. `config/evals/rubric.md` fixes the
+sample count at three for that reason.
 
-**Vectors are `BLOB`s in SQLite, searched by brute-force cosine in numpy.**
-At the projected scale — roughly 600 entries by week eight — exact search over
-an in-memory array is instant, and correct rather than approximate. It also
-installs identically on aarch64, x86, and in the judge container, which the
-portability requirement makes decisive. This sits behind the `Embedder` and
-retrieval interfaces; swapping in a real index later is a one-module change.
-LanceDB is not adopted. See `docs/decisions/0002`.
+**Vectors are never stored. The index is rebuilt in memory at startup**, from
+`entries` and the brain, and searched by brute-force cosine in numpy. At the
+projected scale — roughly 600 entries by week eight — exact search over an
+in-memory array is instant, and correct rather than approximate. It also installs
+identically on aarch64, x86, and in the judge container, which the portability
+requirement makes decisive. An embedding is a pure function of text already
+stored, so it falls under this file's own convention: derived values are not
+stored columns. This sits behind the `Embedder` and retrieval interfaces;
+swapping in a real index later is a one-module change. LanceDB is not adopted.
+See `docs/decisions/0002` and `docs/decisions/0011`.
+
+*This paragraph read "Vectors are `BLOB`s in SQLite" until 2 Sep, which is what
+ADR 0002 decided and what `retrieval` shipped against and contradicted. 0011
+records the supersession and why it went unnoticed.*
 
 **`model_call_payloads` is separate from `model_calls`.** One records what a
 call cost, the other what it said. They are split because the cost row is small,

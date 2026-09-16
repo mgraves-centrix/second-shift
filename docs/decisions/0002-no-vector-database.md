@@ -1,6 +1,9 @@
 # 0002 — No vector database
 
 **Status:** accepted · **Date:** 2026-08-27
+**Superseded in part by [0011](0011-embeddings-are-not-persisted.md)** — embeddings
+are not stored. Everything else here stands. The sentence is left as written: it
+was accepted for six days and a capability shipped against it.
 
 ## Context
 

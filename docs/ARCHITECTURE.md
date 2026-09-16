@@ -25,9 +25,23 @@ probe (CUDA present? vLLM reachable? NeMo importable?), else `cloud`.
 | Transcriber | Nemotron Speech 0.6B, local | Nemotron Speech 0.6B, local | hosted ASR |
 | Reasoner (local-only policy) | Lightning 30B via vLLM | Lightning 30B via vLLM | **unavailable** |
 | Reasoner (cloud-assisted) | Lightning local, Super/Ultra via Token Factory | Token Factory | Token Factory |
-| Embedder | Nemotron Embed 1B, local | Nemotron Embed 1B, local | Token Factory embeddings |
+| Embedder | Nemotron Embed 1B, local | Nemotron Embed 1B, local | **Nemotron Embed 1B, local** |
 | Executor | Nebius Serverless Jobs | Nebius Serverless Jobs | Nebius Serverless Jobs |
 | Night trigger | systemd timer | systemd timer | scheduled job |
+
+### The embedder row was wrong until 2 Sep
+
+This table read "Token Factory embeddings" in the `cloud` column until
+`add-retrieval` implemented it and the contradiction surfaced. Constitution
+principle 2 requires retrieval to run locally on **every** compute profile and
+names "retrieval delegated to a hosted embedding endpoint" as a violation in as
+many words. The constitution outranks this document, so the row is corrected
+rather than the principle bent: there is no remote embedder in `providers/`, and
+no configuration that could reach one.
+
+The judge instance therefore needs a local embedding server in its container.
+That is a deployment cost, and it is the honest one — a demo whose privacy story
+depends on a switch nobody flipped is not a privacy story.
 
 ### The consequence that makes this a feature
 
@@ -52,39 +66,66 @@ is what gets deployed for judging.
 
 ## Repository layout
 
+Directories that do not exist yet are marked `(planned)`. Generate the real
+tree rather than trusting this one — `git ls-files | cut -d/ -f1-2 | sort -u`
+answers it in a second, and this block was wrong for a week because nobody did.
+
 ```
 second-shift/
+├── openspec/
+│   ├── constitution.md          immutable principles
+│   ├── config.yaml              scale classification + enforcement gates
+│   ├── specs/                   the shipped capabilities
+│   └── changes/                 in-flight + archived proposals
 ├── docs/
 │   ├── ARCHITECTURE.md          this file
 │   ├── DATA_MODEL.md
+│   ├── MODELS.md                exact model bindings per profile
+│   ├── SPEC_ROADMAP.md          what is built, what is next
 │   ├── WEEK_ONE.md
-│   ├── NEBIUS_USAGE.md          evidence doc for the judging criterion
-│   └── decisions/               numbered ADRs
+│   ├── decisions/               numbered ADRs
+│   ├── development/             workflow docs
+│   └── prompts/                 the session prompts + their grader report
+├── config/
+│   ├── models.toml              endpoints, ports, served model names
+│   ├── pricing.toml             per-provider rates for telemetry costing
+│   ├── location.toml
+│   └── evals/                   rubric + held-out prompt candidates
 ├── apps/
 │   ├── api/                     FastAPI orchestrator (Python)
-│   │   └── secondshift/
-│   │       ├── config.py        profile resolution + capability probe
-│   │       ├── db/              schema.sql, migrations, repository layer
-│   │       ├── telemetry/       recorder + contextvar invocation tree
-│   │       ├── providers/       base interfaces + one module per backend
-│   │       ├── airlock/         policy resolution + redaction
-│   │       ├── agents/          roster + versioned prompt files
-│   │       ├── night/           checkpointed stage machine
-│   │       ├── morning/         briefing + interview
-│   │       ├── brain/           markdown read/write + git operations
-│   │       ├── retrieval/       embedding index + assembly
-│   │       └── api/routes/
+│   │   ├── secondshift/
+│   │   │   ├── config.py        profile resolution + capability probe
+│   │   │   ├── db/              migrations (the schema authority), repository
+│   │   │   ├── telemetry/       recorder + contextvar invocation tree
+│   │   │   ├── providers/       base interfaces + one module per backend
+│   │   │   ├── airlock/         policy resolution + redaction
+│   │   │   ├── agents/          roster + versioned prompt files
+│   │   │   ├── evals/           seed, activate, baseline, status
+│   │   │   ├── retrieval/       embedding index + assembly
+│   │   │   ├── brain/           markdown read/write + git operations
+│   │   │   ├── api/             app.py, schemas, endpoint modules
+│   │   │   ├── night/           checkpointed stage machine  (planned)
+│   │   │   └── morning/         briefing + interview        (planned)
+│   │   └── tests/
 │   └── web/                     Next.js PWA + dashboard
+│       ├── app/
+│       ├── lib/
+│       ├── public/
+│       ├── tests/
 │       └── components/
 │           ├── scrubber/        the signature component — built once, used three times
-│           └── charts/
+│           └── charts/          (planned)
 ├── packages/
 │   └── seed/                    synthetic night generator
 ├── deploy/
-│   ├── spark/                   systemd units
-│   ├── tailscale/               Serve config
-│   └── nebius/                  container + job definitions
+│   ├── spark/                   systemd units + deploy script
+│   ├── tailscale/               Serve config              (planned)
+│   └── nebius/                  container + job definitions (planned)
 └── scripts/
+    ├── check-american-english.sh
+    ├── check-no-environment.sh
+    ├── grade-prompts.py
+    └── spikes/                  the harnesses, kept rather than deleted
 ```
 
 Python dependencies are managed with `python -m venv` + `pip` against a pinned
@@ -133,10 +174,12 @@ Nightly eval runs dispatch the same way.
 The `cloud` profile in a container, seeded with a synthetic persona and zero
 real data, labeled in-UI as a demo.
 
-> **Open, must be resolved in week one:** Serverless Endpoints appear to be for
-> serving *models*, not arbitrary web applications. If that is correct, the
-> judge instance needs a container or VM target instead. This is a
-> submission-blocking assumption and it gets a spike on day 4, not week 7.
+> **Resolved 2 Sep, ADR 0009.** The assumption above was wrong: Nebius
+> Serverless AI runs arbitrary containers, and both its Endpoints and Jobs
+> creation flows offer a VM with no GPU as a supported configuration. The judge
+> instance runs as a Serverless AI Endpoint on a no-GPU container VM — roughly
+> $36/month at Compute's published non-GPU rate, against roughly $2,957 for the
+> H100 endpoint the fallback would have rented.
 
 ### The demo moment this split produces
 
@@ -161,3 +204,4 @@ README.
 | No empty mornings | `run_stages` rows commit independently; the morning brief is a query over whatever reached `complete`. |
 | Text-first | Every voice path has a text sibling route. TTS is never on a critical path. |
 | One codebase, two deployments | Compute profiles. The judge instance is a profile, not a fork. |
+| One origin | The always-on machine serves the API and the exported PWA together. A development machine is `127.0.0.1` only — a second origin means a second database, and a capture written to the wrong one. (ADR 0012) |

@@ -119,6 +119,49 @@ class TestIdentity:
         assert timestamp_ms(_entry(repo, when=when)) == when
 
 
+class TestOrderedIdentifiers:
+    """`ordered_ulids`, and the reason it is not what `new_ulid` does.
+
+    Every `ORDER BY <ts>, id` in the repository is a stable tiebreak only across
+    milliseconds. Where a loop writes several rows at once — the interviewer
+    raising a turn's questions — plain ULIDs sort those rows by random bits.
+    """
+
+    def test_a_batch_sorts_in_the_order_it_was_asked_for(self):
+        from secondshift.db.ids import ordered_ulids
+
+        ids = ordered_ulids(64, now_ms=1_700_000_123_456)
+
+        assert ids == sorted(ids)
+        assert len(set(ids)) == 64
+
+    def test_every_identifier_carries_the_instant_it_was_asked_for(self):
+        from secondshift.db.ids import ordered_ulids, timestamp_ms
+
+        when = 1_700_000_123_456
+
+        assert {timestamp_ms(i) for i in ordered_ulids(32, now_ms=when)} == {when}
+
+    def test_two_batches_in_the_same_millisecond_do_not_collide(self):
+        """Each batch draws its own randomness, so ordering is within a batch
+        and never across them. Asserting the negative because a monotonic
+        counter shared across batches is the tempting implementation, and it
+        would put mutable state under every table's primary key."""
+        from secondshift.db.ids import ordered_ulids
+
+        when = 1_700_000_123_456
+        first = ordered_ulids(4, now_ms=when)
+        second = ordered_ulids(4, now_ms=when)
+
+        assert not set(first) & set(second)
+
+    def test_an_empty_batch_is_empty_rather_than_an_error(self):
+        """A turn that raised no questions is a normal morning."""
+        from secondshift.db.ids import ordered_ulids
+
+        assert ordered_ulids(0) == []
+
+
 class TestEligibility:
     def test_synthetic_queued_entries_are_never_dispatched(self, repo):
         real = _entry(repo, text="real")

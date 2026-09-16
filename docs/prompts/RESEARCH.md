@@ -1,10 +1,28 @@
 # Research prompt
 
+> **✅ Shipped 2 Sep — `openspec/changes/archive/2026-09-02-add-research`.**
+> Kept as the record of what was asked. Three things to carry forward:
+>
+> 1. **There was no credential, and the instruction to stop was honored in
+>    substance rather than in letter.** Its stated reason — a stub is
+>    indistinguishable from a real search in `tool_calls`, and credits are a
+>    scored artifact — is satisfied: nothing that fabricates results is
+>    importable from `providers/`, and with no credential the stage skips, so
+>    **zero rows** exist. The provider is real and has never made a call.
+> 2. **Its open decision was answered, and the answer changed the design.**
+>    Redaction is construction, not filtering, because category 8 — verbatim
+>    phrasing — is a leak no filter can address.
+> 3. **The leak list was not run against the real four entries.** They are on
+>    the always-on machine. The corpus is synthetic and adversarial by
+>    construction, and the real check is still owed.
+
 Paste as the first message of a fresh session. Needs a Tavily credential —
 **check for one before planning any code.**
 
-**Depends on `RETRIEVAL.md` and `NIGHT_PIPELINE.md`. Runs in parallel with
-`ARTIFACTS.md`; the two must not both be in `secondshift/night/`.**
+**Depends on `RETRIEVAL.md` and `NIGHT_PIPELINE.md`, both shipped 2 Sep.
+`ARTIFACTS.md` also shipped, so the "must not both be in `secondshift/night/`"
+collision is settled rather than avoided: `artifacts` lives in its own package
+and the night calls it.**
 
 ---
 
@@ -20,7 +38,7 @@ name: **raw entry text in a Tavily query.**
 
 The schema was built expecting this. `tool_calls.query_redacted` is not called
 `query` — the column name is the requirement, and its comment says *the raw query
-is never stored*. Nothing has written that column yet.
+is never stored*. Nothing had written that column until this capability did.
 
 ## What already exists — do not invent any of it
 
@@ -64,6 +82,17 @@ the database and the brain's `profile.md`, and enumerate what a search query
 derived from each would leak. Then design to that list, and keep it as the test
 corpus. Put the list in the proposal.
 
+> **That corpus was not reachable when this shipped, and the substitute is
+> labeled rather than passed off.** The development container's database holds
+> zero entries and `../second-shift-brain` is absent; the four real entries live
+> on the always-on machine. The real subject-authored text that *is* in the
+> repository — `config/evals/candidates.md` — is pre-sanitized, because the
+> repository is public and `scripts/check-no-environment.sh` enforces it, so a
+> redaction test against it would pass with redaction deleted. A deliberately
+> adversarial synthetic corpus was built instead, one entry per leak category.
+> **Re-run the list against the real four when the machine returns** — that is
+> the check this substitute cannot perform.
+
 The second open thing: **who builds the query.** A model turning an idea into
 search terms is itself an egress path if it runs remotely — under
 `cloud-assisted` the entry text reaching Token Factory to *produce* the query is
@@ -106,7 +135,7 @@ the same disclosure as the query itself. Say where query construction runs.
 
 ```bash
 git status --short && openspec list && openspec list --specs
-apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 302 pass today
+apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 473 pass today
 npm --prefix apps/web run test && npm --prefix apps/web run typecheck
 scripts/check-no-environment.sh && scripts/check-american-english.sh
 ```

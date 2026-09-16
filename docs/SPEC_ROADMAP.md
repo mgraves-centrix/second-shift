@@ -6,9 +6,29 @@ per capability unless noted.
 Shipped, in the order they landed: `persistence`, `telemetry`,
 `compute-profiles`, `privacy-airlock` (`2026-08-27-add-foundations`, and
 `2026-08-27-fix-probe-model-identity`), then `capture`, `brain`, `evals`,
-`synthetic-seed`, `local-inference` and `night-timeline`. Ten canonical
-capabilities across nine archived changes, all under
-`openspec/changes/archive/`.
+`synthetic-seed`, `local-inference`, `night-timeline`, `retrieval` and
+`agents`.
+
+**Do not trust that list to be current — run `openspec list --specs`.** It said
+"ten capabilities across nine changes" while its own body said twelve, because
+the header was written once and the body was appended to. The count and the
+archive are both derivable in a second; a number typed here is a number that
+goes stale the next time something ships.
+
+## Owed verification
+
+Checked off in an archived change while recording that they were not done. They
+are listed here because a checkbox in an archive is not where anyone looks for
+work remaining, and every one of them needs the always-on machine.
+
+- **A real night on the Spark** against the live reasoner and a real queued
+  entry (`add-night-pipeline` 7.2). Nothing in the night has met the live model.
+- **A live search** through the research stage with a real credential
+  (`add-research` 5.1).
+- **The leak list against the four real entries** (`add-research` 5.2). The
+  corpus in `test_redaction.py` is synthetic by necessity.
+- **`systemd-analyze --user verify`** on the night unit's retry settings
+  (`fix-week-one-review` 2.2).
 
 Each entry lists what is **already decided** — so the proposal has material to
 draw on rather than re-deriving it — and what is **still open**, which becomes
@@ -218,11 +238,13 @@ would have changed the rubric out from under a pinned baseline with nothing
 surfacing it. The rubric's own opening line is the rule: never edit in place;
 supersede with `rubric-v2.md`.
 
-**Still open, and a decision rather than an implementation:** which value the
-baseline actually pinned, and if it is `4a7c2e91b3d0`, whether to re-record week
-1 under the committed rubric. That needs the machine, and the re-record question
-belongs to the person being measured. The brain is days old, so re-recording is
-cheap now and never again.
+~~**Still open:** which value the baseline actually pinned, and whether to
+re-record week 1.~~ **Closed by the paragraphs above, which this line survived
+by being written before them.** There was never a competing hash: the rubric on
+the machine is byte-identical to the committed one, `4a7c2e91b3d0` matches no
+file anywhere, and the baseline recorded on 2 Sep pins `b4decd6fe774`. Nothing
+is left to decide, and a reader arriving here first would have re-opened a
+question the same document already answered twice.
 
 ### 4. `local-inference` — shipped 2 Sep
 
@@ -293,19 +315,30 @@ because a deferred obligation with no home is a dropped one.**
 telemetry.
 
 **Proposed 2 Sep, not implemented.** `2026-09-02-add-nebius-executor` carries the
-proposal, the design and the delta spec. No Nebius credential exists in a
-development window, and nothing is stubbed: a stub executor returning plausible
-job results would be indistinguishable in `model_calls` from the real fan-out
-that is the whole evidence for the Nebius argument.
+proposal, the design and the delta spec. Both Nebius credentials — Token Factory
+and a Cloud IAM service account — were verified live against the real API on
+2 Sep and are held on the always-on machine; see that change's tasks. Nothing is
+implemented and nothing is stubbed: a stub executor returning plausible job
+results would be indistinguishable in `model_calls` from the real fan-out that is
+the whole evidence for the Nebius argument.
 
-**Open, as four clarification markers.** The judge deployment target, which is
-submission-blocking and closes an open risk in ADR 0004. How a job reaches the
-machine that holds the brain — the design records a third option the roadmap did
-not consider, in which the job reports nothing and the poller collects its
-telemetry, so no inbound path exists at all. Idempotency when a job reports
-twice. And whether Token Factory offers a Batch variant for Lightning and Super
-specifically, which decides whether a batch reasoning turn is a `Reasoner` call
-or an `Executor` job.
+**All four markers resolved 2 Sep**, and none by assumption.
+
+- *The judge deployment target* — a Serverless AI Endpoint on a no-GPU
+  container VM. ADR 0009, which closes ADR 0004's open risk in the opposite
+  direction to the one it anticipated: Endpoints host arbitrary containers.
+- *How a job reaches the machine holding the brain* — it does not. The job
+  reports nothing and `await_result` collects its telemetry, so no inbound path
+  exists to secure and no credential sits inside an ephemeral job.
+- *Idempotency on a double report* — a client-generated key per row, enforced
+  by `UNIQUE (dispatching_invocation_id, local_id)` in the recorder, mirroring
+  the ULID replay path `capture` already uses.
+- *Batch for Lightning and Super* — **unavailable**, established by reading the
+  account rather than the docs. `us-central1` serves no `/v1/batches` route at
+  all, and creation on the unregioned host returns 403 "temporarily
+  unavailable". Night reasoning runs on the standard API; the 50% saving stays
+  hypothetical. The modeling is settled regardless: a batch turn is an
+  `Executor` job, never a `Reasoner` that polls behind a synchronous signature.
 
 #### Pricing structure observed in the Token Factory console, 2026-08-27
 
@@ -404,12 +437,627 @@ around it; the night pipeline is where it gets fixed.
 
 | Capability | Covers |
 |---|---|
-| `night-pipeline` | The checkpointed stage machine. "No empty mornings" as executable behavior rather than a schema affordance. |
-| `morning-interview` | Briefing from the log delta, then queued questions. The product. Includes the speech visualization below. |
-| `retrieval` | Local embedding, assembly, policy filtering before egress. Brute-force cosine per ADR 0002. |
-| `research` | Tavily search, extract, crawl. Redaction before any query leaves; credit accounting. |
-| `artifacts` | Briefs, mockups, builds. Variant grouping and critic ranking; outcome capture. |
+| ~~`night-pipeline`~~ | **Shipped 2 Sep** — `2026-09-02-add-night-pipeline`. The checkpointed stage machine; `close_run`'s first caller. Detail below. |
+| ⚠️ `morning-interview` | **Server half shipped 3 Sep** — `2026-09-02-add-morning-interview`. Briefing, questions, answering, policy upgrade. **The screen is not built**: `FRONTEND.md` gates it. Detail below. |
+| ~~`retrieval`~~ | **Shipped 2 Sep** — `2026-09-02-add-retrieval`. Detail below. |
+| ~~`research`~~ | **Shipped 2 Sep** — `2026-09-02-add-research`. Redaction as construction rather than filtering; `query_redacted`'s first writer. Detail below. |
+| ~~`artifacts`~~ | **Shipped 2 Sep** — `2026-09-02-add-artifacts`. Files on disk, variant groups whose rank cannot be the generation order, and `outcomes`' first writer. Detail below. |
 | `judge-mode` | The demo instance: cloud profile, synthetic persona, labeled in-UI, "run the night". |
+
+### The capabilities this table was missing
+
+Added 2 Sep. `docs/prompts/00_INDEX.md` names eight gaps "nobody had a plan
+for," and six of them had a session prompt but no entry here — which meant the
+one document a session reads to decide what to build next could not see them.
+A deferred obligation with no home is a dropped one, so they have a home now.
+
+| Capability | Covers | Blocks |
+|---|---|---|
+| ~~`agents`~~ | **Shipped 2 Sep** — `2026-09-02-add-agents`. Six drafted prompts, pinned by content hash; `deadbeef` is gone. Detail below. | — |
+| ~~`configuration`~~ | **Shipped 2 Sep** — `2026-09-02-add-configuration`. Thirteen `SECOND_SHIFT_*` settings, each with the layer it resolved from, and a tree scan that fails when the registry falls behind. Detail below. | — |
+| `api-layer` | `api/app.py` is one file five sessions need to add routes to; `api/routes/` is in `ARCHITECTURE.md`'s own tree and does not exist. | nothing, but it de-collides five later sessions |
+| `test-harness` | CI gates. Runs any time. | nothing |
+| `operations` | The machine: reboot story, backups, a recovery procedure someone has actually executed. Nobody owns it. | nothing, and that is the problem |
+| `eval-scoring` | The week-8 run and the curve. `SUBMISSION.md` declares a dependency on it that reads as satisfied and is not. | `submission` |
+
+**Six capabilities shipped on 2 Sep and the sections below are not in ship
+order.** Each states the canonical count as of its own ship, so the numbers read
+out of sequence when scanned top to bottom. The order was `retrieval` (11),
+`agents` (12), `configuration` (13), `night-pipeline` (14), `artifacts` (15),
+`research` (16), and on 3 Sep `morning-interview` (17) and `frontend` (18).
+Count them rather than reading the tally: `npx openspec list --specs`.
+
+### `agents` — shipped 2 Sep
+
+Twelve canonical capabilities. Six roles, six drafted prompt files, content-derived
+pinning, and the first invocation path that is not a test fixture.
+
+**`prompt_sha` stopped being `deadbeef`.** It is computed from file bytes at
+registration and nowhere else. The mutation was run: replacing the hash with a
+constant turns four tests red, including the append-only guard — because a
+constant hash makes an edit in place undetectable, which is the whole failure
+this column exists to prevent.
+
+**The versioning question AGENTS.md posed was already answered by the schema.**
+`0001_initial.sql` line 88: `version INTEGER NOT NULL, -- a prompt change is a
+new version`. `config/evals/rubric.md` reached the same conclusion independently.
+Prompt files are append-only, the filename carries the version, and registration
+refuses a file whose content no longer matches what was recorded.
+
+**The six prompts are drafts and say so in their own text.** What a prompt says
+is the subject's decision. Replacing one is `v2`, visible in the curve at the
+point it happened.
+
+**The real model still shows its work, and that is the finding.** One live call
+through the distiller: the completion opens with the literal `Here's a thinking
+process:` as prose, *not* inside the `<think>` wrapper observed hours earlier the
+same day. The strip trimmed something — a `</think>` did appear later — but what
+survived still opens with deliberation. **The wrapper is inconsistent between
+calls**, so a strip conditioned on a delimiter handles the observed case and not
+the general one. It degrades to verbose rather than empty, which was the design
+intent and is the most that can be claimed. 2395 completion tokens for a
+one-sentence request.
+
+**Deliberately not done:** per-role `max_tokens`. `Reasoner.complete()` takes no
+per-call budget, so this needs the provider interface widened — beyond this
+capability, and the token count above makes it matter more than it looked.
+Carried into `night-pipeline`, where budgets per stage first bite.
+
+**Ordering, corrected.** `night-pipeline` heads the table above but was not
+next: `00_INDEX.md`'s dependency graph puts `configuration` and `agents` ahead of
+it. Both shipped on 2 Sep, so **`night-pipeline`'s prerequisites are now
+clear** — it has agents to sequence, retrieval to feed them, and a resolved view
+that can say which endpoint a stage actually reached.
+
+### `morning-interview` — server half shipped 3 Sep, screen not built
+
+Seventeen canonical capabilities. `decisions` had carried the entire interview
+state machine since the first migration — five statuses, a rationale, a modality,
+`consumed_by_run_id` — with **one caller in the repository, and it was a test**.
+`resolve_policy`'s `upgrade_decision_id` had never been passed by anything.
+
+**The open decision was settled by writing three mornings out, and is now
+enforced by them.** "Briefing from the log delta" does not say delta since when,
+and morning 1 (after a clean night) does not discriminate — all three candidate
+rules agree. Mornings 2 and 3 do:
+
+- **Since the last night:** silently drops the night you never read. Work the
+  system did that nobody will ever be told about.
+- **Since you last opened it:** loses the briefing because somebody glanced at
+  their phone while walking.
+- **Since the last *answered* decision:** none of the three reads wrong.
+
+Rendering consumes nothing; only acting does, and **deferring counts** because
+it is a choice the person made. Implementing the rejected rule turns three tests
+red, which is what makes the argument checkable rather than merely written down.
+
+**The trade the rule accepts, named rather than hidden:** a night that raised no
+questions can never be consumed, so it reappears. Repetitive, and safe in the
+direction that matters — it never hides work. Fixing it needs an acknowledgement
+column that does not exist.
+
+**Principle 3 is structural here.** The briefing assembles facts from rows with
+**no model call**, so a failing interviewer costs the questions and not the
+morning. A design where the model produced the whole briefing would render an
+error on exactly the morning it mattered most.
+
+**The scope boundary is structural too, and it was the live risk.**
+`NOT_BUILDING.md` excludes a general chat interface *by name*, and the prompt
+calls it the single most likely way this capability goes wrong. The guard is not
+a rule to remember: no function accepts free text without a question to attach
+it to. An answer takes a decision id; an unknown one is refused.
+
+**A gap found and deliberately not closed.** `run_stages` has no reason column.
+A *failed* stage's reason is recoverable — the night records failures scoped
+`night.<stage>` and `signature()` embeds that scope — but a *skipped* stage's is
+not stored anywhere. Rather than a `reason` field that is always `None`, the
+briefing carries one only where it exists and says so. Closing it properly is a
+migration.
+
+**Two defects in this change's own tests, caught before commit.** A "no
+hardcoded questions" test was grepping the source for a question mark and
+matching SQL `?` placeholders — it would have passed forever whatever the module
+did. And a failure fixture had no run attached, so its lookup failed for the
+wrong reason.
+
+**What is not built, and it is the important part.** `FRONTEND.md` must land
+first — its own prompt says so, and the reason is checkable: `/` and `/night/`
+have no navigation between them and design tokens are drifting across
+`app/globals.css` and `components/scrubber/scrubber.module.css`. A third surface
+on that foundation makes the drift worse. So the server half is reachable at
+`GET /morning` and `POST /decisions/{id}/answer`, and **the prompt's best report
+item — whether the interview feels like being interviewed or like filling in a
+form — is unanswerable and stays open** rather than answered badly.
+
+> **Those two routes did not exist when this first shipped, and this section
+> said they did.** The morning package had no caller anywhere in the tree: no
+> route, no CLI, nothing. It imported and tested cleanly and no running system
+> could reach it. Found by auditing the claim rather than re-reading it, and
+> fixed by building what had been asserted — `API_LAYER.md`'s scope says "no new
+> routes; a capability adds its own", so they were always this capability's to
+> add.
+>
+> Two dead properties went with it — `StageLine.ran` and `NightLine.produced`,
+> both defined, both called by nothing — and `include_synthetic` had no caller
+> and no test despite being principle 5's hook: the judge deployment runs this
+> same code over seeded rows, and a briefing that filtered them would show a
+> judge an empty morning. Voice is deferred
+entirely: there is no ASR, and a waveform with no transcription behind it is the
+decoration the prompt names.
+
+### `frontend` — shipped 3 Sep
+
+Eighteen canonical capabilities. One token file, navigation between every
+surface, and the demo label principle 5 requires.
+
+**The open decision was answered by measurement, and the answer is asymmetric.**
+Rendering the built capture page at keyboard-up viewports, with the shipped nav
+inserted above the content:
+
+| viewport | shipped (no nav) | with a nav bar |
+|---|---|---|
+| 390×300 | 0% | 0% |
+| 390×350 | **79%** | **0%** |
+| 390×390 | **100%** | **71%** |
+| 390×420 | 100% | 100% |
+
+That is the `local-only` policy option — the privacy choice. At 390×350 a nav
+bar is the difference between seeing it and not seeing it at all. The default is
+`cloud-assisted`, so a person who does not scroll takes the wider policy by
+omission: principle 2, not a layout preference. **Capture gets links below its
+button; the desktop surfaces get a nav.** Coherence lives in the tokens and one
+type ramp, not in a bar on the 3am screen.
+
+**A second drift, found by reading the file rather than the prompt.**
+`globals.css` styled bare element selectors — `button`, `textarea`, `main`,
+`h1` — so `button { width: 100% }` was capture's layout applied to every surface
+that would ever exist, and the scrubber was already working around it. Scoped to
+a module, with capture's rendering above the fold measured identical before and
+after.
+
+**Two defects in this capability's own work.**
+
+1. **The first measurement was taken against a mock** — the same stylesheet with
+   invented policy text — and reported different numbers. The conclusion held
+   and got sharper, but a measurement against a stand-in is not a measurement of
+   the thing.
+2. **The demo label shipped on capture and not on the night surface.** The shell
+   took it as a prop and the night page rendered `<Nav />` without one, so the
+   screen a judge is most likely to open was the one not saying it was a demo.
+   The shell fetches the capability report itself now, and a test asserts it
+   takes no such prop — a label every caller has to remember is a label that
+   goes missing.
+
+One test had to be **narrowed** after it overreached: it forbade `process.env`
+anywhere in the shell, which failed the moment the shell needed to know where
+the API is, and would have pushed the label back to the prop that had just
+caused the bug.
+
+**Recorded rather than fixed:** capture hides the privacy choice entirely at
+390×300 on the shipped screen, with no nav involved. That bites on small phones —
+an iPhone SE with a keyboard leaves roughly 308px — and the fix reorders the
+screen a person uses at 3am, so it is the subject's call rather than a
+refactor's.
+
+**What this unblocked:** `app/morning/`, which shipped the same day as one line
+in `lib/surfaces.ts` — the extension point, used once and now covered by a test
+that every registered surface resolves to a route on disk.
+
+### The audit of 3 Sep — four findings, and the loop that was open
+
+An audit of everything shipped on 2–3 Sep, run by checking claims against the
+tree rather than re-reading what had been written about them.
+
+**The loop did not close.** `raise_questions`, `queued_for_tonight` and
+`mark_consumed` each worked when called, were each tested, and **nothing called
+any of them**. So two of `morning-interview`'s own claims were structurally
+unreachable: the briefing could never contain a question, because nothing ran
+the interviewer; and `queued-for-tonight` was a status the system could write
+and never act on. Both are fixed — the interviewer runs at the end of the night
+(nobody is spoken to then, so ADR 0005 holds: the questions sit as `open`
+decisions until morning), and a run takes the queued answers as input and marks
+them consumed.
+
+**A guard that guarded nothing.** `assert_artifact_kinds_match_schema` was
+written against stage-to-artifact-kind drift and was never called, tested or
+exported. Its sibling `assert_matches_schema` was. Now wired, with a proof it
+can fail.
+
+**Two endpoint literals that could drift.** `SEARCH` and `EXTRACT` were defined
+and then not used — `search()` and `extract()` built their URLs from separate
+string literals, one edit away from a `tool_calls` row that says `search` about
+a call that went somewhere else. `TavilyProvider.extract` also had no test at
+all, on the one provider that talks to the internet.
+
+**A placeholder stored as a question, found by running the thing.** The `cloud`
+profile binds `EchoReasoner`, which returns its own input, so the interviewer's
+format instruction came back verbatim and `<the question>` was written to
+`decisions` as something to ask a person over coffee. Every test was green. It
+was visible only by running the real command and reading what landed — which is
+the argument for doing that, and the reason the report items that ask "read it
+yourself" are in these prompts at all.
+
+**The check that found the first one is worth keeping:** for each public symbol
+in a new module, does anything outside that module reference it? A capability
+can be correct, tested and entirely unreachable, and no test it owns will say
+so. It is worth running on `frontend` when that lands.
+
+### `research` — shipped 2 Sep
+
+Sixteen canonical capabilities. The first stage that talks outward, and the
+first writer of `tool_calls.query_redacted` — a column whose *name* has carried
+the requirement since the first migration.
+
+**Redaction is construction, not filtering, and that is the whole design.** The
+obvious shape is `redact(text) -> safe_text` then search that. It fails open: an
+unknown proper noun passes, a codename that looks like a common word passes, and
+— the category no filter can address at all — the subject's own phrasing passes.
+Six distinctive words identify a writer without containing a name. So the raw
+text is never a candidate to become a query; `build_query` extracts topical
+terms and a token has to earn its way in. An unrecognized codename is dropped
+for being capitalized, not for being known.
+
+**Query construction runs locally on every profile and is not a model call.**
+Under `cloud-assisted`, a remote model turning the entry into search terms would
+send the entry one hop earlier and make the whole thing theater.
+
+**Three defects the tests found in this change's own design.**
+
+1. The query preserved word order, so *"How does Contoso handle on-call
+   rotations without burning people out?"* became `handle on-call rotations
+   without burning people` — six consecutive words and a fingerprint.
+2. **Sorting did not fix it, and a design comment claimed it did.** Where the
+   source words already run alphabetically, the sorted query reproduces them.
+   Order is now verified against the source and repaired by rotation, so the
+   guarantee is a checked postcondition rather than an argument about shuffling.
+3. Two leak categories survived the first pass: `chemo`, because it is lowercase
+   and ordinary, and a private hostname, because the contact pattern anchors on
+   `$` and the span still carried its trailing period.
+
+**No bypass, enforced by a signature test.** Principle 2 calls a redaction that
+configuration can disable a violation *even when it defaults to on*, so the
+guard is not a safe default but the absence of anywhere to put an unsafe one.
+
+**The queries, read beside their entries — including the bad ones:**
+
+```
+entry: What are people doing about agent memory systems that either forget
+       everything or remember too much?
+query: agent forget memory remember systems
+
+entry: How does Contoso handle on-call rotations without burning people out?
+query: on-call rotations burning handle
+```
+
+The first is a genuinely good search. The second is **mediocre** — "handle" is
+noise and a person would have written something sharper. That is the trade
+stated before it was measured: a mediocre query that leaks nothing beats a good
+one that leaks.
+
+**Honest about the weak part.** `_SENSITIVE` — the health, legal and financial
+term list — is the one place this module filters rather than constructs, and it
+**fails open**. A term not on it passes. It is a backstop for the category the
+capitalization rule cannot reach, not a mechanism, and an exhaustive list of
+what a person might not want searched does not exist.
+
+**Two things still owed.** No live call was ever made: there is no Tavily
+credential in the development container and obtaining one is a hard stop, so the
+provider is unproven against the real API exactly as the reasoner was before the
+Spark served it. And **the leak list has never been run against the four real
+entries** — they are on the always-on machine; the corpus is synthetic and
+adversarial by construction, and that substitute cannot perform the real check.
+
+### `artifacts` — shipped 2 Sep
+
+Fifteen canonical capabilities. A night now lands `brief.md`,
+`mockup/N/index.html`, `build/N/build.md`, `critique.md` and `summary.md`, each
+hashed from the file as read back.
+
+**What was broken.** `insert_artifact` existed but only `packages/seed/` called
+it. `outcomes` had **no writer at all** — it appeared in `repository.py` only in
+the append-only table list. So `cost_per_accepted_artifact`, which counts
+`label = 'keep'`, reported `accepted = 0` and a null cost on every night. The
+chart the submission's thesis rests on could not return a number.
+
+**The layout found a defect in the convention the seed established.**
+`artifacts/{night_of}/{kind}.md` collides when two entries are worked on the
+same night — both write `brief.md`. The seed gets away with it because it writes
+rows, not files, and nothing ever opens those paths. Keyed on `run_id` instead,
+with `night_of` leading so a person can list a date by hand, and the stored path
+relative to a configured root: an absolute path would pin a home directory into
+rows a judge reads.
+
+**The rank is honest by construction, not by rule.** `write_artifact` takes no
+rank parameter, so the writer *cannot* default one to the generation index. A
+rank is written afterward by a separate ranker from an ordering parsed out of
+the critic's prose, and a partial, repeated or unknown-index ordering is refused
+wholesale — a group with three of five ranked reads as fully ranked to anything
+that sorts by rank and puts nulls last.
+
+**The mutation that stayed green is the useful one.** Hashing `content.encode()`
+instead of the file read back left every test in the writer's suite passing,
+because for a successful write the two are byte-identical, and the corruption
+tests damage the file *after* the row exists. So the decision the module argues
+for hardest had no test behind it. `test_a_short_write_is_recorded_as_what_landed`
+closes it by patching the write to truncate.
+
+**Two defects found during implementation.** `produced_by_invocation_id` was
+being handed the *agent* id — a different table, caught by the foreign key
+rather than stored; `AgentTurn` now carries `invocation_id`. And stage-to-kind
+is mapped explicitly and checked against the `artifacts.kind` CHECK, because the
+two lists overlap in five of six places and differ in one (`research` produces a
+`research_digest`).
+
+**A drift audit on 2 Sep found four defects in what had just shipped, three of
+them mine.**
+
+1. **A docstring in `night/run.py` asserted that the builder and architect
+   prompts ask for a `## Variant N` heading. They do not** — both end "Answer in
+   plain prose" and neither mentions variants. So **a fan-out produces exactly
+   one variant today**: the splitter is correct and its input never exercises
+   it. That was a false statement in shipped code, and it hid a real limit.
+2. **Mockups landed as `index.html` while the architect produces prose.** A
+   prose plan in a `.html` file fails the requirement the layout exists to
+   satisfy — "a file you can open in the tool that edits that kind of file" —
+   and opens in a browser as one unstyled paragraph. Both variant kinds are
+   markdown now, in one line that changes when a prompt asks for HTML.
+3. **`artifacts_for_run` shipped with no test**, including its null-rank
+   ordering — where a null must sort as "the critic did not order this" rather
+   than as "last", or an unranked group reads as a ranked one whose best is
+   arbitrary.
+4. **Changing the mockup extension broke no test**, which is how the second one
+   was found: nothing asserted what the files were. It does now, and the
+   mutation was run.
+
+**What this means for the fan-out, stated rather than left to be discovered:**
+the variant machinery is real and unexercised. Making it fire needs a `v2`
+builder prompt that asks for the format — **the subject's call**, because a
+prompt change resets `prompt_sha` and with it that role's eight-week curve. The
+same is true of the critic: it is told to "rank every variant" and nothing tells
+it the numbering `parse_ordering` reads, which is why the ordering came back
+empty below.
+
+**The night that ran, and why its output is worthless.** Two entries, one night,
+no collision, every row carrying its invocation, every `variant_rank` NULL — and
+the ledger says why:
+
+```
+orchestrator_crash:night.critique.ranking |
+  the critic's ordering [] does not cover exactly the variants in group '...'
+```
+
+That is the refusal working. The `cloud` profile binds `EchoReasoner`, whose
+critique contains no ordering, so nothing was ranked rather than the column
+being filled with generation order. **The briefs are the entry text echoed
+back.** A pipeline that produces unreadable artifacts is a finding, not a
+milestone, and this is that finding.
+
+**Still open, and unanswerable here:** whether a rank is trustworthy when the
+same model family generates and judges. It needs five real variants read by the
+subject. Recommendation recorded: treat `variant_rank` as the critic's opinion,
+and never let it select what an outcome defaults to — `cost_per_accepted_artifact`
+counts a person's `keep`, so the chart stays honest while the rank is unproven.
+The moment rank chooses what gets kept, the chart measures the critic.
+
+**Not built, recorded rather than dropped:** no retention or deletion story
+(tables are append-only, files are not, and what "the artifact for this run"
+means after a cleanup is a decision); and no implicit `signal` outcomes, which
+need a UI that observes the person.
+
+### `night-pipeline` — shipped 2 Sep
+
+Fourteen canonical capabilities. Six stages, each committing its own outcome as
+it completes, and the first caller `Repository.close_run` has ever had.
+
+**What was actually broken.** `run_stages` had a writer only in
+`packages/seed/`. `close_run` had no caller *and no test* — the only other
+mention of it in the tree was a comment noting its own absence, and its
+docstring's claim to refuse a double close had never been checked. Every run the
+system could record would have sat permanently in flight.
+
+**The crash test is the only test here that can find the defect it exists for.**
+Every other assertion in the file passes against an implementation that buffers
+all six stage writes to the end of the walk, because they assert on final state.
+So it runs a night in a real subprocess, kills it after three stages, reopens
+the database and asserts what survived. Mutated by making the walk buffer: it
+goes red with `KeyError: 'brief'` — nothing survived the kill, which is the
+all-or-nothing transaction principle 3 names as the violation.
+
+**Blocking is a predicate per stage, not an edge in a chain.** Two blocking
+edges: `brief` blocks everything, `build` blocks `critique`. Mutating to a
+uniform "each stage needs the one before" turns three tests red, and in
+production would skip `mockups` and `build` on every night today, since
+`research` has no provider — producing empty mornings on exactly the nights the
+principle exists for. `distill` is blocked by *all* predecessors failing rather
+than by any one, which is why a dependency list would have needed a mode flag
+beside it and a predicate did not.
+
+**Quarantine opens no run at all.** Not a run of six skipped stages: `runs` is
+the denominator of the cost-per-artifact curve, and a night that never happened
+must not enter it. The trap is concrete — `Registry.bind("cloud")` returns an
+`EchoReasoner`, so a `local-only` entry on a cloud profile would otherwise run
+to `complete` against a placeholder.
+
+**`distill` writes the brain additively.** One file per night under `nights/`,
+never a rewrite of `profile.md`. The distiller's own prompt warns that an
+over-confident inference there compounds silently for weeks, and no output has
+been read against the real reasoner yet. Append first, earn the rewrite.
+
+**Two defects found during implementation rather than after.** `_retrieve`
+returned `ContextPiece` objects where a string was expected — it would have
+raised only once an embedder was reachable, so never in a container and first on
+the machine. And `stages_for_run` did not select `commit_sha` or
+`committed_at_ms`, so the commit `distill` records would have been invisible to
+the one query written to answer what the night did.
+
+**Recorded rather than resolved:** the failure taxonomy has no entry for a
+policy refusal, so a quarantine lands as `orchestrator_crash` by
+`telemetry/failures.py`'s own documented fallback rule. That is misleading — a
+deliberate refusal is not a crash — and adding a `policy_refused` type is a
+migration, which is a data-model change beyond a capability scoped to control
+flow. The signature is scoped `night.quarantine` so it still groups distinctly.
+
+**The material gap: it has never met the real reasoner.** The Spark has been
+unreachable for days, so this ships tested against a stub and one end-to-end run
+against the `cloud` profile's `EchoReasoner` placeholder. A pipeline that has
+never run against the live model is unproven where it matters most, and that is
+the first thing to do when the machine returns. There is also **no reaper**: a
+process killed mid-run leaves an open row, which is honest and visible — a
+reaper would have to guess an outcome, and the guess would enter the curve.
+
+### `configuration` — shipped 2 Sep
+
+Thirteen canonical capabilities. `python -m secondshift.config show` prints
+every `SECOND_SHIFT_*` setting, its resolved value, and the layer it came
+from — environment, a named file, or a default.
+
+**The count was the argument.** `docs/prompts/CONFIGURATION.md` was written on
+2 Sep saying *ten* variables and listing ten; `retrieval` had added three the
+same day. A capability scoped to that number would have shipped three settings
+short. So the load-bearing test scans the tree — Python **and** shell, because
+`SECOND_SHIFT_RUBRIC_OVERWRITE` is read only by `deploy/spark/deploy.sh` and a
+Python-only view has a hole exactly its shape — and fails when the registry
+falls behind. Proved by adding a throwaway read to `brain/repo.py` and watching
+it go red naming the variable.
+
+**The open decision was the wrong question, and enumeration is what showed it.**
+The prompt asked whether an unresolvable required value is a startup failure or
+a runtime one. Measuring all thirteen — a script setting each state and recording
+what came back, rather than reading the source — says the axis is
+**absent versus malformed**:
+
+- **Absent is legitimate for twelve of thirteen** and the existing defaults are
+  right. A missing `models.toml` genuinely means "use the defaults." A uniform
+  startup-failure rule would have made ten settings worse.
+- **Malformed never is.** A mistyped `config/models.toml` was indistinguishable
+  from an absent one — both yielded `127.0.0.1:8000` and an empty model name — so
+  the probe reported the reasoner **unreachable** while the real cause was a
+  syntax error nothing mentioned. An operator would go debug a network that was
+  fine. That is the failure this capability exists to end.
+
+**Loud is not fatal, and checking the blast radius changed the design
+mid-implementation.** The first draft said a malformed file raises. But
+`api/app.py:77` resolves the profile at construction, so raising there takes the
+API down — and capture with it — over a file capture never reads. It reports
+instead: through the capability finding that depends on it, and through a
+non-zero exit a deploy can gate on. `pricing.toml` keeps raising, because it
+already did and a silent zero understates a scored measurement; it just names
+the file now.
+
+**`SECOND_SHIFT_SYNTHETIC` is the one setting that refuses.** `is_synthetic` is
+what keeps seed rows out of a measurement (principle 7), and `SYNTHETIC=ture`
+quietly meaning "real data" fails in the direction that cannot be undone.
+Failing to start is recoverable; a contaminated eight-week curve is not.
+
+**Still open, and honestly so:** the view has only ever run in this container.
+It reports `/root/...` for the database default here and will report the service
+account's path on the always-on machine — which is the point, and is also
+unverified there. `operations` owns running it on the box.
+
+**Deferred with a handoff rather than dropped:** per-role `max_tokens`, which
+this table parked here. The `[agents]` block shape depends on what
+`night-pipeline` needs per stage, and a shape guessed now is one that gets
+rewritten.
+
+### `retrieval` — shipped 2 Sep
+
+Local embedding behind the existing `Embedder`, exact brute-force cosine over an
+in-memory `numpy` array, and policy-filtered assembly. Eleven canonical
+capabilities now.
+
+**Both open questions were answered by measurement, not preference**, and the
+numbers came from the machine rather than from arithmetic on paper. The index is
+rebuilt in memory and never persisted: the real corpus is 6 documents, a rebuild
+takes **40ms** steady-state, and the index is **48.0 KiB** — against 48 KB
+predicted in the proposal, and 4.70 MiB projected at ADR 0002's own week-8 scale
+of ~600 entries. `docs/prompts/RETRIEVAL.md` set the bar at "if rebuilding takes
+under a second, the argument for persisting anything is weak." It is
+twenty-five times under.
+
+**The embedder is served by vLLM on 8201**, mirroring the reasoner rather than
+adding `torch`/`transformers` as a second aarch64-uncertain dependency chain.
+The unit shipped `--task embed`, which vLLM 0.27.1 rejects outright; only
+running it on the machine found that. `--runner pooling --trust-remote-code` is
+correct, and the second of those runs code from the model repository — a real
+supply-chain surface, accepted because the repository is NVIDIA's own, and
+called out rather than buried.
+
+**Spike B's co-residency question is closed.** It measured the reasoner alone
+and could not say whether an embedder fits beside it. Measured with both
+serving: reasoner 4.98 GiB RSS, embedder 3.56 GiB, **69 of 121 GiB still
+available**.
+
+**Two things this change corrected in accepted documents.**
+`docs/ARCHITECTURE.md`'s profile table said the `cloud` embedder was "Token
+Factory embeddings" — which constitution principle 2 names as a violation in as
+many words. The constitution outranks the table; the embedder is now local on
+every profile, the row is fixed, and there is no remote embedder in
+`providers/` to select. The same file's "Serverless Endpoints appear to be for
+serving models" note is answered by ADR 0009 and no longer open.
+
+**One decision that needed an ADR**: brain topic files carry `local-only`
+(ADR 0010). They are distilled from every idea regardless of the policy each was
+captured under, so they inherit the most restrictive one. A `cloud-assisted` run
+therefore assembles from entries alone — 3 of 6 documents on today's corpus.
+That is a real functional limit in the recoverable direction; failing open would
+not have been.
+
+**Still open, and inherited by whatever calls this:** ~~nothing calls it yet~~ —
+`night-pipeline` calls it as of 2 Sep. The brief stage attempts retrieval and,
+where the embedder is unreachable, is told so explicitly rather than quietly
+handed nothing: a brief written with no memory behind it otherwise reads exactly
+like one written with memory that had nothing to say.
+
+**Two things this capability got wrong about its own compliance, corrected
+2 Sep.** Both were self-certified in the proposal and neither was true.
+
+1. **It superseded ADR 0002 and said it did not.** 0002's Decision section reads
+   "embeddings are stored as `BLOB`s in SQLite"; the shipped spec forbids
+   persisting them. `design.md` asserted "this implements ADR 0002 rather than
+   superseding it," and `proposal.md` that 0002 "settled the search mechanism but
+   not this." **ADR 0011** records the supersession, what it changes (the storage
+   clause only — cosine, no vector database and no native extension all stand),
+   and why the archive gate did not catch it: the gate was answered from the
+   change's account of the ADR instead of from the ADR.
+2. **Its principle-6 row read "nothing in `NOT_BUILDING.md`."** "Vector search
+   over the brain" is in that file, under *Deferred, not excluded*, conditioned
+   on "only when keyword + recency retrieval demonstrably falls over." **That
+   condition was never evaluated** — there is no keyword search and no recency
+   ranking in the codebase, so nothing fell over. Not a constitution violation
+   (principle 6 enumerates the *Excluded* table) but a deferral gate stepped
+   past, and the check that should have surfaced it asserted the opposite.
+   Open, and the subject's call: build the keyword + recency baseline and
+   measure whether cosine beats it, or record that the comparison will not be
+   run. `NOT_BUILDING.md` carries the question.
+
+---
+
+## The drift pass — 2 Sep
+
+The audit's central finding was that the drift that matters is between the
+repository and reality, not between documents. This pass closed the
+document-to-reality half. Everything below was a document asserting something
+that was not true on the machine or in the tree:
+
+| Fixed | Was |
+|---|---|
+| Schema authority, 4 places incl. `openspec/config.yaml` | Pointed at the wrong file — and `config.yaml` injects it into every proposal, so it propagated |
+| Capability counts in `README.md`, `SPEC_ROADMAP.md`, `GRADES.md`, `00_INDEX.md` | Stale numbers; the roadmap header now says to run `openspec list --specs` rather than carrying one |
+| `00_INDEX.md`'s "what is true on 2 Sep" table | A frozen snapshot labeled "do not re-derive any of it." Replaced with the commands that derive it, plus a dated table of what cannot be derived |
+| Four resolved-but-open nebius markers; the `4a7c2e91b3d0` rubric hash; ADR 0006 pricing | Written out as resolutions; the hash matched no file on the machine |
+| `configuration` scope, 10 → 13 variables | Enumerated from source; scoping to 10 would have shipped it three settings short. The roadmap said "wrong by four" — 10 against 13 is wrong by three, and a drift pass that miscounts its own finding is the thing it exists to stop |
+| `ARCHITECTURE.md`'s repository tree | Seven entries that do not exist (`NEBIUS_USAGE.md`, `night/`, `morning/`, `api/routes/`, `charts/`, `deploy/tailscale/`, `deploy/nebius/`), and eleven real directories absent — `openspec/` and `config/` among them. Now marks planned ones `(planned)` and says to generate the real tree |
+| `WEEK_ONE.md`'s day-3 pass gate | Read as pending; it was missed. Now says which of the four were met, and that the 2 Sep baseline pins a later brain because the day-3 state is unrecoverable |
+| Five prompts → six, in `WEEK_ONE.md` and `DATA_MODEL.md` | Six were activated 30 Aug. `DATA_MODEL.md`'s "45 points of noise" derived from nothing in the rubric |
+| Spike letters C and D | Collided: the harnesses in `scripts/spikes/` and the plan used them for different spikes. `WEEK_ONE.md` now carries the reconciliation table, and E and F are the two the plan lost |
+| `MODELS.md`'s "to verify in week one" | Week one ended with two of three unverified. Each now states its real status; the pricing in `config/pricing.toml` is `eu-north1`'s and the account targets `us-central1` |
+| `DATA_MODEL.md` "Vectors are `BLOB`s in SQLite" | Contradicted the shipped spec. See ADR 0011 |
+| ADR 0002 and 0004 | Both superseded in part with no forward pointer. Added, bodies untouched — how long a decision stood is part of the record |
+
+**What this pass did not close.** The repository-to-production half. Production
+on the always-on machine is 4 days stale, is not a git repository, and the live
+database still reads `runs=0, model_calls=0, agent_invocations=0, artifacts=0`.
+No document edit changes that, and nothing here should be read as if it did.
 
 ---
 
@@ -453,3 +1101,57 @@ exception to that.
 be restarted. `nebius-executor` before any cloud reasoning, because the pricing
 placeholders make every cloud call fail until it lands. `synthetic-seed` before
 `night-timeline`, because a scrubber cannot be built against three events.
+
+### `app/morning/` — 3 Sep
+
+The interview, which is the product. `morning-interview` shipped its server half
+on 3 Sep with no screen; `frontend` unblocked one later that day and this is it.
+
+**The decision that made it an interview.** One question at a time, with the
+agenda's length visible, rather than a list of questions each with a box under
+it. A list is a form, a form is answered easy-first, and the night's actual
+blocker is rarely the easy one. Every outcome advances, including *Defer*, which
+is what makes deferring first-class in the pixels and not only in the schema.
+It is also the anti-chat argument in layout: with one agenda item on screen,
+whose text box sits inside a specific question and whose submit path carries
+that question's decision id, there is nowhere to put an instruction that is not
+an answer to something the system asked.
+
+**Voice deferred, and stated.** ADR 0006 binds an end-of-utterance detector that
+has never been run. The surface references no microphone API at all, asserted by
+name in a test — a stronger form of principle 4 than mocking a denial, because
+code that never asks cannot be refused.
+
+**Two fields that were never set**, found by reading the server half before
+building on it. `will_leave_the_machine` had never once been `true`:
+`_open_questions` built every question without it, so the default rode out
+through the API while `morning-interview`'s spec claimed the briefing marks the
+questions whose answer sends an idea off the machine. The test that named the
+field asserted the *key was present in the JSON*, which a permanently `false`
+value satisfies — which is how a suite at 587 passing missed it. It is now set
+from the entry's policy, over-warning deliberately, because the narrower rule is
+not derivable and principle 2 picks the safe direction. `blocking_stage` is
+still always `NULL`; no spec claims otherwise, so it is recorded.
+
+**Four defects came out of rendering the page and reading it**, with the suite
+green throughout — the fifth capability in a row where looking beat testing:
+
+| what | why it mattered |
+|---|---|
+| every artifact rendered its full path | the run's ULID six times, making the night's record three times taller than the interview |
+| `Decided` carried the accent | reads as the recommended answer; a person in a hurry clicks the highlighted button, biasing the record away from `Defer` |
+| the empty morning claimed the night got stuck on nothing | on a morning with **no night at all** — the state you land in right after an interview, because acting advances the delta boundary past the run you just discussed |
+| the interviewer's question order was lost to a ULID tiebreak | a turn's questions land in the same millisecond, so `ORDER BY raised_at_ms, id` sorted them by random bits; observed reversing between two runs of the same seed |
+
+The last is the one the design created. On a list, random order is untidy; on a
+screen that asks one question at a time, it spends the interviewer's judgment
+about which question matters most. Fixed with `ordered_ulids`, additive and used
+only where the caller knows the order — making *every* identifier monotonic
+would put shared mutable state under every table's primary key.
+
+**Recorded, not built:** no answer has ever actually widened a policy —
+`run_entry` never passes `upgrade_decision_id`, and `decisions` has no column
+separating "yes, take this one to the cloud" from any other queued answer, so
+treating a queued answer as authorization would send a local-only idea off the
+machine on an answer that said the opposite. That is a migration and a Privacy
+Airlock decision, not a wiring change.

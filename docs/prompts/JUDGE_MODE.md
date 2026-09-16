@@ -28,7 +28,12 @@ broken and the fix is upstream, not here.
 - `SECOND_SHIFT_SYNTHETIC` is read by `api/main.py` and is **server-derived,
   never accepted from a request** — the capture schema deliberately has no
   `is_synthetic` field, because accepting it would let a real entry be excluded
-  from every measurement, unrecoverably.
+  from every measurement, unrecoverably. Since `configuration` shipped it parses
+  strictly: `1`, `true`, `yes`, `on` and their negatives, and **anything else
+  raises rather than resolving to false**. That matters most here — a typo in the
+  judge deployment's environment used to mean its seeded persona wrote rows
+  indistinguishable from real ones. Confirm with
+  `python -m secondshift.config show`, which prints what it resolved to.
 - Every accumulating table carries `is_synthetic`, and the rollup views already
   exclude it.
 - `python -m secondshift_seed --seed 42` writes a full night: 1,223 events over

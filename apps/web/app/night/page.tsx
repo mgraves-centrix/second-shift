@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Scrubber } from "@/components/scrubber/Scrubber";
 import type { RunSummary, Timeline } from "@/lib/timeline";
+import { Nav } from "@/components/shell/Shell";
 import styles from "./night.module.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
@@ -67,6 +68,8 @@ export default function NightPage() {
   const pick = useCallback((id: string) => setSelected(id), []);
 
   return (
+    <>
+    <Nav />
     <main className={styles.page}>
       {runs.length > 1 ? (
         <nav className={styles.runs} aria-label="Recorded nights">
@@ -99,5 +102,6 @@ export default function NightPage() {
         <p className={styles.notice}>Reading the night…</p>
       ) : null}
     </main>
+    </>
   );
 }

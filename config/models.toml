@@ -6,7 +6,8 @@
 #
 # Port allocation is deliberate and non-overlapping:
 #   8080  Second Shift API
-#   8200  local reasoner (this)
+#   8200  local reasoner
+#   8201  local embedder
 #   8000  left free — the vLLM default, and what an ad-hoc server will grab
 #   11434 ollama
 # Sharing 8000 would mean the probe had to distinguish two different services on
@@ -34,3 +35,24 @@ reasoner_port = 8200
 reasoner_max_tokens = 4096
 reasoner_temperature = 0.7
 reasoner_timeout_s = 300
+
+# The embedder is its own server on its own port rather than a second role for
+# the reasoner's. Sharing 8200 would make the probe unable to say which service
+# is down when one of them is, and the two have different lifecycles: the
+# reasoner is restarted to change sampling, the embedder almost never.
+#
+# `dimensions` is not a request parameter — it is what this model returns, and
+# it is recorded here so the index can allocate its array before the first
+# response arrives, and so a server quietly swapped for a different model is a
+# loud shape mismatch rather than a silently wrong index.
+#
+# `embedder_timeout_s` is short next to the reasoner's 300: embedding is a
+# single forward pass over a few kilobytes with no generation loop, so a slow
+# response means something is wrong rather than something is thinking.
+
+[embedder]
+embedder_model = "nvidia/llama-nemotron-embed-vl-1b-v2"
+embedder_host = "127.0.0.1"
+embedder_port = 8201
+embedder_dimensions = 2048
+embedder_timeout_s = 30

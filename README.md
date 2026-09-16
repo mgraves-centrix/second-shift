@@ -17,7 +17,7 @@ Built for the Nebius x NVIDIA Global AI Hackathon, Personal AI track.
 
 ## Status
 
-Week one, as of 1 Sep 2026. Capture works end to end and is taking real ideas
+Week one, as of 2 Sep 2026. Capture works end to end and is taking real ideas
 daily; everything downstream of it is still ahead. The rest of this README
 describes the target — this table describes the present.
 
@@ -30,16 +30,29 @@ describes the target — this table describes the present.
 | The brain — plaintext memory under git | done — receiving every entry |
 | Eval harness — pinned rubric, pinned brain state, repeated sampling | done — baseline recorded 2 Sep, six prompts; scoring waits on a judge |
 | Synthetic night generator | done — 1,200+ events, every row `is_synthetic = 1` |
-| Local reasoning on the Spark | done — behind the `Reasoner` interface, supervised; no call made from a development window |
-| Nebius Token Factory + Serverless Jobs | not started |
-| Night orchestrator | not started |
-| Morning interview | not started |
+| Local reasoning on the Spark | done — behind the `Reasoner` interface; a real completion was made through an agent on 2 Sep |
+| Nebius Token Factory | credentials live and verified against the real API; the cloud `Reasoner` is not implemented |
+| Nebius Serverless Jobs | not started |
+| Retrieval — local embedding and policy-filtered assembly | done — measured on the machine: 40ms rebuild, 48 KiB index |
+| Agents — six roles, versioned prompts pinned by content | done — prompts are drafts awaiting judgment |
+| Configuration — resolved view with provenance | done — `python -m secondshift.config show`; not yet run on the always-on machine |
+| Night orchestrator | done — checkpointed six-stage walk, quarantine over downgrade; **never run against the real reasoner** |
+| Artifacts — files on disk, variant groups, outcomes | done — hashed from what landed; `cost_per_accepted_artifact` returns a number once a `keep` is recorded |
+| Research — redaction before egress | done — queries are constructed, never filtered from raw text; `local-only` makes zero calls. **Never run against the live Tavily API**: no credential here |
+| Morning interview | **server half only** — briefing, questions with rationale, answering, policy upgrade. **No screen yet**; `frontend` has now landed, so it is unblocked |
+| Frontend shell and token system | done — one token file, navigation between every surface, demo label from the served profile |
 | Night scrubber UI | done — reads a recorded night, scrubs by pointer or keyboard |
 | Judge demo instance | not started |
 
-Eight capabilities have shipped across six OpenSpec changes. Their specifications
-are in `openspec/specs/`; the changes that built them, with their task lists, are
-in `openspec/changes/archive/`.
+Eighteen capabilities have shipped across seventeen OpenSpec changes. Their
+specifications are in `openspec/specs/`; the changes that built them, with their
+task lists, are in `openspec/changes/archive/`. Both directories are the
+authority on that count — this sentence has been wrong before, so count them
+rather than trusting it:
+
+```bash
+npx openspec list --specs && ls openspec/changes/archive/
+```
 
 ---
 

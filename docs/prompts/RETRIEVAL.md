@@ -51,9 +51,12 @@ the authority on the data model" both bite.
 
 **Where the index lives.**
 
-ADR 0002 settled *no vector database*. It did not settle whether embeddings are
-a new SQLite table, a file beside the database, or rebuilt in memory at startup.
-Each is compatible with the ADR and they are not equivalent:
+ADR 0002 settled *no vector database* — and, in the same paragraph, that
+"embeddings are stored as `BLOB`s in SQLite." This prompt read that as leaving
+storage open. It did not. The three options below were live questions, but
+choosing anything other than the first was a supersession, and shipping it as
+though it were not is the defect **ADR 0011** now records. Whichever is chosen,
+if it is not a table, it needs a new ADR before it ships:
 
 - A table means a migration, append-only semantics, and vectors in every backup.
 - A file means the database and the index can disagree after a crash.
@@ -83,7 +86,12 @@ Bring the numbers to the proposal.
 
 - **No vector database.** No FAISS, no Chroma, no pgvector, no `sqlite-vss`.
   ADR 0002, and `NOT_BUILDING.md` defers vector search "only when keyword +
-  recency retrieval demonstrably falls over."
+  recency retrieval demonstrably falls over." **That condition was never
+  evaluated** — keyword + recency retrieval does not exist, so nothing fell
+  over, and the capability shipped cosine search anyway. The line above was in
+  this prompt while that happened. Read `NOT_BUILDING.md` for the open question,
+  and do not treat a deferral condition as satisfied because a prompt quoted
+  it.
 - **No reranker.** Optional, week 4+, per `docs/MODELS.md`.
 - **No chunking framework.** A brain file is small; split on headings if you must
   split at all.

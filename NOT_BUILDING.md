@@ -43,4 +43,44 @@ re-litigated.
 |---|---|
 | TTS for the morning briefing | After text briefing works end to end. Verified on aarch64 2026-08-28; must still never block. |
 | Celestial layer on the night scrubber | After the scrubber works. It is polish, and it is worth real time — but only once. |
-| Vector search over the brain | Only when keyword + recency retrieval demonstrably falls over. |
+| Vector search over the brain | ⚠️ **Shipped 2 Sep without meeting this condition — see below.** Original entry: only when keyword + recency retrieval demonstrably falls over. |
+
+### ⚠️ Vector search over the brain — the condition was skipped, not met
+
+`2026-09-02-add-retrieval` shipped exact cosine search over embeddings of
+`entries` and brain topic files. It is running.
+
+**The deferral condition was never evaluated, because it could not be.** It reads
+"only when keyword + recency retrieval demonstrably falls over," and keyword +
+recency retrieval was never built — there is no keyword search and no recency
+ranking anywhere in `apps/api/secondshift/`, then or now. Nothing fell over.
+The gate was stepped past rather than passed.
+
+**The compliance check that should have caught it asserted the opposite.** The
+proposal's constitution table, principle 6, reads *"Compliant — nothing in
+`NOT_BUILDING.md`."* Vector search over the brain is in `NOT_BUILDING.md`, on
+this page. The honest answer was "listed under *Deferred, not excluded*, with an
+unmet condition," and writing that would have surfaced the question before the
+code existed rather than a week after.
+
+**What this is and is not.** It is not a constitution violation: principle 6
+enumerates the *Excluded* table — calendar, email, meeting capture, day planning,
+task management, wake words, multi-user, general chat — and vector search is on
+the *Deferred* table, which says these are "in scope but explicitly not now." It
+is not an override case either; the override protocol governs the Excluded list.
+It is a deferral condition that was skipped, and a compliance claim that was
+false.
+
+**The entry stays here until decided.** Two things are open and both are the
+subject's call:
+
+1. Build keyword + recency retrieval as the baseline the condition names, and
+   measure whether cosine actually beats it on this corpus — or accept that the
+   comparison will never be run and say so.
+2. Move this entry out of the file, per the protocol, once (1) is answered.
+
+Recommendation: do (1). The condition was written because a 600-entry corpus is
+small enough that recency plus keyword may well win, and cosine over six
+documents has never been compared against anything. It is a day's work and it is
+the only way the claim "vector search earns its place here" becomes something
+other than an assumption. Until then this entry is the record that it is one.

@@ -16,38 +16,46 @@ at once only if the set of files they write is disjoint. Everything below is
 grouped by that rule, not by how interesting it is.
 
 ```
-   API_LAYER ──────┐   (run early: it de-collides five later sessions)
-   CONFIGURATION ──┤
-                   ├──> NIGHT_PIPELINE ──> ARTIFACTS ──┐
-   AGENTS ─────────┘         │                         ├──> JUDGE_MODE ──> SUBMISSION
-                             ├──> RESEARCH ────────────┤                      ^
-   RETRIEVAL ────────────────┘                         │                      │
+   API_LAYER ──────┐   (run early: it de-collides four later sessions)
+   CONFIGURATION ✅┤
+                   ├──> NIGHT_PIPELINE ✅> ARTIFACTS ✅┐
+   AGENTS ────────✅┘        │                         ├──> JUDGE_MODE ──> SUBMISSION
+                             ├──> RESEARCH ✅─────────┤                      ^
+   RETRIEVAL ───────────────✅┘                        │                      │
                                                        │       EVAL_SCORING ──┘
-   FRONTEND ──> MORNING_INTERVIEW ─────────────────────┘
+   FRONTEND ✅> MORNING_INTERVIEW ✅────────────────────┘
+
+   ✅ shipped. API_LAYER is now the blocker: five sessions add routes to one
+   file, and it is the only unshipped prompt that makes the others cheaper.
 
    TEST_HARNESS    OPERATIONS    ASR    NEBIUS_EXECUTOR
    any time        needs the     needs  blocked on
                    machine       Spark  credentials
 ```
 
+Shipped rows are struck through. A prompt for a shipped capability is a record
+of what was asked, not a session to run — read it for the reasoning, and read
+the change in `openspec/changes/archive/` for what actually happened, which in
+all three cases differs from the prompt in at least one decision.
+
 | # | Prompt | Owns | Runs after | Parallel with |
 |---|---|---|---|---|
-| 0 | `API_LAYER.md` | `api/routes/`, `api/app.py` | — | 1, 2, 3, 8, 10 |
-| 1 | `CONFIGURATION.md` | `config.py`, `config/*.toml` | — | 0, 2, 3, 8, 10 |
-| 2 | `AGENTS.md` | `secondshift/agents/` | — | 0, 1, 3, 8, 10 |
-| 3 | `RETRIEVAL.md` | `retrieval/`, `providers/embed*` | — | 0, 1, 2, 8, 9 |
-| 4 | `NIGHT_PIPELINE.md` | `night/`, `repository.close_run` | 1, 2 | 9, 10 |
-| 5 | `RESEARCH.md` | `research/`, `providers/tavily*` | 3, 4 | 6 |
-| 6 | `ARTIFACTS.md` | `secondshift/artifacts/` | 4 | 5 |
+| 0 | `API_LAYER.md` | `api/`, `api/app.py` | — | 8, 10 |
+| 1 | ~~`CONFIGURATION.md`~~ | ✅ shipped 2 Sep | — | — |
+| 2 | ~~`AGENTS.md`~~ | ✅ shipped 2 Sep | — | — |
+| 3 | ~~`RETRIEVAL.md`~~ | ✅ shipped 2 Sep | — | — |
+| 4 | ~~`NIGHT_PIPELINE.md`~~ | ✅ shipped 2 Sep | — | — |
+| 5 | ~~`RESEARCH.md`~~ | ✅ shipped 2 Sep | — | — |
+| 6 | ~~`ARTIFACTS.md`~~ | ✅ shipped 2 Sep | — | — |
 | 7 | `NEBIUS_EXECUTOR.md` | `providers/nebius*`, ingest route | credentials | anything |
-| 8 | `FRONTEND.md` | `components/`, `app/globals.css` | — | 0, 1, 2, 3, 10 |
-| 9 | `MORNING_INTERVIEW.md` | `app/morning/`, `secondshift/morning/` | 8 | 4, 10 |
+| 8 | ~~`FRONTEND.md`~~ | ✅ shipped 3 Sep | — | — |
+| 9 | ~~`MORNING_INTERVIEW.md`~~ | ✅ shipped 3 Sep — server half and `app/morning/` | — | — |
 | 10 | `TEST_HARNESS.md` | `.github/`, `scripts/gates/` | — | everything |
 | 11 | `JUDGE_MODE.md` | `deploy/judge/` | 4, 6, 9 | 12 |
 | 12 | `EVAL_SCORING.md` | `eval_runs` rows, the curve | a judge | 11 |
 | 13 | `SUBMISSION.md` | `docs/NEBIUS_USAGE.md`, the write-up | 11, 12 | — |
 | — | `OPERATIONS.md` | `deploy/`, the machine | — | everything |
-| — | `ASR.md` | `providers/asr*`, spike E | — | everything |
+| — | `ASR.md` | `providers/asr*`, spike F | — | everything |
 
 **Three collision surfaces, not two.** Two sessions must never both be in
 `apps/web/app/`, in `secondshift/night/`, or in **`api/app.py`** — which is a
@@ -60,23 +68,38 @@ route touches one new file and the five sessions stop queueing behind each other
 
 ---
 
-## What is true on 2 Sep — do not re-derive any of it
+## What is true — derive it, do not read it here
 
-Verified on the machine, not inferred from the repository.
+This section used to be a table of numbers headed "do not re-derive any of it."
+Every derivable number in it was wrong within a day: it claimed 302 tests
+against 358, and ten capabilities against twelve. The instruction not to
+re-derive is what made the staleness durable, so the numbers are gone and the
+commands that produce them are here instead.
 
-| | |
+```bash
+apps/api/.venv/bin/python -m pytest apps/api/tests -q   # suite
+npm --prefix apps/web run test                          # web
+openspec list --specs                                   # capabilities
+openspec list                                           # active changes
+```
+
+**What cannot be derived from the repository** — because it lives on the
+always-on machine — is below, with the date it was read. Treat every line as a
+claim whose age you can see.
+
+| | read |
 |---|---|
-| Suite | 302 Python tests, 25 web tests, typecheck, both check scripts — green |
-| Capabilities | 10 shipped: persistence, telemetry, compute-profiles, privacy-airlock, capture, brain, evals, synthetic-seed, local-inference, night-timeline |
-| Reasoner | **live** — `nemotron-3.5-lightning` on the Spark, 65k context, container up |
-| API | **live** — uvicorn on 127.0.0.1:8080 as a user service; linger enabled |
-| Brain sync | **live** — timer firing |
-| Eval baseline | recorded 2 Sep: `01M1FYFECEXC5ZJEWHNP7WZMXB`, six prompts, rubric `b4decd6fe774`, brain `ad17b3bcddb6`, awaiting scoring |
-| Entries | 4 real — 1 archived, **3 still queued and never processed** |
-| Runs | **0.** No night has ever executed |
+| Eval baseline | 2 Sep — `01M1FYFECEXC5ZJEWHNP7WZMXB`, six prompts, rubric `b4decd6fe774`, brain `ad17b3bcddb6`, **awaiting scoring** |
+| Entries | 2 Sep — 4 real: 1 archived, **3 still queued and never processed** |
+| Runs | 2 Sep — **0.** No night has ever executed |
+| Production code | 2 Sep — deployed tree dated 30 Aug; `retrieval`, `agents` and the embedder are **not** on the machine |
+| Reasoner | 2 Sep — container up, but **unmanaged**: the systemd unit was never installed, so a reboot ends it |
+| API / brain sync | 2 Sep — both live as enabled user units |
 
-**Nothing reasons yet in production.** `local-inference` implements `Reasoner`
-and the registry binds it, but no agent calls it, because there are no agents.
+**Nothing reasons in production.** `local-inference` and `agents` both shipped,
+and a real completion was made through an agent from a development window — but
+the deployed code predates all of it, and `model_calls` on the machine is still
+empty. The gap is a deploy, not a missing capability.
 
 ---
 
@@ -84,17 +107,28 @@ and the registry binds it, but no agent calls it, because there are no agents.
 
 Found 2 Sep. Each is now a prompt above.
 
-1. **`configuration`** — ten `SECOND_SHIFT_*` variables across three TOML files,
-   no way to print the resolved configuration or where each value came from.
-2. **`agents`** — `docs/ARCHITECTURE.md` specifies `agents/ roster + versioned
-   prompt files`. The directory does not exist. `agents.prompt_sha` is `NOT NULL`
-   and the only thing writing it is a test fixture writing `deadbeef`.
-3. **`close_run` has no caller.** Every run is permanently in flight, with a null
-   outcome and no end time. `night-timeline` reads around it.
-4. **`docs/NEBIUS_USAGE.md` does not exist.** `ARCHITECTURE.md` calls it "evidence
-   doc for the judging criterion." It was a day-7 deliverable and did not happen.
-5. **The API layer had no owner**, and `api/routes/` — specified in
-   `ARCHITECTURE.md`'s own directory tree — does not exist.
+1. ~~**`configuration`**~~ — **closed 2 Sep** (`2026-09-02-add-configuration`).
+   Thirteen `SECOND_SHIFT_*` settings, each reporting the layer it resolved
+   from. The count was the whole lesson: this line said *ten* until 2 Sep while
+   `retrieval` had already added three, so the capability now carries a test that
+   scans the tree — Python and shell both — and fails when the registry falls
+   behind. Do not trust a count in a document; run the scan.
+2. ~~**`agents`**~~ — **closed 2 Sep** (`2026-09-02-add-agents`). Six roles, six
+   drafted prompt files, `prompt_sha` computed from file content. `deadbeef` is
+   gone from the codebase.
+3. ~~**`close_run` has no caller.**~~ — **closed 2 Sep**
+   (`2026-09-02-add-night-pipeline`). It also had no test; both are fixed, and
+   the refusal-to-double-close its docstring always claimed is now checked. An
+   open run means a process died, not the normal case.
+4. **`docs/NEBIUS_USAGE.md` does not exist.** `SUBMISSION.md` still lists it as a
+   deliverable and describes what it has to argue; it was a day-7 item and did
+   not happen. `ARCHITECTURE.md`'s directory tree used to assert it as a file on
+   disk — that entry is gone, because a tree is not the place to record an
+   intention.
+5. **The API layer had no owner**, and `api/routes/` — which
+   `ARCHITECTURE.md`'s directory tree asserted — does not exist. The real
+   package is `secondshift/api/`, a flat set of modules with `app.py` at 368
+   lines. The tree now says that instead.
 6. **Nothing produced a week-8 eval score.** `SUBMISSION.md` declares a
    dependency on it. The submission's centerpiece had no owner at all.
 7. **Nobody owned the machine.** Four prompts mention deploying; none owns the
