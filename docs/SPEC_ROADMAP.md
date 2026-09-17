@@ -21,9 +21,6 @@ Checked off in an archived change while recording that they were not done. They
 are listed here because a checkbox in an archive is not where anyone looks for
 work remaining, and every one of them needs the always-on machine.
 
-- **A live search** through the research stage with a real credential
-  (`add-research` 5.1). Both real nights ran without the credential loaded, so
-  research skipped.
 
 **Closed 16 Sep.** Two real nights ran on the Spark against the live reasoner
 (`add-night-pipeline` 7.2). The first, at a 4096-token budget, completed five
@@ -40,6 +37,13 @@ capitalized word, an identifier or address shape, and a four-word run from its
 source: none survived, and the three that would be searched read as topic words
 only. The embedder also ran there for the first time, and exposed that every idea
 retrieved itself as memory; fixed in `c814131`.
+
+**Closed 17 Sep.** A live search ran through the research stage's real code path
+with the Tavily credential (`add-research` 5.1): the redacted query was the only
+thing sent, five results came back for one credit in 1.2s, and the one
+`tool_calls` row holds the redacted query and no entry text. Nothing on this list
+is owed. The night unit still runs without the credential, so nightly research
+skips until that is deliberately turned on.
 
 Each entry lists what is **already decided** — so the proposal has material to
 draw on rather than re-deriving it — and what is **still open**, which becomes
