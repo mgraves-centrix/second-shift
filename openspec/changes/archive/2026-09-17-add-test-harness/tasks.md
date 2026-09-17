@@ -9,5 +9,5 @@
 
 ## 2. Proof
 
-- [ ] 2.1 CI green on the branch.
-- [ ] 2.2 A deliberately broken guard pushed to a branch turns CI red; the run recorded.
+- [x] 2.1 CI green on the branch: run 35220187848, all ten gates in 89.6s on the runner, 2m10s including installs.
+- [x] 2.2 Identifier redaction disabled on a throwaway branch turned CI red: run 35220426474 stopped at the airlock gate in 2.3s, naming each leak, before any later gate ran. The branch is deleted.

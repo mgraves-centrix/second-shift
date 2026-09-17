@@ -20,6 +20,7 @@ PATTERNS=(
   '[a-z0-9-]+\.tail[a-z0-9]+\.ts\.net' # real tailnet hostnames
   '/home/[a-z][a-z0-9_-]+'            # someone's home directory
   '/Users/[a-z][a-z0-9_-]+'
+  '[A-Za-z]:\\{1,2}Users\\{1,2}[a-z][a-z0-9_-]+'  # a Windows profile path, escaped or not
 )
 
 status=0

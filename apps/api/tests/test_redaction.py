@@ -212,8 +212,8 @@ REVIEW_LEAKS: list[tuple[str, str, str]] = [
     ),
     (
         "username in a windows path",
-        "clean up C:\\Users\\mgraves\\scratch before the demo",
-        "mgraves",
+        "clean up D:\\profiles\\jsmith\\scratch before the demo",
+        "jsmith",
     ),
     (
         "repository slug",

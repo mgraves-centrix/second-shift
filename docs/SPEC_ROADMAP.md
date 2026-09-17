@@ -462,7 +462,7 @@ A deferred obligation with no home is a dropped one, so they have a home now.
 | ~~`agents`~~ | **Shipped 2 Sep** — `2026-09-02-add-agents`. Six drafted prompts, pinned by content hash; `deadbeef` is gone. Detail below. | — |
 | ~~`configuration`~~ | **Shipped 2 Sep** — `2026-09-02-add-configuration`. Thirteen `SECOND_SHIFT_*` settings, each with the layer it resolved from, and a tree scan that fails when the registry falls behind. Detail below. | — |
 | `api-layer` | `api/app.py` is one file five sessions need to add routes to; `api/routes/` is in `ARCHITECTURE.md`'s own tree and does not exist. | nothing, but it de-collides five later sessions |
-| `test-harness` | CI gates. Runs any time. | nothing |
+| ~~`test-harness`~~ | **Shipped 17 Sep** — `2026-09-17-add-test-harness`. `python3 scripts/gate.py` runs every gate; CI runs that file. A browser test of the night view, and a mutation check over shipped defects. See `docs/development/GATES.md`. | nothing |
 | `operations` | The machine: reboot story, backups, a recovery procedure someone has actually executed. Nobody owns it. | nothing, and that is the problem |
 | `eval-scoring` | The week-8 run and the curve. `SUBMISSION.md` declares a dependency on it that reads as satisfied and is not. | `submission` |
 
