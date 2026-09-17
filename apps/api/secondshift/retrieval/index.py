@@ -214,6 +214,7 @@ def assemble_context(
     *,
     policy: str,
     max_pieces: int = 5,
+    exclude: frozenset[str] = frozenset(),
 ) -> list[ContextPiece]:
     """Bounded, ordered, policy-filtered context for one query.
 
@@ -226,12 +227,19 @@ def assemble_context(
     taking the top five and then dropping the local-only ones would silently
     return fewer pieces than asked for whenever the best matches were the
     private ones.
+
+    `exclude` names sources that must not come back — the entry being worked,
+    above all, which is otherwise its own closest match and is handed to the
+    brief as memory of earlier work. Applied before the bound, for the same
+    reason as the policy filter.
     """
     if max_pieces <= 0 or not len(index):
         return []
     query_vector = index.embed_query(query)
     ranked = index.search(query_vector, len(index))
-    eligible = [p for p in ranked if _may_leave(p.policy, policy)]
+    eligible = [
+        p for p in ranked if _may_leave(p.policy, policy) and p.source not in exclude
+    ]
     return eligible[:max_pieces]
 
 

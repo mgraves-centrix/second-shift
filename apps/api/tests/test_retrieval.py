@@ -402,6 +402,44 @@ class TestTheAirlockAtAssembly:
         assert [p.source for p in pieces] == ["entry:a", "entry:b"]
 
 
+class TestAnIdeaIsNotItsOwnMemory:
+    """Found on the always-on machine once the embedder ran: every idea's
+    closest match was itself, so the brief was handed its own text back as
+    memory of earlier work."""
+
+    def test_an_excluded_source_is_never_returned(self, index):
+        index.load(
+            [
+                Document("entry:this", "sourdough starter rye", "cloud-assisted"),
+                Document("entry:other", "sourdough", "cloud-assisted"),
+            ]
+        )
+
+        pieces = assemble_context(
+            index, "sourdough starter rye", policy="cloud-assisted",
+            exclude=frozenset({"entry:this"}),
+        )
+
+        assert [p.source for p in pieces] == ["entry:other"]
+
+    def test_exclusion_happens_before_the_bound_is_applied(self, index):
+        """Otherwise excluding the top match costs the caller a slot."""
+        index.load(
+            [
+                Document("entry:this", "sourdough starter", "cloud-assisted"),
+                Document("entry:a", "sourdough starter", "cloud-assisted"),
+                Document("entry:b", "sourdough", "cloud-assisted"),
+            ]
+        )
+
+        pieces = assemble_context(
+            index, "sourdough starter", policy="cloud-assisted", max_pieces=2,
+            exclude=frozenset({"entry:this"}),
+        )
+
+        assert [p.source for p in pieces] == ["entry:a", "entry:b"]
+
+
 class TestWhatAssemblyReturns:
     def test_every_piece_carries_score_source_and_policy(self, index):
         index.load([Document("entry:a", "sourdough", "cloud-assisted")])

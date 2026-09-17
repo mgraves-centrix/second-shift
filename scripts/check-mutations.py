@@ -116,6 +116,15 @@ MUTATIONS = [
         "                is_synthetic=is_synthetic,\n            )\n\n    # --",
         PYTEST + [str(ROOT / "apps/api/tests/test_the_loop_closes.py")],
     ),
+    Mutation(
+        "idea-retrieves-itself",
+        "17 Sep: on the always-on machine every idea's closest memory was itself, "
+        "handed to the brief as earlier work.",
+        "apps/api/secondshift/retrieval/index.py",
+        "if _may_leave(p.policy, policy) and p.source not in exclude",
+        "if _may_leave(p.policy, policy)",
+        PYTEST + [str(ROOT / "apps/api/tests/test_retrieval.py")],
+    ),
 ]
 
 

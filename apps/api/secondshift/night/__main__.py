@@ -100,7 +100,12 @@ def _retrieve(repo, providers, brain, entry) -> str:
         index = RetrievalIndex(providers.embedder)
         index.load(collect_documents(repo, brain))
         pieces = assemble_context(
-            index, entry["raw_text"] or "", policy=entry["default_policy"]
+            index,
+            entry["raw_text"] or "",
+            policy=entry["default_policy"],
+            # The idea itself is indexed with every other entry, and is always
+            # its own nearest neighbor.
+            exclude=frozenset({f"entry:{entry['id']}"}),
         )
     except (EmbedderUnavailable, LocalEmbedderNotConfigured, BrainUnavailable):
         return ""

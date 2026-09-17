@@ -721,7 +721,7 @@ class TestABriefWithNoMemorySaysSo:
             embedder=StubEmbedder(),  # type: ignore[arg-type]
             executor=None,  # type: ignore[arg-type]
         )
-        entry = {"raw_text": "an idea", "default_policy": "local-only"}
+        entry = {"id": "01ENTRY", "raw_text": "an idea", "default_policy": "local-only"}
 
         out = _retrieve(repo, providers, BrainRepo(path), entry)
 
@@ -731,4 +731,41 @@ class TestABriefWithNoMemorySaysSo:
     def test_retrieve_degrades_to_empty_without_a_brain(self, repo):
         from secondshift.night.__main__ import _retrieve
 
-        assert _retrieve(repo, None, None, {"raw_text": "x", "default_policy": "local-only"}) == ""
+        entry = {"id": "01ENTRY", "raw_text": "x", "default_policy": "local-only"}
+        assert _retrieve(repo, None, None, entry) == ""
+
+    def test_the_idea_being_worked_is_not_retrieved_as_its_own_memory(
+        self, repo, recorder, tmp_path
+    ):
+        from secondshift.brain.repo import BrainRepo
+        from secondshift.night.__main__ import _retrieve
+        from secondshift.providers.registry import Providers
+
+        class StubEmbedder:
+            def embed(self, texts, *, policy):
+                return [[1.0] + [0.0] * 2047 for _ in texts]
+
+        path = tmp_path / "brain"
+        path.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=path, check=True)
+        own = repo.insert_entry(
+            created_at_ms=now_ms(), captured_tz="UTC", tz_offset_min=0, modality="text",
+            default_policy="cloud-assisted", status="queued", capture_profile="spark",
+            raw_text="the idea being worked tonight",
+        )
+        repo.insert_entry(
+            created_at_ms=now_ms(), captured_tz="UTC", tz_offset_min=0, modality="text",
+            default_policy="cloud-assisted", status="queued", capture_profile="spark",
+            raw_text="an earlier idea",
+        )
+        providers = Providers(
+            reasoner=None,  # type: ignore[arg-type]
+            transcriber=None,  # type: ignore[arg-type]
+            embedder=StubEmbedder(),  # type: ignore[arg-type]
+            executor=None,  # type: ignore[arg-type]
+        )
+
+        out = _retrieve(repo, providers, BrainRepo(path), repo.get_entry(own))
+
+        assert "the idea being worked tonight" not in out
+        assert "an earlier idea" in out
