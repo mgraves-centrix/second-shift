@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PYTHON = os.environ.get("SECOND_SHIFT_PYTHON", str(ROOT / "apps/api/.venv/bin/python"))
+PYTHON = os.environ.get("GATE_PYTHON", str(ROOT / "apps/api/.venv/bin/python"))
 
 WEB_TESTS = ["npm", "--prefix", str(ROOT / "apps/web"), "test"]
 PYTEST = [PYTHON, "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider"]

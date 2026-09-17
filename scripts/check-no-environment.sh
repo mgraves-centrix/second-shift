@@ -8,7 +8,9 @@
 #
 # Run before a push, or wire it into a pre-commit hook.
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel)"
+# Resolved from this file, not the caller's directory, and passed to git with
+# -C rather than entered: the check runs identically from anywhere.
+ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 
 PATTERNS=(
   '192\.168\.[0-9]+\.[0-9]+'          # private IPv4
@@ -26,7 +28,7 @@ for pattern in "${PATTERNS[@]}"; do
   # --untracked so a file that has not been committed yet is still checked.
   # git grep defaults to tracked files only, which meant a brand-new file passed
   # the check right up until the moment it was added — the one moment it matters.
-  hits=$(git grep -InE --untracked "$pattern" -- . ':!package-lock.json' ':!scripts/check-no-environment.sh' 2>/dev/null \
+  hits=$(git -C "$ROOT" grep -InE --untracked "$pattern" -- . ':!package-lock.json' ':!scripts/check-no-environment.sh' 2>/dev/null \
          | grep -vE '<host>|<tailnet>|<spark-host>|REPLACE_USER|\$HOME|\$\{?USER' || true)
   if [ -n "$hits" ]; then
     echo "environment detail found ($pattern):"

@@ -18,7 +18,7 @@ const WEB = resolve(import.meta.dirname, "..");
 const API = resolve(WEB, "..", "api");
 
 /** The interpreter with the orchestrator installed. Overridable for CI. */
-const PYTHON = process.env.SECOND_SHIFT_PYTHON ?? join(API, ".venv", "bin", "python");
+const PYTHON = process.env.GATE_PYTHON ?? join(API, ".venv", "bin", "python");
 
 /** How long the orchestrator gets to answer before the test says it did not. */
 const READY_WITHIN_MS = 30_000;
@@ -46,7 +46,7 @@ function requireBuilt(): void {
   if (!existsSync(PYTHON)) {
     throw new Error(
       `no orchestrator interpreter at ${PYTHON} — create apps/api/.venv (see the ` +
-        "README) or set SECOND_SHIFT_PYTHON",
+        "README) or set GATE_PYTHON",
     );
   }
   if (!existsSync(join(WEB, "out", "night", "index.html"))) {
@@ -126,7 +126,7 @@ export async function startOrchestrator(seed = 42): Promise<Orchestrator> {
  * every run is minutes spent on something no test is about.
  */
 export function launchBrowser(): Promise<Browser> {
-  const executablePath = process.env.SECOND_SHIFT_CHROME;
+  const executablePath = process.env.GATE_CHROME;
   return chromium.launch(
     executablePath ? { executablePath, headless: true } : { channel: "chrome", headless: true },
   );

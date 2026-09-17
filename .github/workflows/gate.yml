@@ -1,0 +1,53 @@
+# Runs the gate set on every push and pull request.
+#
+# This file installs tools and calls `scripts/gate.py`. It does not list gates:
+# that script is the only definition of them, so a developer and CI cannot run
+# different checks. It needs no secret and deploys nothing — nothing in this
+# repository may reach the always-on machine automatically.
+
+name: gate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # The always-on machine runs Ubuntu 24.04's Python, so CI matches it. The
+      # development laptop runs a newer one, which is how both get exercised.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install the orchestrator
+        run: |
+          python -m venv apps/api/.venv
+          apps/api/.venv/bin/pip install -q -c apps/api/constraints.txt -e "apps/api[dev]" -e packages/seed
+
+      - name: Install the web app and OpenSpec
+        run: |
+          npm --prefix apps/web ci --no-audit --no-fund
+          npm install --global --no-audit --no-fund @fission-ai/openspec@1.11.0
+
+      # The browser test drives the Chrome the runner image already carries;
+      # `playwright-core` downloads no browser.
+      - name: Gate
+        run: python scripts/gate.py
