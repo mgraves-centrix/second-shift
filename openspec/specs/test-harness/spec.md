@@ -1,7 +1,11 @@
 # test-harness Specification
 
 ## Purpose
-TBD - created by archiving change 2026-09-17-add-test-harness. Update Purpose after archive.
+Every gate this project has, run as one command in one order, by developers and
+by CI alike — and shown to fail. The privacy gates run first; the night view is
+exercised in a real browser against a real orchestrator; and defects that have
+already shipped are reintroduced on every run so the gates that catch them
+cannot quietly stop catching them.
 
 ## Requirements
 
