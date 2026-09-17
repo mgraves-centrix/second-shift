@@ -145,6 +145,32 @@ test("a lane is the lane the event recorded, even with no invocation behind it",
   assert.equal(byId.get(3)!.lane, 1, "the recorded lane wins over the producer's role");
 });
 
+test("the lanes are the run's roster, not the lanes some invocation touched", () => {
+  // The lanes defect of 2 Sep, which the test above did not catch: in its
+  // fixture every lane happens to hold an event with an invocation behind it,
+  // so lanes rebuilt from invocations come out identical. Here `system` holds
+  // only the night's skeleton — stage boundaries, which nothing produced — and
+  // `orchestrator` is on the roster with no event in view at all.
+  const night = layoutNight(
+    timeline(
+      [
+        event({ id: 1, ts_ms: T0, lane: "system", agent_invocation_id: null }),
+        event({ id: 2, ts_ms: T0 + HOUR, lane: "critic", agent_invocation_id: "01INV" }),
+      ],
+      {
+        lanes: ["critic", "orchestrator", "system"],
+        invocations: [
+          { id: "01INV", parent_invocation_id: null, depth: 1, stage: "critique",
+            outcome: "success", started_at_ms: T0, ended_at_ms: null },
+        ],
+      },
+    ),
+  );
+  assert.deepEqual(night.lanes, ["critic", "orchestrator", "system"]);
+  const skeleton = night.marks.find((m) => m.event.id === 1)!;
+  assert.equal(night.lanes[skeleton.lane], "system", "the skeleton event lost its lane");
+});
+
 test("depth comes from the invocation tree, and is zero without one", () => {
   const night = layoutNight(
     timeline(
