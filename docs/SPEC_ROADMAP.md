@@ -24,8 +24,6 @@ work remaining, and every one of them needs the always-on machine.
 - **A live search** through the research stage with a real credential
   (`add-research` 5.1). Both real nights ran without the credential loaded, so
   research skipped.
-- **The leak list against the real entries** (`add-research` 5.2). The corpus
-  in `test_redaction.py` is synthetic by necessity.
 
 **Closed 16 Sep.** Two real nights ran on the Spark against the live reasoner
 (`add-night-pipeline` 7.2). The first, at a 4096-token budget, completed five
@@ -35,6 +33,13 @@ stages wrote the same file. The second, after the fix, completed five stages
 in 192 seconds with no truncation, clean and distinct artifacts, and one real
 question. `systemd-analyze --user verify` passes on the night unit and timer
 (`fix-week-one-review` 2.2).
+
+**Closed 17 Sep.** The leak list ran against the four real entries on the
+always-on machine (`add-research` 5.2). Each query was checked for a
+capitalized word, an identifier or address shape, and a four-word run from its
+source: none survived, and the three that would be searched read as topic words
+only. The embedder also ran there for the first time, and exposed that every idea
+retrieved itself as memory; fixed in `c814131`.
 
 Each entry lists what is **already decided** — so the proposal has material to
 draw on rather than re-deriving it — and what is **still open**, which becomes
