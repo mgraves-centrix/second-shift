@@ -308,7 +308,7 @@ export function Scrubber({ timeline }: { timeline: Timeline }) {
               )}
             </div>
           ))}
-          <div ref={headRef} className={styles.playhead} />
+          <div ref={headRef} className={styles.playhead} data-playhead="" />
         </div>
       </div>
 
