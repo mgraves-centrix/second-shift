@@ -14,6 +14,8 @@ were already green while the loop was open.
 
 from __future__ import annotations
 
+import subprocess
+
 import pytest
 
 from secondshift.agents.roster import discover, register
@@ -529,6 +531,100 @@ class TestTheNightRaisesTheQuestions:
         result = _run(repo, recorder, entry, roster, tmp_path)
 
         assert result.effective_policy == "cloud-assisted"
+
+
+class TestTheNightRevisesWhatItBelieves:
+    """ADR 0007: improvement comes from the brain, and the week-1-to-week-8
+    `git diff` is the evidence. Until now the distiller only ever appended a
+    night's record; nothing revised a belief, so that diff showed an unchanged
+    profile however many nights had run."""
+
+    @pytest.fixture
+    def brain(self, tmp_path):
+        from secondshift.brain.repo import BrainRepo
+
+        path = tmp_path / "brain"
+        path.mkdir()
+        (path / "profile.md").write_text("# Profile\n\nPrefers short briefs.\n")
+        (path / "style-guide.md").write_text("# Style\n\nDirect sentences.\n")
+        for args in (
+            ["init", "-q", "-b", "main"],
+            ["config", "user.email", "t@example.invalid"],
+            ["config", "user.name", "Test"],
+            ["add", "-A"],
+            ["commit", "-q", "-m", "seed"],
+        ):
+            subprocess.run(["git", "-C", str(path), *args], check=True, capture_output=True)
+        return BrainRepo(path)
+
+    def _distilling(self, recorder, text):
+        return Recorder_(recorder, text=text)
+
+    def test_a_proposed_belief_lands_in_the_profile_and_its_commit(
+        self, repo, recorder, entry, roster, tmp_path, brain
+    ):
+        proposal = (
+            "The night showed a preference for brevity.\n\n"
+            "BELIEF: Prefers a brief short enough to read standing up.\n"
+            "REPLACES: Prefers short briefs.\n"
+        )
+        agents, prompts = roster
+
+        run_entry(
+            repo,
+            recorder,
+            Providers(
+                reasoner=self._distilling(recorder, proposal),
+                transcriber=None,  # type: ignore[arg-type]
+                embedder=None,  # type: ignore[arg-type]
+                executor=None,  # type: ignore[arg-type]
+            ),
+            repo.get_entry(entry),
+            profile="spark",
+            agents=agents,
+            prompts=prompts,
+            local_available=True,
+            night_of="2026-09-17",
+            artifact_root=tmp_path,
+            brain=brain,
+        )
+
+        profile = (brain.path / "profile.md").read_text()
+        assert "read standing up" in profile
+        assert "Prefers short briefs." not in profile
+        committed = subprocess.run(
+            ["git", "-C", str(brain.path), "show", "--stat", "--format=%s", "HEAD"],
+            capture_output=True, text=True, check=True,
+        ).stdout
+        assert "profile.md" in committed and "nights/" in committed
+
+    def test_a_night_that_proposes_nothing_leaves_the_brain_alone(
+        self, repo, recorder, entry, roster, tmp_path, brain
+    ):
+        """The normal case: most nights teach nothing about the person."""
+        before = (brain.path / "profile.md").read_text()
+        agents, prompts = roster
+
+        run_entry(
+            repo,
+            recorder,
+            Providers(
+                reasoner=self._distilling(recorder, "Nothing new about the person tonight."),
+                transcriber=None,  # type: ignore[arg-type]
+                embedder=None,  # type: ignore[arg-type]
+                executor=None,  # type: ignore[arg-type]
+            ),
+            repo.get_entry(entry),
+            profile="spark",
+            agents=agents,
+            prompts=prompts,
+            local_available=True,
+            night_of="2026-09-17",
+            artifact_root=tmp_path,
+            brain=brain,
+        )
+
+        assert (brain.path / "profile.md").read_text() == before
 
 
 class TestTheGuardsAreWired:

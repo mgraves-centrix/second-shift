@@ -14,6 +14,7 @@ from pathlib import Path
 
 from ..artifacts.store import VARIANT_KINDS, ArtifactWriteFailed, write_artifact
 from ..artifacts.variants import write_variants
+from ..brain.beliefs import apply_beliefs, parse_beliefs
 from ..brain.repo import BrainRepo, BrainUnavailable
 from ..db.connection import now_ms
 from ..db.repository import Repository
@@ -206,6 +207,10 @@ def write_to_brain(
 ) -> tuple[int | None, str | None]:
     """Append this night's distillation and commit it. Never raises.
 
+    The beliefs it proposed are applied in the same commit, so one night is one
+    revision of what the system thinks and `git show` reads as an argument: the
+    night's reasoning, and the lines of the profile it changed.
+
     An unavailable or unwritable brain must not fail a night that otherwise
     worked — principle 3 again. The stage still completes; `commit_sha` stays
     null, which reads as "not committed" rather than as a claim nobody can
@@ -219,8 +224,12 @@ def write_to_brain(
             f"# Night {datetime.now(UTC).strftime('%Y-%m-%d')}\n\n"
             f"Run `{run_id}`.\n\n{text}\n"
         )
+        revised = apply_beliefs(brain, parse_beliefs(text))
+        summary = f"night: distill {run_id}"
+        if revised:
+            summary += f"\n\nRevised {', '.join(revised)}."
         sha = brain.commit_paths(
-            [str(path.relative_to(brain.path))], f"night: distill {run_id}"
+            [str(path.relative_to(brain.path)), *revised], summary
         )
     except (BrainUnavailable, OSError):
         return None, None
