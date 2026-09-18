@@ -42,8 +42,15 @@ retrieved itself as memory; fixed in `c814131`.
 with the Tavily credential (`add-research` 5.1): the redacted query was the only
 thing sent, five results came back for one credit in 1.2s, and the one
 `tool_calls` row holds the redacted query and no entry text. Nothing on this list
-is owed. The night unit still runs without the credential, so nightly research
-skips until that is deliberately turned on.
+is owed.
+
+Nightly research is on as of 17 Sep: the night unit reads an optional file
+holding the Tavily key alone, never the machine's secrets file, which also holds
+the Nebius keys. Verified on the machine — the night process sees that key and
+no other. A full night then ran against a copy of the database with research
+enabled and finished `complete`, six stages of six, the first run to do so:
+research produced a digest the later stages read, and its tool call named its
+run and stored only the redacted query.
 
 Each entry lists what is **already decided** — so the proposal has material to
 draw on rather than re-deriving it — and what is **still open**, which becomes
