@@ -11,6 +11,12 @@ Type=oneshot
 WorkingDirectory=%h/second-shift
 Environment=SECOND_SHIFT_DB=%h/second-shift-data/second-shift.db
 Environment=SECOND_SHIFT_BRAIN=%h/second-shift-brain
+# The search credential, and deliberately nothing else. The machine's
+# `secrets.env` also holds the Nebius keys, and the night has no use for them:
+# a process that cannot read a credential cannot leak it. Optional, so a
+# machine without the file — every machine but the always-on one — still
+# starts, and research skips with its own reason rather than failing.
+EnvironmentFile=-%h/.config/second-shift/night.env
 # No timeout override. One night is bounded by the reasoner's own
 # `reasoner_timeout_s` per completion, and a systemd timeout firing mid-stage
 # would kill the process between a stage's insert and its close — which the

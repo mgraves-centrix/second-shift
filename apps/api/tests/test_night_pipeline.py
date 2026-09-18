@@ -601,6 +601,19 @@ class TestTheDeployUnits:
         assert "RestartPreventExitStatus=1 3" in service
         assert "StartLimitBurst=" in service
 
+    def test_the_night_reads_only_the_search_credential(self):
+        """The machine's secrets file also holds the Nebius keys. The night has
+        no use for them, and a process that cannot read a credential cannot
+        leak it. Optional, so a machine without the file still starts."""
+        service = (
+            REPO_ROOT / "deploy" / "spark" / "second-shift-night.user.service"
+        ).read_text()
+
+        loaded = [
+            line for line in service.splitlines() if line.startswith("EnvironmentFile=")
+        ]
+        assert loaded == ["EnvironmentFile=-%h/.config/second-shift/night.env"]
+
     def test_the_timer_persists_a_missed_night(self):
         """An idea captured on Tuesday must not be skipped because the box was
         asleep on Tuesday night."""
