@@ -287,6 +287,124 @@ class TestTheIndex:
         assert index.search([0.0] * len(VOCAB), 3) == []
 
 
+def _night_file(brain, run_id: str, text: str, *, night_of: str = "2026-09-16") -> None:
+    nights = brain.path / "nights"
+    nights.mkdir(exist_ok=True)
+    (nights / f"{night_of}-{run_id}.md").write_text(text)
+    for args in (["add", "-A"], ["commit", "-q", "-m", f"night {run_id}"]):
+        subprocess.run(["git", "-C", str(brain.path), *args], check=True, capture_output=True)
+
+
+def _run_for(repo, entry_id: str, *, policy: str) -> str:
+    return repo.insert_run(
+        entry_id=entry_id,
+        night_of="2026-09-16",
+        effective_policy=policy,
+        policy_source="entry-default",
+        compute_profile="spark",
+    )
+
+
+class TestWhatTheNightLearnedIsReadable:
+    """What the distiller writes to `nights/` was never indexed, so nothing a
+    night learned could reach a later one. Each file belongs to exactly one run
+    of one entry, so unlike a topic file it has a policy that can be read rather
+    than assumed."""
+
+    def test_a_night_is_indexed_under_its_entry_s_policy(self, repo, brain):
+        entry = _capture(repo, "a shareable idea", policy="cloud-assisted")
+        run = _run_for(repo, entry, policy="cloud-assisted")
+        _night_file(brain, run, "The subject prefers short briefs.")
+
+        documents = {d.source: d for d in collect_documents(repo, brain)}
+
+        assert f"night:{run}" in documents
+        assert documents[f"night:{run}"].policy == "cloud-assisted"
+        assert "short briefs" in documents[f"night:{run}"].text
+
+    def test_a_private_night_never_reaches_a_cloud_assisted_run(self, repo, brain, index):
+        entry = _capture(repo, "a private idea", policy="local-only")
+        run = _run_for(repo, entry, policy="local-only")
+        _night_file(brain, run, "sourdough starter rye, learned privately")
+
+        index.rebuild(repo, brain)
+        pieces = assemble_context(index, "sourdough starter", policy="cloud-assisted")
+
+        assert not any(p.source == f"night:{run}" for p in pieces)
+
+    def test_a_night_whose_run_widened_the_policy_takes_the_stricter_one(
+        self, repo, brain
+    ):
+        """A local-only entry widened by a decision produces work shaped by
+        private material. The strictest policy involved is the honest one."""
+        entry = _capture(repo, "a private idea", policy="local-only")
+        run = _run_for(repo, entry, policy="cloud-assisted")
+        _night_file(brain, run, "learned from a private idea")
+
+        documents = {d.source: d for d in collect_documents(repo, brain)}
+
+        assert documents[f"night:{run}"].policy == "local-only"
+
+    def test_a_night_with_no_run_behind_it_is_private(self, repo, brain):
+        """Fails closed: an unreadable origin is not an open one."""
+        _night_file(brain, "01NOSUCHRUN", "an orphan distillation")
+
+        documents = {d.source: d for d in collect_documents(repo, brain)}
+
+        assert documents["night:01NOSUCHRUN"].policy == "local-only"
+
+
+class TestAnsweredQuestionsAreMemory:
+    """The rubric scores using "something learned from a prior decision or
+    outcome" above using the profile. Neither was indexed at all."""
+
+    def test_an_answered_decision_is_indexed_under_its_entry_s_policy(self, repo, brain):
+        entry = _capture(repo, "a shareable idea", policy="cloud-assisted")
+        decision = repo.insert_decision(
+            entry_id=entry, question="Which shape?", rationale="two paths", status="open"
+        )
+        repo.answer_decision(decision, answer="the phone-first one", status="decided")
+
+        documents = {d.source: d for d in collect_documents(repo, brain)}
+
+        assert documents[f"decision:{decision}"].policy == "cloud-assisted"
+        assert "phone-first" in documents[f"decision:{decision}"].text
+        assert "Which shape?" in documents[f"decision:{decision}"].text
+
+    def test_an_unanswered_question_is_not_memory(self, repo, brain):
+        entry = _capture(repo, "an idea")
+        decision = repo.insert_decision(
+            entry_id=entry, question="Which shape?", rationale="two paths", status="open"
+        )
+
+        documents = {d.source for d in collect_documents(repo, brain)}
+
+        assert f"decision:{decision}" not in documents
+
+    def test_a_private_answer_never_reaches_a_cloud_assisted_run(self, repo, brain, index):
+        entry = _capture(repo, "a private idea", policy="local-only")
+        decision = repo.insert_decision(
+            entry_id=entry, question="Which starter?", rationale="two", status="open"
+        )
+        repo.answer_decision(decision, answer="sourdough starter rye", status="decided")
+
+        index.rebuild(repo, brain)
+        pieces = assemble_context(index, "sourdough starter", policy="cloud-assisted")
+
+        assert not any(p.source == f"decision:{decision}" for p in pieces)
+
+    def test_an_outcome_is_indexed_with_its_note(self, repo, brain):
+        entry = _capture(repo, "a shareable idea", policy="cloud-assisted")
+        outcome = repo.insert_outcome(
+            entry_id=entry, label="keep", note="the short version was the usable one"
+        )
+
+        documents = {d.source: d for d in collect_documents(repo, brain)}
+
+        assert documents[f"outcome:{outcome}"].policy == "cloud-assisted"
+        assert "short version" in documents[f"outcome:{outcome}"].text
+
+
 class TestReadingTheBrainAtAPinnedCommit:
     def test_two_commits_return_what_each_actually_held(self, repo, brain, index):
         """Pinning must read history, not the working tree.

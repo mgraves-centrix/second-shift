@@ -811,6 +811,39 @@ class Repository:
             "ORDER BY role, name, version"
         ).fetchall()
 
+    def run_provenance(self) -> list[sqlite3.Row]:
+        """Every run with the policy it ran under and the one its entry carries.
+
+        Both, because the honest policy of what a run produced is the stricter
+        of them: a `local-only` entry widened by a decision still did its work
+        on private material.
+        """
+        return self._conn.execute(
+            "SELECT r.id, r.entry_id, r.effective_policy, e.default_policy "
+            "FROM runs r JOIN entries e ON e.id = r.entry_id"
+        ).fetchall()
+
+    def answered_decisions_for_index(self) -> list[sqlite3.Row]:
+        """Questions the person answered, with the policy of the idea they were about.
+
+        An unanswered question is not memory: it records what the system could
+        not decide, not anything it learned.
+        """
+        return self._conn.execute(
+            "SELECT d.id, d.question, d.answer, d.status, e.default_policy "
+            "FROM decisions d JOIN entries e ON e.id = d.entry_id "
+            "WHERE d.answered_at_ms IS NOT NULL AND COALESCE(TRIM(d.answer), '') != '' "
+            "ORDER BY d.answered_at_ms, d.id"
+        ).fetchall()
+
+    def outcomes_for_index(self) -> list[sqlite3.Row]:
+        """What happened to what the night produced, with its idea's policy."""
+        return self._conn.execute(
+            "SELECT o.id, o.label, o.signal, o.note, e.default_policy "
+            "FROM outcomes o JOIN entries e ON e.id = o.entry_id "
+            "ORDER BY o.ts_ms, o.id"
+        ).fetchall()
+
     def entries_for_index(self) -> list[sqlite3.Row]:
         """Every entry with text, for the retrieval index.
 

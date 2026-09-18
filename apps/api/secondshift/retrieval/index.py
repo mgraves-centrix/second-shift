@@ -88,6 +88,29 @@ def collect_documents(
         for row in repo.entries_for_index()
     ]
 
+    # What the person decided, and what became of what the night built. Both
+    # belong to one entry, so both carry that entry's policy rather than the
+    # brain's blanket one — the rubric scores using a prior decision above using
+    # the profile, and neither was indexed at all.
+    documents += [
+        Document(
+            source=f"decision:{row['id']}",
+            text=f"You were asked: {row['question']}\nYou answered: {row['answer']}",
+            policy=row["default_policy"],
+        )
+        for row in repo.answered_decisions_for_index()
+    ]
+    documents += [
+        Document(
+            source=f"outcome:{row['id']}",
+            text=" ".join(
+                part for part in (row["label"], row["signal"], row["note"]) if part
+            ),
+            policy=row["default_policy"],
+        )
+        for row in repo.outcomes_for_index()
+    ]
+
     try:
         topics = brain.topic_files_at(commit) if commit else brain.topic_files()
     except BrainUnavailable:
@@ -109,6 +132,54 @@ def collect_documents(
                     source=f"brain:skill:{name}", text=text, policy=BRAIN_POLICY
                 )
             )
+
+    documents += _night_documents(repo, brain, commit)
+    return documents
+
+
+def _strictest(*policies: str) -> str:
+    """The most restrictive of the policies given. `local-only` wins."""
+    return BRAIN_POLICY if any(p == BRAIN_POLICY for p in policies) else CLOUD_ASSISTED
+
+
+def _night_documents(
+    repo: Repository, brain: BrainRepo, commit: str | None
+) -> list[Document]:
+    """What each night distilled, under the policy of the work behind it.
+
+    A topic file is distilled across every entry, which is why ADR 0010 gives
+    the brain a blanket `local-only`: there is no provenance to read. A night
+    file has exactly one run behind it, and its name carries that run's id, so
+    the policy here is read rather than assumed — the stricter of the run's own
+    policy and its entry's, because a widened run still worked on private
+    material.
+
+    A file whose run cannot be resolved is `local-only`. An unreadable origin is
+    not an open one.
+    """
+    try:
+        files = brain.night_files_at(commit) if commit else brain.night_files()
+    except BrainUnavailable:
+        return []
+    if not files:
+        return []
+
+    by_run = {
+        row["id"]: _strictest(row["effective_policy"], row["default_policy"])
+        for row in repo.run_provenance()
+    }
+    documents: list[Document] = []
+    for name, text in sorted(files.items()):
+        if not text.strip():
+            continue
+        run_id = name.removesuffix(".md").split("-")[-1]
+        documents.append(
+            Document(
+                source=f"night:{run_id}",
+                text=text,
+                policy=by_run.get(run_id, BRAIN_POLICY),
+            )
+        )
     return documents
 
 

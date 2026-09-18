@@ -23,6 +23,11 @@ ENV_BRAIN = "SECOND_SHIFT_BRAIN"
 _DEFAULT = Path(__file__).resolve().parents[4].parent / "second-shift-brain"
 
 JOURNAL_DIR = "journal"
+#: Where the night writes what it learned. One file per run, additive, and —
+#: unlike a topic file distilled across every entry — traceable to the single
+#: run that produced it, which is what lets retrieval read its policy rather
+#: than assume one.
+NIGHTS_DIR = "nights"
 PROFILE = "profile.md"
 STYLE_GUIDE = "style-guide.md"
 SKILLS_DIR = "skills"
@@ -151,6 +156,35 @@ class BrainRepo:
         return TopicFiles(
             profile=read(PROFILE), style_guide=read(STYLE_GUIDE), skills=skills
         )
+
+    def night_files(self) -> dict[str, str]:
+        """What each night distilled, keyed by file name. Empty for a new brain."""
+        self.require()
+        directory = self.path / NIGHTS_DIR
+        if not directory.is_dir():
+            return {}
+        return {
+            path.name: path.read_text()
+            for path in sorted(directory.glob("*.md"))
+            if path.name.upper() != "README.MD"
+        }
+
+    def night_files_at(self, commit: str) -> dict[str, str]:
+        """The same, as the brain held it at a commit. See `topic_files_at`."""
+        self.require()
+        try:
+            listing = self._git("ls-tree", "--name-only", f"{commit}:{NIGHTS_DIR}")
+        except BrainUnavailable:
+            return {}
+        files = {}
+        for name in listing.split():
+            if not name.endswith(".md") or name.upper() == "README.MD":
+                continue
+            try:
+                files[name] = self._git("show", f"{commit}:{NIGHTS_DIR}/{name}")
+            except BrainUnavailable:
+                continue
+        return files
 
     def topic_files(self) -> TopicFiles:
         """Read what the brain believes. A missing file is a new brain, not a broken one."""
