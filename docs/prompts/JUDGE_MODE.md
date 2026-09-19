@@ -5,6 +5,16 @@ Paste as the first message of a fresh session.
 **Depends on `NIGHT_PIPELINE.md`, `ARTIFACTS.md` and `MORNING_INTERVIEW.md`, and
 on the judge deployment target being decided.**
 
+> **All four are satisfied as of 19 Sep.** The three capabilities shipped on
+> 2–3 Sep, and the deployment target was decided on 2 Sep as
+> **ADR 0009 — the judge instance runs on a no-GPU Serverless AI Endpoint**,
+> accepted, superseding ADR 0004's open risk. The `[NEEDS CLARIFICATION]` marker
+> this prompt sends you to look for is gone, because it was answered. Endpoints
+> and Jobs both run an arbitrary container on a Compute container VM, and both
+> creation flows offer the same "should the VM have GPUs" choice — a VM without
+> one is a supported configuration, so the hosting risk closed as answered
+> rather than falling back.
+
 ---
 
 Build `judge-mode`. Read `openspec/constitution.md`, `CLAUDE.md`,
@@ -47,11 +57,14 @@ broken and the fix is upstream, not here.
 
 ## The open decision
 
-**The deployment target, which is not yours to pick.** It is a
-`[NEEDS CLARIFICATION]` marker in the `nebius-executor` change and it closes an
-open risk in ADR 0004. If it is unresolved, stop and say so.
+**The deployment target was not yours to pick, and it has been picked.** It was
+a `[NEEDS CLARIFICATION]` marker in the `nebius-executor` change closing an open
+risk in ADR 0004, and **ADR 0009 answered it on 2 Sep**. Read that ADR rather
+than re-deciding it. If you find yourself reaching for a different target, that
+is a superseding ADR and the subject's call, not a build decision.
 
-**What is yours:** whether "run the night" in judge mode replays a recorded night
+**What is yours, and it is the whole open decision now:** whether "run the
+night" in judge mode replays a recorded night
 or executes a real one. Replay is reliable and reproducible; a live run is
 evidence. **Do not decide by preference** — time both against the real pipeline
 and report the numbers. If a live run takes four minutes, no judge will watch it,
@@ -158,7 +171,12 @@ tracked files.
 ## Report
 
 1. The replay-versus-live timing, and what you chose.
-2. Screenshots of every surface, and what a stranger said the product was.
+2. Screenshots of every surface, and what a stranger said the product was —
+   **their words, not a tidied version of them.** If they could not tell what it
+   was within one screen, say so plainly: that is the finding, and it is worth
+   more than a green suite. This is the one report item a judge's experience
+   actually depends on, so an honestly bad answer here is more useful than a
+   flattering one.
 3. The proof that no real data is present.
 4. What shipped, with test counts.
 5. Anything blocked, with your recommendation.
