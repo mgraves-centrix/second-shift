@@ -1,0 +1,74 @@
+# Tasks — `judge-mode`
+
+Seven groups. Each leaves the gate green and is committed on its own.
+
+## 1. Stop two changes claiming one requirement
+
+- [ ] 1.1 Remove `The judge instance is this code, with no real data` from
+      `2026-09-02-add-nebius-executor`'s delta, and note in that change why.
+- [ ] 1.2 It is added verbatim here, with the requirements it needs beside it.
+
+## 2. A night records what happened
+
+- [ ] 2.1 Stage start and end events, lane `system`, inside the stage's own
+      transaction so a crashed night keeps what committed.
+- [ ] 2.2 Invocation events on the agent's role lane, with the turn's span.
+- [ ] 2.3 A failed stage writes an event with a severity; a skipped stage writes
+      a note. Neither may collapse into the other.
+- [ ] 2.4 Test: a night through `run_entry` returns a non-empty timeline with
+      more than one lane. **Mutation: remove the stage events and watch it go
+      red** — today it would pass, because today there is no such test.
+- [ ] 2.5 Assert the lane is the work's lane, never the producer's role.
+
+## 3. Artifacts can be read back
+
+- [ ] 3.1 A route addressed by artifact id. No path in the URL.
+- [ ] 3.2 A row naming a missing file is a 404, never an empty 200.
+- [ ] 3.3 Content type from the recorded kind, never sniffed.
+- [ ] 3.4 The morning's artifact list links to it.
+- [ ] 3.5 Test the refusals, including that no request can reach outside the
+      artifact root, and that `model_call_payloads` is unreachable from here.
+
+## 4. The seed has an interview and real bytes
+
+- [ ] 4.1 Seeded decisions with rationales, deterministic by seed, at least one
+      on a `local-only` entry so the egress warning has something to mark.
+- [ ] 4.2 Seeded artifacts get bytes whose hash matches the recorded one.
+- [ ] 4.3 Test: the same seed produces the same questions in the same order.
+
+## 5. The first screen says what this is
+
+- [ ] 5.1 An explanation block, rendered from the served capability report on
+      `cloud`, absent otherwise. No build flag, no new endpoint.
+- [ ] 5.2 **Below the capture control.** `frontend` measured what chrome above
+      the input costs: `local-only` from 79% visible to 0% at 390×350.
+- [ ] 5.3 Assert capture renders identically on a non-cloud profile — byte for
+      byte where it can be, by screenshot where it cannot.
+
+## 6. The container
+
+- [ ] 6.1 A Dockerfile carrying `config/models.toml`, the built export, and a
+      database seeded at image build time.
+- [ ] 6.2 `SECOND_SHIFT_SYNTHETIC=1`, `SECOND_SHIFT_PROFILE=cloud`.
+- [ ] 6.3 It must not carry the brain, a real database, or payloads.
+- [ ] 6.4 Build it and run it locally. A deploy target verified only on paper is
+      not verified.
+
+## 7. Synthetic containment, enforced
+
+- [ ] 7.1 Migration: `is_synthetic` on the eval tables; the runner sets it from
+      the deployment, never from a request; the views exclude it.
+- [ ] 7.2 A check that a deployment package carries no `model_call_payloads`,
+      **and a test proving that check can fail.**
+- [ ] 7.3 Fix the README recipe.
+
+## 8. Verify and close
+
+- [ ] 8.1 Full gate. Every new test shown able to fail, with the mutation named.
+- [ ] 8.2 Stand up the container, open all three surfaces, **read the
+      screenshots**, and report what a stranger said the product was — their
+      words.
+- [ ] 8.3 On the Spark: a real night, and confirm its timeline renders. This is
+      the only way group 2 is actually proven, and it needs the machine.
+- [ ] 8.4 Sync, archive, roadmap, and record anything deferred in the next
+      capability's entry rather than only here.
