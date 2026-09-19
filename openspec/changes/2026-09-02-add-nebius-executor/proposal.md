@@ -200,3 +200,22 @@ Nebius argument cannot afford.
 **Risk:** this is the system's first real egress, and the privacy guarantee is the
 product's claim rather than a feature of it. Every implementation step is checked
 against principle 2 again, not once at the start.
+
+---
+
+## The judge requirement moved out — 19 Sep
+
+This change's delta carried **"The judge instance is this code, with no real
+data"** alongside its remote-dispatch requirements. `2026-09-19-add-judge-mode`
+now owns it.
+
+They were two changes claiming one requirement. This one has been parked on a
+Nebius credential since 2 Sep; `judge-mode` is where the judge deployment is
+built, verified and archived. Leaving it in both meant whichever archived second
+would duplicate the requirement or silently overwrite it — and since this change
+has no implementation behind its deltas, archiving it would have asserted a
+judge instance that nothing had built.
+
+It moved verbatim, with the synthetic-containment and first-screen requirements
+it turned out to need beside it. This change keeps every requirement about
+dispatching work off the machine, which is what it is for.

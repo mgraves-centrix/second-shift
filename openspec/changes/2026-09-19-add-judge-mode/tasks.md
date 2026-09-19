@@ -4,9 +4,14 @@ Seven groups. Each leaves the gate green and is committed on its own.
 
 ## 1. Stop two changes claiming one requirement
 
-- [ ] 1.1 Remove `The judge instance is this code, with no real data` from
-      `2026-09-02-add-nebius-executor`'s delta, and note in that change why.
-- [ ] 1.2 It is added verbatim here, with the requirements it needs beside it.
+- [x] 1.1 Removed from `2026-09-02-add-nebius-executor`'s delta, with the why
+      recorded in that change's proposal. Six remote-dispatch requirements stay.
+- [x] 1.2 Added verbatim here, with the requirements it needs beside it.
+- [x] 1.3 **A `REMOVED` delta was the wrong instrument and is gone.** It named
+      `nebius-executor` as a canonical spec — but that change has never archived,
+      so no such spec exists and `REMOVED` would have tried to take a requirement
+      out of nothing. `openspec validate --strict` passed it; archive would not
+      have. Editing the parked change's own delta is the fix.
 
 ## 2. A night records what happened
 
