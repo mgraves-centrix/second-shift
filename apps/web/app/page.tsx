@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { newUlid } from "@/lib/ulid";
 import { drain, enqueue, pendingCount, type PendingEntry } from "@/lib/queue";
-import { Footer } from "@/components/shell/Shell";
+import { Explainer, Footer } from "@/components/shell/Shell";
 import styles from "./capture.module.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
@@ -164,6 +164,7 @@ export default function Capture() {
         {status?.message ?? ""}
       </div>
 
+      <Explainer />
       <Footer />
     </main>
   );

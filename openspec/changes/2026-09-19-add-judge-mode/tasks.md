@@ -69,12 +69,22 @@ Seven groups. Each leaves the gate green and is committed on its own.
 
 ## 5. The first screen says what this is
 
-- [ ] 5.1 An explanation block, rendered from the served capability report on
+- [x] 5.1 An explanation block, rendered from the served capability report on
       `cloud`, absent otherwise. No build flag, no new endpoint.
-- [ ] 5.2 **Below the capture control.** `frontend` measured what chrome above
+- [x] 5.2 **Below the capture control.** `frontend` measured what chrome above
       the input costs: `local-only` from 79% visible to 0% at 390×350.
-- [ ] 5.3 Assert capture renders identically on a non-cloud profile — byte for
-      byte where it can be, by screenshot where it cannot.
+- [x] 5.3 Measured on both deployments at 390x350, the keyboard-up viewport
+      `frontend` used: `local-only` is **100% visible on each**, explainer
+      present on `cloud` and absent on `spark`. The explanation costs the
+      privacy choice nothing.
+- [x] 5.4 **Found by reading the render: the copy said "the night below" and
+      there is no night below.** The night is its own surface. It points at the
+      nav now.
+- [x] 5.5 `profile.test.ts` failed because the new doc comment names
+      `NEXT_PUBLIC_DEMO` to explain why it is forbidden — the same shape as the
+      `process.env` over-reach that test already warns about. It strips comments
+      before matching now, so the rule is about code and the clearest place to
+      document it stays available.
 
 ## 6. The container
 

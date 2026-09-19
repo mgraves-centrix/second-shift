@@ -91,6 +91,61 @@ export function Footer() {
 }
 
 /**
+ * What this is, for somebody who has never seen it.
+ *
+ * Shown only where the served report resolves `cloud` — the judge deployment.
+ * A stranger who opens the root otherwise meets a textarea reading "What's the
+ * idea?" and a Capture button, which is the right screen for the person it was
+ * built for and tells a visitor nothing: not that it works overnight, not that
+ * it produces artifacts, not that it interviews you.
+ *
+ * Driven by the same fetch as the demo label rather than a build flag, because
+ * `NEXT_PUBLIC_DEMO=1` would mean two builds and principle 5 says one codebase
+ * separated only by compute profile.
+ *
+ * **Below the capture control, never above it.** `frontend` measured what
+ * chrome above the input costs: at a keyboard-up 390x350 viewport a nav bar
+ * takes the `local-only` option from 79% visible to 0%, and the default is the
+ * policy that sends the idea off the machine. A judge scrolls one screen; the
+ * person capturing at 3am never sees this.
+ */
+export function Explainer() {
+  const demo = useDemoProfile();
+  if (!demo) return null;
+  return (
+    <section className={styles.explainer} aria-label="What this is">
+      <h2 className={styles.explainerTitle}>What this is</h2>
+      <p className={styles.explainerLead}>
+        An always-on assistant that turns half-formed ideas into artifacts
+        overnight, then interviews you in the morning about what it got stuck
+        on.
+      </p>
+      <ol className={styles.explainerSteps}>
+        <li>
+          <strong>You capture an idea</strong> in one line, choosing whether it
+          may leave the machine. That is the screen above.
+        </li>
+        <li>
+          <strong>Overnight it works</strong> — briefs, researches, mocks up,
+          builds, critiques and distills, committing each stage as it finishes
+          so a late failure never retracts an early success.
+        </li>
+        <li>
+          <strong>In the morning it interviews you</strong> about what it could
+          not decide alone, one question at a time.
+        </li>
+      </ol>
+      <p className={styles.explainerNote}>
+        This deployment holds no real data. Every row in it was generated from a
+        fixed seed, so <strong>Morning</strong> and <strong>Night</strong> below
+        show the same recorded night every time — which is what makes a
+        screenshot of it reproducible.
+      </p>
+    </section>
+  );
+}
+
+/**
  * Principle 5: the judge instance contains zero real data and must be labeled
  * in-UI as a demo. Rendered from the served capability report, so the judge
  * deployment is a caller of this code rather than a fork of it.

@@ -41,8 +41,16 @@ test("no build-time flag governs the label", () => {
   const shell = readFileSync(
     join(import.meta.dirname, "..", "components", "shell", "Shell.tsx"), "utf8",
   );
+  // Comments stripped first. The rule is about code, and a doc comment naming
+  // the forbidden flag to explain *why* it is forbidden is the clearest place
+  // that rule can live — this test failed on exactly that on 19 Sep, which is
+  // the same shape as the earlier `process.env` over-reach it already warns
+  // about two paragraphs up.
+  const code = shell
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
   assert.ok(
-    !/NEXT_PUBLIC_DEMO|DEMO_MODE|IS_DEMO/i.test(shell),
+    !/NEXT_PUBLIC_DEMO|DEMO_MODE|IS_DEMO/i.test(code),
     "a build-time flag decides the demo label, which is two builds",
   );
   assert.ok(
