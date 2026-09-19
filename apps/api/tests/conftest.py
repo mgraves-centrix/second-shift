@@ -15,6 +15,23 @@ from secondshift.telemetry.pricing import PricingTable, Rate
 from secondshift.telemetry.recorder import Recorder
 
 
+@pytest.fixture(autouse=True)
+def _artifacts_under_tmp(tmp_path, monkeypatch):
+    """Keep every test's artifact writes inside its own tmp directory.
+
+    `artifact_root()` falls back to `~/second-shift-data/artifacts` when nothing
+    says otherwise, which was harmless while only the night wrote files and the
+    night was never exercised in-process. The synthetic generator started
+    writing real bytes on 19 Sep, so without this a test run would deposit
+    artifacts in a developer's home directory — and on CI, in the runner's.
+
+    Autouse rather than opt-in: a test that writes outside tmp is a test nobody
+    notices until it pollutes something, and remembering to ask for isolation is
+    exactly the kind of thing that erodes.
+    """
+    monkeypatch.setenv(config.ENV_ARTIFACTS, str(tmp_path / "artifacts"))
+
+
 @pytest.fixture
 def db(tmp_path):
     """Open connections that are guaranteed to be closed at teardown.

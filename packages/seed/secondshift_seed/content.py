@@ -135,3 +135,98 @@ def output_path(stage: str, slug: str) -> str:
     from real output without anyone having to consult the database.
     """
     return f"synthetic/{stage}/{slug}.md"
+
+
+#: What the interviewer asks after a night, as (question, rationale) pairs.
+#:
+#: Written as an agent that tried something and stopped, because the rationale
+#: is what separates a question from a quiz — `morning-interview`'s own rule.
+#: A seeded night raised none of these until 19 Sep, so the judge deployment
+#: rendered "Nothing is waiting on you" on the screen the product is named for.
+DECISIONS: tuple[tuple[str, str], ...] = (
+    (
+        f"{SYNTHETIC} Should a note that spans two topics be filed under both, "
+        "or under the one it is mostly about?",
+        "I built the grouping and both readings produce a coherent digest. They "
+        "diverge on the notes that matter most — the ones written while thinking "
+        "across two things at once. Duplicating makes the week look busier than "
+        "it was; picking one loses the connection. I could not choose without "
+        "knowing which failure you would rather read.",
+    ),
+    (
+        f"{SYNTHETIC} The critic ranked the third build above the first. Keep "
+        "its ranking, or the order they were generated in?",
+        "The critic's note says the third handles an empty week and the first "
+        "does not, which is the case you described. But it scored lower on "
+        "everything else, so promoting it trades the common case for the edge "
+        "one. That is a judgment about what you will actually open.",
+    ),
+    (
+        f"{SYNTHETIC} May I search the web for how other people schedule a "
+        "weekly review?",
+        "The brief asserts Sunday evening and the brain holds nothing about "
+        "your week. I stopped rather than build a schedule on an assumption I "
+        "invented. Searching means the topic of this idea leaves the machine.",
+    ),
+)
+
+
+#: The bodies a seeded night's artifacts carry.
+#:
+#: Real bytes, because the seeder wrote rows with none behind them and said so
+#: in its own docstring — which was fine while nothing served artifacts, and
+#: became a demo offering files that 404 the moment something did.
+ARTIFACT_BODIES: dict[str, str] = {
+    "brief": (
+        "# {title}\n\n"
+        "{text}\n\n"
+        "## What is settled\n\n"
+        "A single page per week, generated overnight, grouped by subject rather "
+        "than by the day a note was captured.\n\n"
+        "## What is not\n\n"
+        "Whether a note spanning two subjects is duplicated or assigned to one. "
+        "Raised as a question rather than decided here.\n"
+    ),
+    "research_digest": (
+        "# Research digest\n\n"
+        "Three sources, two of which agree. The redacted query was the only "
+        "thing that left the machine; what came back is summarized here and the "
+        "tool call holds the query, not the idea.\n\n"
+        "- Weekly reviews cluster on Sunday evening and Monday morning.\n"
+        "- Grouping by subject beats grouping by day once a week exceeds "
+        "roughly twenty notes.\n"
+        "- One source repeated another and was discarded.\n"
+    ),
+    "mockup": (
+        "# Layout\n\n"
+        "One column. The week's decision at the top, the notes that produced it "
+        "underneath, grouped by subject with the subject as a heading.\n\n"
+        "Rejected: a two-column layout. It reads well at a desk and badly on "
+        "the phone, which is where this is actually opened.\n"
+    ),
+    "build": (
+        "# Build variant {index}\n\n"
+        "Generates the page from the week's entries.\n\n"
+        "- Handles an empty week by saying so rather than rendering a blank "
+        "page.\n"
+        "- Groups by subject, falling back to capture order where no subject "
+        "is derivable.\n"
+        "- Ranked {rank} of {total} by the critic.\n"
+    ),
+    "critique": (
+        "# Critique\n\n"
+        "The variants differ on one thing that matters: what an empty week "
+        "renders.\n\n"
+        "Ranked by whether the page is readable when the week was quiet, then "
+        "by how little the grouping has to guess. The ranking is the critic's "
+        "and is recorded as such — it is not the order they were built in.\n"
+    ),
+    "summary": (
+        "# What the night did\n\n"
+        "Framed the idea, gathered prior art, drew a layout, built variants and "
+        "ranked them.\n\n"
+        "One question is waiting: whether a note spanning two subjects is "
+        "duplicated or assigned. Everything downstream of that answer is built "
+        "and none of it is committed to.\n"
+    ),
+}

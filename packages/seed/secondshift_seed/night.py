@@ -19,6 +19,7 @@ would surface weeks later, in whatever had been built against them.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import random
 from dataclasses import dataclass
@@ -30,6 +31,7 @@ from secondshift.airlock.policy import (
     assert_permitted,
     is_remote,
 )
+from secondshift.artifacts.store import artifact_root, relative_path
 from secondshift.db.connection import transaction
 from secondshift.db.repository import Repository
 from secondshift.telemetry.failures import (
@@ -39,7 +41,16 @@ from secondshift.telemetry.failures import (
     signature,
 )
 
-from .content import IDEAS, RESOLUTIONS, STAGE_WORK, SYNTHETIC, TOPICS, output_path
+from .content import (
+    ARTIFACT_BODIES,
+    DECISIONS,
+    IDEAS,
+    RESOLUTIONS,
+    STAGE_WORK,
+    SYNTHETIC,
+    TOPICS,
+    output_path,
+)
 from .ids import Mint
 
 #: The local date a generated night belongs to. Fixed rather than derived from
@@ -315,6 +326,7 @@ class _Generator:
             self._spawn(stage=stage, role=lead, span=window, parent=None, depth=0)
 
         artifacts = self._artifacts(subject)
+        self._decisions(entries)
         failures = self._failures()
         self._close_invocations(failed={invocation for invocation, _ in failures})
         self._repo.transition_entry(subject, to_status="answered")
@@ -335,7 +347,67 @@ class _Generator:
             policy=self._policy,
         )
 
+    # -- the interview -----------------------------------------------------
+
+    def _decisions(self, entries: list[str]) -> list[str]:
+        """The questions the night got stuck on.
+
+        Raised here rather than left to an interviewer, because a generated
+        night has no model behind it and the morning is the screen the product
+        is named for. A seeded night raised none until 19 Sep, so a judge
+        deployment rendered "Nothing is waiting on you" on exactly that screen.
+
+        The last one is attached to the `local-only` capture, so the briefing
+        marks it as a question whose answer would send the idea off the machine
+        and a judge sees the airlock working rather than described.
+
+        Identifiers are minted from the run's own clock like everything else
+        here, so the same seed asks the same questions in the same order.
+        """
+        raised: list[str] = []
+        window = self._stage_windows()["distill"]
+        interviewers = [i for i in self._invocations if i.stage == "distill"]
+        for offset, (question, rationale) in enumerate(DECISIONS):
+            # The last question belongs to the idea that never leaves the
+            # machine; the rest to the idea the night actually worked on.
+            entry_id = entries[-1] if offset == len(DECISIONS) - 1 else entries[0]
+            raised_at = window.end_ms + offset
+            raised.append(
+                self._repo.insert_decision(
+                    decision_id=self._mint(raised_at),
+                    entry_id=entry_id,
+                    question=question,
+                    rationale=rationale,
+                    status="open",
+                    raised_by_run_id=self._run_id,
+                    raised_by_invocation_id=(
+                        interviewers[0].invocation_id if interviewers else None
+                    ),
+                    raised_at_ms=raised_at,
+                    is_synthetic=True,
+                )
+            )
+        return raised
+
     # -- artifacts ---------------------------------------------------------
+
+    def _land(self, path: str, body: str) -> tuple[str, int]:
+        """Write a seeded artifact where its row says it is, and hash what landed.
+
+        The generator recorded rows with a plausible-looking hash and no bytes
+        behind them — its own docstring said so. That was honest while nothing
+        served artifacts and became a demo offering files that 404 the moment
+        `GET /artifacts/{id}` shipped.
+
+        Hashed from the bytes after writing rather than from the string before,
+        for the same reason the real store does it: what is recorded should
+        describe what is on disk, not what was intended.
+        """
+        target = artifact_root() / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(body)
+        landed = target.read_bytes()
+        return hashlib.sha256(landed).hexdigest(), len(landed)
 
     def _content_sha(self) -> str:
         """A plausible content hash from the seeded generator.
@@ -360,24 +432,37 @@ class _Generator:
         """
         written: list[str] = []
         builders = [i for i in self._invocations if i.stage == "build"] or self._invocations
+        title, text = self._subject_idea
 
-        for stage, kind in (("brief", "brief"), ("research", "research_digest")):
+        for stage, kind in (("brief", "brief"), ("research", "research_digest"),
+                            ("mockups", "mockup"), ("critique", "critique"),
+                            ("distill", "summary")):
             window = self._stage_windows()[stage]
             producer = next(
                 (i for i in self._invocations if i.stage == stage), self._invocations[0]
             )
+            body = ARTIFACT_BODIES[kind].format(title=title, text=text)
+            index = 0 if kind in ("mockup",) else None
+            path = relative_path(
+                night_of=self._night_of,
+                run_id=self._run_id,
+                kind=kind,
+                variant_index=index,
+            )
+            sha, size = self._land(path, body)
             written.append(
                 self._repo.insert_artifact(
                     run_id=self._run_id,
                     entry_id=entry_id,
                     stage=stage,
                     kind=kind,
-                    path=f"artifacts/{self._night_of}/{kind}.md",
+                    path=path,
+                    variant_index=index,
                     created_at_ms=window.end_ms,
                     produced_by_invocation_id=producer.invocation_id,
                     artifact_id=self._mint(window.end_ms),
-                    content_sha=self._content_sha(),
-                    artifact_bytes=self._rng.randint(1_200, 9_000),
+                    content_sha=sha,
+                    artifact_bytes=size,
                     is_synthetic=True,
                 )
             )
@@ -388,21 +473,31 @@ class _Generator:
         self._rng.shuffle(ranks)
         for index, rank in enumerate(ranks):
             producer = builders[index % len(builders)]
+            path = relative_path(
+                night_of=self._night_of,
+                run_id=self._run_id,
+                kind="build",
+                variant_index=index,
+            )
+            body = ARTIFACT_BODIES["build"].format(
+                index=index, rank=rank, total=count
+            )
+            sha, size = self._land(path, body)
             written.append(
                 self._repo.insert_artifact(
                     run_id=self._run_id,
                     entry_id=entry_id,
                     stage="build",
                     kind="build",
-                    path=f"artifacts/{self._night_of}/build-{index}/index.html",
+                    path=path,
                     variant_group=self._variant_group,
                     variant_index=index,
                     variant_rank=rank,
                     created_at_ms=window.end_ms,
                     produced_by_invocation_id=producer.invocation_id,
                     artifact_id=self._mint(window.end_ms),
-                    content_sha=self._content_sha(),
-                    artifact_bytes=self._rng.randint(4_000, 60_000),
+                    content_sha=sha,
+                    artifact_bytes=size,
                     is_synthetic=True,
                 )
             )
@@ -424,6 +519,7 @@ class _Generator:
         window = _Span(self._local(CAPTURE_FROM_HOUR), self._night.start_ms)
         instants = window.instants(self._rng, count)
 
+        self._subject_idea = ideas[0]
         ids: list[str] = []
         for index, idea in enumerate(ideas):
             title, text = idea
@@ -449,7 +545,13 @@ class _Generator:
                 asr_confidence=(
                     round(self._rng.uniform(0.82, 0.99), 3) if voice else None
                 ),
-                default_policy=self._policy,
+                # The last capture is `local-only` whatever the night's policy
+                # is. A judge deployment with no private idea in it cannot show
+                # the airlock at all — every question would be unmarked, and the
+                # egress warning would be a feature nobody sees.
+                default_policy=(
+                    str(Policy.LOCAL_ONLY) if index == count - 1 else self._policy
+                ),
                 status="captured",
                 title=title,
                 source_device=self._rng.choice(_DEVICES),

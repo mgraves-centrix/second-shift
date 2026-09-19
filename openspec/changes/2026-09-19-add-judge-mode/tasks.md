@@ -53,10 +53,19 @@ Seven groups. Each leaves the gate green and is committed on its own.
 
 ## 4. The seed has an interview and real bytes
 
-- [ ] 4.1 Seeded decisions with rationales, deterministic by seed, at least one
+- [x] 4.1 Seeded decisions with rationales, deterministic by seed, at least one
       on a `local-only` entry so the egress warning has something to mark.
-- [ ] 4.2 Seeded artifacts get bytes whose hash matches the recorded one.
-- [ ] 4.3 Test: the same seed produces the same questions in the same order.
+- [x] 4.2 Seeded artifacts get bytes whose hash matches the recorded one.
+- [x] 4.3 Test: the same seed produces the same questions in the same order.
+- [x] 4.4 Seeded artifact paths now follow the real `night_of/run_id/` convention
+      instead of an invented `artifacts/<night>/` one, so a judge sees the path
+      shape the product actually produces.
+- [x] 4.5 **Tests were writing outside tmp.** `artifact_root()` falls back to
+      `~/second-shift-data/artifacts`, harmless while nothing in-process wrote
+      files and not harmless the moment the generator did. An autouse fixture in
+      `conftest.py` now points it at each test's tmp directory.
+- [x] 4.6 `NIGHT_TABLES` gained `decisions` — the existing audit caught the new
+      table itself, which is what it is for.
 
 ## 5. The first screen says what this is
 

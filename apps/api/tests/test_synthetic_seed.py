@@ -47,6 +47,10 @@ NIGHT_TABLES = (
     "events",
     "failures",
     "artifacts",
+    # Added 19 Sep. A seeded night raised no questions until then, so the
+    # morning — the screen the product is named for — was empty on the only
+    # deployment a judge ever opens.
+    "decisions",
 )
 
 #: The flagged tables a generated night must actually put rows in. Without this
@@ -664,3 +668,87 @@ class TestVariants:
         )
         rows = repo.connection.execute("SELECT * FROM cost_per_accepted_artifact").fetchall()
         assert rows == []
+
+
+class TestTheSeededNightHasAnInterview:
+    """A judge opening the morning found "Nothing is waiting on you" until
+    19 Sep: the generator wrote no decisions, so the screen the product is named
+    for was empty on the only deployment a judge ever sees.
+    """
+
+    def test_a_seeded_night_raises_questions(self, open_night_db):
+        repo = open_night_db("interview.db")
+        generate_night(repo, seed=42)
+
+        rows = repo.connection.execute("SELECT * FROM decisions").fetchall()
+
+        assert rows, "the seeded night got stuck on nothing"
+        assert all(r["rationale"] for r in rows), (
+            "a question without its rationale is a quiz"
+        )
+        assert all(r["status"] == "open" for r in rows)
+        assert all(r["is_synthetic"] for r in rows)
+
+    def test_one_question_is_about_an_idea_that_never_left_the_machine(
+        self, open_night_db
+    ):
+        """Otherwise every question is unmarked and the egress warning is a
+        feature no judge ever sees."""
+        repo = open_night_db("egress.db")
+        generate_night(repo, seed=42)
+
+        policies = {
+            r["default_policy"]
+            for r in repo.connection.execute(
+                "SELECT e.default_policy FROM decisions d "
+                "JOIN entries e ON e.id = d.entry_id"
+            )
+        }
+
+        assert "local-only" in policies
+
+    def test_the_same_seed_asks_the_same_questions_in_the_same_order(
+        self, open_night_db
+    ):
+        left, right = open_night_db("q1.db"), open_night_db("q2.db")
+        generate_night(left, seed=7)
+        generate_night(right, seed=7)
+
+        def asked(repo):
+            return [
+                r["question"]
+                for r in repo.connection.execute(
+                    "SELECT question FROM decisions ORDER BY raised_at_ms, id"
+                )
+            ]
+
+        assert asked(left) == asked(right)
+        assert len(asked(left)) > 1
+
+
+class TestSeededArtifactsHaveContent:
+    def test_every_artifact_row_has_a_file_whose_hash_it_records(
+        self, open_night_db
+    ):
+        """The generator recorded a plausible-looking hash over nothing — its
+        own docstring said "these artifacts have no bytes behind them". Fine
+        while nothing served artifacts; a demo offering files that 404 the
+        moment `GET /artifacts/{id}` shipped."""
+        import hashlib
+
+        from secondshift.artifacts.store import artifact_root
+
+        repo = open_night_db("bytes.db")
+        generate_night(repo, seed=42)
+
+        rows = repo.connection.execute(
+            "SELECT path, content_sha, bytes FROM artifacts"
+        ).fetchall()
+
+        assert rows
+        for row in rows:
+            target = artifact_root() / row["path"]
+            assert target.is_file(), f"{row['path']} has no file behind it"
+            landed = target.read_bytes()
+            assert hashlib.sha256(landed).hexdigest() == row["content_sha"]
+            assert len(landed) == row["bytes"]
