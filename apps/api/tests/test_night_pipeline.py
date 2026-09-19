@@ -150,6 +150,93 @@ class TestTheStageTable:
         assert not BY_NAME["distill"].can_run(frozenset())
 
 
+class TestANightRecordsWhatHappened:
+    """The night view renders from `events`, and until 19 Sep a real night wrote
+    none — six invocations, six model calls, an empty timeline. The scrubber has
+    only ever drawn seeded data, and nothing caught it because no spec required
+    the night to emit anything and the browser gate drives the seed.
+    """
+
+    def test_a_real_night_produces_a_timeline(
+        self, repo, recorder, providers, entry, roster
+    ):
+        result = _night(repo, recorder, providers(), entry, roster)
+
+        rows = repo.connection.execute(
+            "SELECT lane, kind FROM events WHERE run_id = ?", (result.run_id,)
+        ).fetchall()
+
+        assert rows, "a real night wrote no events, so the night view is blank"
+        assert len({r["lane"] for r in rows}) > 1, (
+            "every event landed in one lane, so the scrubber draws a single row"
+        )
+
+    def test_every_stage_that_opens_also_closes(
+        self, repo, recorder, providers, entry, roster
+    ):
+        """An unclosed stage is a bar with no end. The first version of this
+        change left `research` open, because that stage returns through its own
+        module and did not write an end."""
+        result = _night(repo, recorder, providers(), entry, roster)
+
+        def count(kind):
+            return repo.connection.execute(
+                "SELECT COUNT(*) FROM events WHERE run_id = ? AND kind = ?",
+                (result.run_id, kind),
+            ).fetchone()[0]
+
+        assert count("stage_start") == count("stage_end") > 0
+
+    def test_a_stage_boundary_is_recorded_on_the_system_lane(
+        self, repo, recorder, providers, entry, roster
+    ):
+        """The lane is the work's, never the producer's role — and a stage
+        boundary has no producer at all."""
+        result = _night(repo, recorder, providers(), entry, roster)
+
+        lanes = {
+            r["lane"]
+            for r in repo.connection.execute(
+                "SELECT DISTINCT lane FROM events "
+                "WHERE run_id = ? AND kind IN ('stage_start', 'stage_end')",
+                (result.run_id,),
+            )
+        }
+
+        assert lanes == {"system"}
+
+    def test_a_skipped_stage_says_so_without_being_an_error(
+        self, repo, recorder, providers, entry, roster
+    ):
+        """`research` skips for want of a credential. Skipped and failed must
+        not collapse: the distinction is the half that says whether anything is
+        wrong."""
+        result = _night(repo, recorder, providers(), entry, roster)
+
+        rows = repo.connection.execute(
+            "SELECT label, severity FROM events "
+            "WHERE run_id = ? AND label LIKE '%skipped%'",
+            (result.run_id,),
+        ).fetchall()
+
+        assert rows, "a skipped stage left no trace on the timeline"
+        assert all(r["severity"] != "error" for r in rows)
+
+    def test_telemetry_cannot_cost_a_night_its_work(
+        self, repo, recorder, providers, entry, roster, monkeypatch
+    ):
+        """A stage that produced an artifact and then failed to describe itself
+        is still a stage that produced an artifact."""
+        def boom(*a, **k):
+            raise RuntimeError("the events table is on fire")
+
+        monkeypatch.setattr(recorder, "record_event", boom)
+        result = _night(repo, recorder, providers(), entry, roster)
+
+        assert result.run_id is not None
+        assert any(s.status == "complete" for s in result.stages)
+
+
 # -- principle 3 -----------------------------------------------------------
 
 

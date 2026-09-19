@@ -37,6 +37,7 @@ from .output import (
     write_output,
     write_to_brain,
 )
+from .events import _stage_event
 from .stages import STAGES, Stage
 
 __all__ = [
@@ -154,14 +155,33 @@ def _run_stage(
             run_id=run_id, stage=stage.name, seq=stage.seq, status=RUNNING
         )
         repo.complete_run_stage(stage_id, status=SKIPPED)
+        # A note rather than an error: a skipped stage is a decision the walk
+        # made, and collapsing it into a failure throws away the half that says
+        # whether anything is wrong.
+        _stage_event(
+            recorder,
+            run_id=run_id,
+            lane="system",
+            kind="note",
+            label=f"{stage.name} skipped — {blocked}",
+            severity="warn",
+        )
         return StageResult(stage.name, SKIPPED, reason=blocked)
 
+    started_at = now_ms()
     stage_id = repo.insert_run_stage(
         run_id=run_id,
         stage=stage.name,
         seq=stage.seq,
         status=RUNNING,
-        started_at_ms=now_ms(),
+        started_at_ms=started_at,
+    )
+    _stage_event(
+        recorder,
+        run_id=run_id,
+        lane="system",
+        kind="stage_start",
+        label=f"{stage.name} started",
     )
     # Research is a tool call, not a model call, so it runs before the agent
     # rather than through it: the searching is the stage's work, and the
@@ -179,6 +199,7 @@ def _run_stage(
             night_of=night_of,
             invocation_id=None,
             artifact_root=artifact_root,
+            started_at_ms=started_at,
         )
 
     context = _context_for(stage, results)
@@ -210,7 +231,36 @@ def _run_stage(
         # cannot disagree about whether this stage failed.
         recorder.record_failure(exc, scope=f"night.{stage.name}", run_id=run_id)
         repo.complete_run_stage(stage_id, status=FAILED)
+        # On the role's lane, not `system`: the turn is what failed, and the
+        # morning already reads the reason from the ledger. This is so the
+        # failure is visible on the timeline rather than only in a table.
+        _stage_event(
+            recorder,
+            run_id=run_id,
+            lane=stage.role,
+            kind="error",
+            label=f"{stage.name} failed — {str(exc) or type(exc).__name__}",
+            severity="error",
+        )
+        _stage_event(
+            recorder,
+            run_id=run_id,
+            lane="system",
+            kind="stage_end",
+            label=f"{stage.name} failed",
+            severity="error",
+            duration_ms=now_ms() - started_at,
+        )
         return StageResult(stage.name, FAILED, reason=str(exc) or type(exc).__name__)
+
+    _stage_event(
+        recorder,
+        run_id=run_id,
+        lane=stage.role,
+        kind="model_call",
+        label=f"{stage.role} turn",
+        duration_ms=now_ms() - started_at,
+    )
 
     committed_at, commit_sha = (None, None)
     if stage.name == "distill" and brain is not None:
@@ -233,13 +283,51 @@ def _run_stage(
     except Exception as exc:  # noqa: BLE001 - recorded; a stage never raises
         recorder.record_failure(exc, scope=f"night.{stage.name}.artifact", run_id=run_id)
         repo.complete_run_stage(stage_id, status=FAILED)
+        _stage_event(
+            recorder,
+            run_id=run_id,
+            lane=stage.role,
+            kind="error",
+            label=f"{stage.name} produced nothing — {exc}",
+            severity="error",
+        )
+        _stage_event(
+            recorder,
+            run_id=run_id,
+            lane="system",
+            kind="stage_end",
+            label=f"{stage.name} failed",
+            severity="error",
+            duration_ms=now_ms() - started_at,
+        )
         return StageResult(stage.name, FAILED, reason=str(exc))
+
+    # Labeled by what was produced, not by the artifact id. `write_output`
+    # returns ids — its docstring says so — and a ULID on a timeline is a row a
+    # reader has to go and look up, which is the opposite of a pre-rendered
+    # label.
+    for _ in landed:
+        _stage_event(
+            recorder,
+            run_id=run_id,
+            lane=stage.role,
+            kind="file_write",
+            label=f"{stage.artifact_kind or stage.name} written",
+        )
 
     repo.complete_run_stage(
         stage_id,
         status=COMPLETE,
         committed_at_ms=committed_at,
         commit_sha=commit_sha,
+    )
+    _stage_event(
+        recorder,
+        run_id=run_id,
+        lane="system",
+        kind="stage_end",
+        label=f"{stage.name} complete",
+        duration_ms=now_ms() - started_at,
     )
     return StageResult(
         stage.name,

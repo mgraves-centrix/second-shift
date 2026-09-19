@@ -287,8 +287,20 @@ class Recorder:
         payload_json: str | None = None,
         ts_ms: int | None = None,
         is_synthetic: bool = False,
+        run_id: str | None = None,
     ) -> int:
-        """Record a timeline event with pre-rendered scalar columns."""
+        """Record a timeline event with pre-rendered scalar columns.
+
+        `run_id` is for a caller outside an invocation, and it is the same
+        argument `record_failure` makes: a stage boundary has no invocation
+        producing it, so the context is empty and an event recorded without an
+        explicit run is invisible to the timeline, which queries by run.
+
+        That was not a hypothetical. Nothing in `night/` called this at all
+        until 19 Sep, so a real night wrote no events and the night view — the
+        signature screen — rendered nothing for it. An explicit value wins over
+        the context.
+        """
         active = ctx.current()
         with self._lock:
             return self._repo.insert_event(
@@ -300,7 +312,7 @@ class Recorder:
                 duration_ms=duration_ms,
                 payload_json=payload_json,
                 agent_invocation_id=active.invocation_id if active else None,
-                run_id=active.run_id if active else None,
+                run_id=run_id or (active.run_id if active else None),
                 ts_ms=ts_ms,
                 is_synthetic=is_synthetic,
             )

@@ -15,15 +15,24 @@ Seven groups. Each leaves the gate green and is committed on its own.
 
 ## 2. A night records what happened
 
-- [ ] 2.1 Stage start and end events, lane `system`, inside the stage's own
+- [x] 2.1 Stage start and end events, lane `system`, inside the stage's own
       transaction so a crashed night keeps what committed.
-- [ ] 2.2 Invocation events on the agent's role lane, with the turn's span.
-- [ ] 2.3 A failed stage writes an event with a severity; a skipped stage writes
+- [x] 2.2 Invocation events on the agent's role lane, with the turn's span.
+- [x] 2.3 A failed stage writes an event with a severity; a skipped stage writes
       a note. Neither may collapse into the other.
-- [ ] 2.4 Test: a night through `run_entry` returns a non-empty timeline with
+- [x] 2.4 Test: a night through `run_entry` returns a non-empty timeline with
       more than one lane. **Mutation: remove the stage events and watch it go
       red** — today it would pass, because today there is no such test.
-- [ ] 2.5 Assert the lane is the work's lane, never the producer's role.
+- [x] 2.5 Assert the lane is the work's lane, never the producer's role.
+- [x] 2.6 **Found by rendering it: a skipped stage drew as a failure.** The
+      scrubber collapsed `warn` and `error` into one color and the legend called
+      both "a failure". Nothing had shown it — the seed writes only `info` and
+      `error`, so no `warn` had ever reached the screen, and the morning already
+      draws skipped amber and failed red. The two views contradicted each other
+      about the same stage.
+- [x] 2.7 And found by reading the render again: the new legend swatch had no
+      `display: inline-block`, so it was a label with no color beside it. A test
+      over the stylesheet's text passed throughout.
 
 ## 3. Artifacts can be read back
 

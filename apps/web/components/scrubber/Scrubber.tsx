@@ -288,7 +288,7 @@ export function Scrubber({ timeline }: { timeline: Timeline }) {
                     }}
                     className={styles.mark}
                     data-tick={!mark.bar}
-                    data-severe={mark.severe}
+                    data-severity={mark.severity ?? undefined}
                     data-depth={mark.depth}
                     data-past="false"
                     data-selected={selected === mark.event.id}
@@ -320,6 +320,9 @@ export function Scrubber({ timeline }: { timeline: Timeline }) {
           <i className={styles.swatchTick} /> an instant
         </span>
         <span>
+          <i className={styles.swatchWarn} /> a stage skipped
+        </span>
+        <span className={styles.legendItem}>
           <i className={styles.swatchSevere} /> a failure
         </span>
       </p>

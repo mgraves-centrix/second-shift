@@ -19,6 +19,7 @@ from ..brain.repo import BrainRepo, BrainUnavailable
 from ..db.connection import now_ms
 from ..db.repository import Repository
 from ..telemetry.recorder import Recorder
+from .events import _stage_event
 from .research import run_research
 from .stages import Stage
 
@@ -71,6 +72,7 @@ def run_research_stage(
     night_of: str,
     invocation_id: str | None,
     artifact_root: Path | None,
+    started_at_ms: int | None = None,
 ) -> StageResult:
     """The one stage that talks outward. Skips are reasons, not failures.
 
@@ -78,7 +80,23 @@ def run_research_stage(
     policy are both facts about the deployment rather than something that broke,
     and a morning that reported them as failures would be reporting a defect
     that does not exist. A quota refusal *is* a failure, and a typed one.
+
+    `started_at_ms` is the stage's own start, so the `stage_end` this writes has
+    a span. The caller opened the stage and recorded `stage_start`; every exit
+    here has to close it, or the timeline shows research beginning and never
+    ending — which is exactly what the first version of this did.
     """
+    def _end(label: str, severity: str = "info") -> None:
+        _stage_event(
+            recorder,
+            run_id=run_id,
+            lane="system",
+            kind="stage_end",
+            label=label,
+            severity=severity,
+            duration_ms=(now_ms() - started_at_ms) if started_at_ms else None,
+        )
+
     try:
         outcome = run_research(
             recorder, policy=policy, entry_text=entry_text, run_id=run_id
@@ -86,10 +104,17 @@ def run_research_stage(
     except Exception as exc:  # noqa: BLE001 - classified and recorded, not swallowed
         recorder.record_failure(exc, scope="night.research", run_id=run_id)
         repo.complete_run_stage(stage_id, status=FAILED)
+        _stage_event(
+            recorder, run_id=run_id, lane=stage.role, kind="error",
+            label=f"research failed — {str(exc) or type(exc).__name__}",
+            severity="error",
+        )
+        _end("research failed", "error")
         return StageResult(stage.name, FAILED, reason=str(exc) or type(exc).__name__)
 
     if not outcome.searched:
         repo.complete_run_stage(stage_id, status=SKIPPED)
+        _end(f"research skipped — {outcome.reason}", "warn")
         return StageResult(stage.name, SKIPPED, reason=outcome.reason)
 
     # The digest lands like any other stage's output. `produced_by_invocation_id`
@@ -109,9 +134,20 @@ def run_research_stage(
     except Exception as exc:  # noqa: BLE001 - recorded; a stage never raises
         recorder.record_failure(exc, scope="night.research.artifact", run_id=run_id)
         repo.complete_run_stage(stage_id, status=FAILED)
+        _end("research produced nothing", "error")
         return StageResult(stage.name, FAILED, reason=str(exc))
 
     repo.complete_run_stage(stage_id, status=COMPLETE)
+    _stage_event(
+        recorder, run_id=run_id, lane=stage.role, kind="search",
+        label="search returned results",
+    )
+    for _ in landed:
+        _stage_event(
+            recorder, run_id=run_id, lane=stage.role, kind="file_write",
+            label=f"{stage.artifact_kind or stage.name} written",
+        )
+    _end("research complete")
     return StageResult(
         stage.name, COMPLETE, text=outcome.digest, artifacts=tuple(landed)
     )

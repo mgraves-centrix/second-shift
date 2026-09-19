@@ -96,7 +96,14 @@ export interface Mark {
   /** Nesting of the invocation that produced it, or zero where none did. */
   depth: number;
   bar: boolean;
-  severe: boolean;
+  /**
+   * `warn`, `error`, or null for everything else.
+   *
+   * A boolean here until 19 Sep, which is what made a skipped stage and a
+   * failed one the same color: the two severities the schema keeps apart were
+   * collapsed before they reached the screen.
+   */
+  severity: "warn" | "error" | null;
 }
 
 export interface Night {
@@ -125,7 +132,24 @@ export interface Night {
  */
 export const MIN_BAR_FRACTION = 0.0025;
 
-const SEVERE = new Set(["warn", "error"]);
+/**
+ * How a mark's severity is drawn.
+ *
+ * `warn` and `error` shared one color until 19 Sep, and the legend called both
+ * "a failure". Nothing showed it: the synthetic generator writes only `info`
+ * and `error`, so no `warn` had ever reached the screen. The first real night
+ * to record one was a *skipped* stage — and the morning already draws skipped
+ * amber and failed red, so the two views contradicted each other about the same
+ * stage.
+ *
+ * Skipped is not failed. That distinction is the half of a partial night that
+ * says whether anything is wrong, and principle 3 is the reason it is kept.
+ */
+export function severityOf(severity: string): "warn" | "error" | null {
+  if (severity === "error") return "error";
+  if (severity === "warn") return "warn";
+  return null;
+}
 
 /**
  * Lay a night out once.
@@ -165,7 +189,7 @@ export function layoutNight(timeline: Timeline): Night {
       lane: laneIndex.get(event.lane) ?? 0,
       depth: event.agent_invocation_id ? (depths.get(event.agent_invocation_id) ?? 0) : 0,
       bar,
-      severe: SEVERE.has(event.severity),
+      severity: severityOf(event.severity),
     };
   });
 

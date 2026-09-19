@@ -7,9 +7,12 @@
 // and it can tell you whether the numbers under it are correct.
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
+  severityOf,
   MIN_BAR_FRACTION,
   eventsAt,
   formatCost,
@@ -293,4 +296,31 @@ test("costs and durations read as themselves", () => {
   // A night is hours. "506m" is arithmetically fine and nobody reads it.
   assert.equal(formatDuration(5_121_279), "1h 25m");
   assert.equal(formatDuration(30_390_064), "8h 27m");
+});
+
+
+test("a skipped stage is not drawn as a failure", () => {
+  /** `warn` and `error` shared one color until 19 Sep, and the legend called
+   * both "a failure". Nothing showed it: the synthetic generator writes only
+   * `info` and `error`, so no `warn` had ever reached the screen. The first
+   * real night to record one was a skipped stage — and the morning screen
+   * already draws skipped amber and failed red, so the two views contradicted
+   * each other about the same stage. */
+  assert.equal(severityOf("warn"), "warn");
+  assert.equal(severityOf("error"), "error");
+  assert.notEqual(severityOf("warn"), severityOf("error"));
+});
+
+test("an ordinary event carries no severity styling", () => {
+  assert.equal(severityOf("info"), null);
+  assert.equal(severityOf("debug"), null);
+});
+
+test("the scrubber gives warn and error different colors", () => {
+  const css = readFileSync(
+    join(import.meta.dirname, "..", "components", "scrubber", "scrubber.module.css"),
+    "utf8",
+  );
+  assert.match(css, /\[data-severity="error"\]\s*\{[^}]*--severe/);
+  assert.match(css, /\[data-severity="warn"\]\s*\{[^}]*--warn/);
 });
