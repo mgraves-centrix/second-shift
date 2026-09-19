@@ -460,7 +460,7 @@ around it; the night pipeline is where it gets fixed.
 | Capability | Covers |
 |---|---|
 | ~~`night-pipeline`~~ | **Shipped 2 Sep** — `2026-09-02-add-night-pipeline`. The checkpointed stage machine; `close_run`'s first caller. Detail below. |
-| ⚠️ `morning-interview` | **Server half shipped 3 Sep** — `2026-09-02-add-morning-interview`. Briefing, questions, answering, policy upgrade. **The screen is not built**: `FRONTEND.md` gates it. Detail below. |
+| ~~`morning-interview`~~ | **Shipped 3 Sep**, in two halves — `2026-09-02-add-morning-interview` (briefing, questions, answering, policy upgrade) and `2026-09-03-add-morning-screen` (`app/morning/`, the interview one question at a time). `FRONTEND.md` gated the screen and landed the same day. Detail below. |
 | ~~`retrieval`~~ | **Shipped 2 Sep** — `2026-09-02-add-retrieval`. Detail below. |
 | ~~`research`~~ | **Shipped 2 Sep** — `2026-09-02-add-research`. Redaction as construction rather than filtering; `query_redacted`'s first writer. Detail below. |
 | ~~`artifacts`~~ | **Shipped 2 Sep** — `2026-09-02-add-artifacts`. Files on disk, variant groups whose rank cannot be the generation order, and `outcomes`' first writer. Detail below. |
@@ -531,7 +531,7 @@ it. Both shipped on 2 Sep, so **`night-pipeline`'s prerequisites are now
 clear** — it has agents to sequence, retrieval to feed them, and a resolved view
 that can say which endpoint a stage actually reached.
 
-### `morning-interview` — server half shipped 3 Sep, screen not built
+### `morning-interview` — shipped 3 Sep, both halves
 
 Seventeen canonical capabilities. `decisions` had carried the entire interview
 state machine since the first migration — five statuses, a rationale, a modality,
@@ -582,14 +582,20 @@ matching SQL `?` placeholders — it would have passed forever whatever the modu
 did. And a failure fixture had no run attached, so its lookup failed for the
 wrong reason.
 
-**What is not built, and it is the important part.** `FRONTEND.md` must land
-first — its own prompt says so, and the reason is checkable: `/` and `/night/`
-have no navigation between them and design tokens are drifting across
-`app/globals.css` and `components/scrubber/scrubber.module.css`. A third surface
-on that foundation makes the drift worse. So the server half is reachable at
-`GET /morning` and `POST /decisions/{id}/answer`, and **the prompt's best report
+**What was not built when this shipped, and why it was the important part.**
+`FRONTEND.md` had to land first — its own prompt says so, and the reason was
+checkable: `/` and `/night/` had no navigation between them and design tokens
+were drifting across `app/globals.css` and
+`components/scrubber/scrubber.module.css`. A third surface on that foundation
+would have made the drift worse. So the server half shipped reachable at
+`GET /morning` and `POST /decisions/{id}/answer`, and the prompt's best report
 item — whether the interview feels like being interviewed or like filling in a
-form — is unanswerable and stays open** rather than answered badly.
+form — was left open rather than answered badly.
+
+**Both closed on 3 Sep.** `frontend` shipped the token system and the shells,
+and `app/morning/` followed. The answer to the report item is in
+`### app/morning/ — 3 Sep` below: yes, and it comes down to asking one question
+at a time rather than rendering a list.
 
 > **Those two routes did not exist when this first shipped, and this section
 > said they did.** The morning package had no caller anywhere in the tree: no
@@ -762,12 +768,19 @@ term list — is the one place this module filters rather than constructs, and i
 capitalization rule cannot reach, not a mechanism, and an exhaustive list of
 what a person might not want searched does not exist.
 
-**Two things still owed.** No live call was ever made: there is no Tavily
-credential in the development container and obtaining one is a hard stop, so the
-provider is unproven against the real API exactly as the reasoner was before the
-Spark served it. And **the leak list has never been run against the four real
-entries** — they are on the always-on machine; the corpus is synthetic and
-adversarial by construction, and that substitute cannot perform the real check.
+**Two things were owed at ship, and both closed on 17 Sep.** No live call had
+been made — there was no Tavily credential in the development container and
+obtaining one is a hard stop — so the provider was unproven against the real API
+exactly as the reasoner was before the Spark served it. And the leak list had
+never been run against the four real entries, which are on the always-on
+machine; the corpus is synthetic and adversarial by construction, and that
+substitute cannot perform the real check.
+
+Both were done on the machine: the redacted query was the only thing sent, five
+results came back for one credit in 1.2s, and the one `tool_calls` row holds no
+entry text. The leak list ran against the four real entries and none survived.
+Nightly research has been on since. See **Closed 17 Sep** at the top of this
+file for the detail.
 
 ### `artifacts` — shipped 2 Sep
 

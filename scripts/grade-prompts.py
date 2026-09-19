@@ -39,7 +39,16 @@ CRITERIA: dict[str, tuple[str, object]] = {
     "5": ("falsifiable success criteria", lambda t: "what good looks like" in t),
     "6": ("explicit non-goals", lambda t: "not to build" in t),
     "7": ("constitution hooks", lambda t: "constitution hooks" in t),
-    "8": ("a runnable loop", lambda t: "## the loop" in t and "pytest" in t),
+    # A loop is runnable if it names a command that checks the tree, not if it
+    # names one particular command. This asked for `pytest` until 19 Sep, which
+    # made it a test of the pre-gate workflow rather than of the prompt: when
+    # the seven unshipped prompts moved to `scripts/gate.py` — the one command
+    # `test-harness` shipped on 17 Sep to replace the hand-run list — all seven
+    # dropped to 11/12 while getting strictly more useful. Shipped prompts are
+    # records and keep the `pytest` loop they were written with, so both spellings
+    # pass.
+    "8": ("a runnable loop",
+          lambda t: "## the loop" in t and ("scripts/gate.py" in t or "pytest" in t)),
     "9": ("verification that can fail",
           lambda t: re.search(r"(able to fail|can fail|must be able|go red)", t) is not None),
     "10": ("quality bar", lambda t: "never ship" in t and "always:" in t),

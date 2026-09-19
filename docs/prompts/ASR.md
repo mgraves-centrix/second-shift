@@ -115,9 +115,18 @@ produced their most useful findings from things that did not work.
 
 ```bash
 git status --short && openspec list && openspec list --specs
-apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 302 pass today
-scripts/check-no-environment.sh && scripts/check-american-english.sh
+python3 scripts/gate.py
 ```
+
+**One command, and it is the one CI runs.** Ten gates in order — airlock, the
+two repository guards, specs, the orchestrator suite, web unit/types/build, a
+browser test, and a mutation check — stopping at the first failure with that
+gate's exit code. About 85 seconds. `docs/development/GATES.md` has the table.
+
+The hand-run list this prompt used to carry here was six commands typed in a
+remembered order, and `TEST_HARNESS.md` shipped on 17 Sep specifically to
+replace it. If you find yourself running the pieces separately, run the gate
+instead: it is the only definition of passing this project has.
 
 On the Spark, **never `uv run`** — it re-resolves the environment to x86_64 and
 destroys it. `python -m venv` plus `pip` with pinned constraints, Python 3.12.

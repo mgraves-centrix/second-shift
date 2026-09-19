@@ -117,10 +117,18 @@ markers resolve. Weigh it on liveness, not on effort.
 
 ```bash
 git status --short && openspec list && openspec list --specs
-apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 302 pass today
-npm --prefix apps/web run test && npm --prefix apps/web run typecheck
-scripts/check-no-environment.sh && scripts/check-american-english.sh
+python3 scripts/gate.py
 ```
+
+**One command, and it is the one CI runs.** Ten gates in order — airlock, the
+two repository guards, specs, the orchestrator suite, web unit/types/build, a
+browser test, and a mutation check — stopping at the first failure with that
+gate's exit code. About 85 seconds. `docs/development/GATES.md` has the table.
+
+The hand-run list this prompt used to carry here was six commands typed in a
+remembered order, and `TEST_HARNESS.md` shipped on 17 Sep specifically to
+replace it. If you find yourself running the pieces separately, run the gate
+instead: it is the only definition of passing this project has.
 
 All green before starting. The change is already proposed — resolve the markers,
 then apply, verify, sync, archive.

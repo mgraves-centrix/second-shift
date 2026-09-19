@@ -4,8 +4,12 @@ One file per session. Paste as the first message of a fresh session; each is
 self-contained on purpose, so the shared sections repeat rather than referring
 you elsewhere.
 
-**Deadline: Fri 30 Oct 2026, 10:00 PT.** Solo. Written 2 Sep, which leaves 58
-days.
+**Deadline: Fri 30 Oct 2026, 10:00 PT.** Solo.
+
+A day count was written here on 2 Sep and was wrong by two weeks the next time
+anyone read it. Derive it instead — `python3 -c "from datetime import date;
+print((date(2026,10,30) - date.today()).days)"` — because a number that ages is
+worse than no number: it reads as current.
 
 ---
 
@@ -28,9 +32,9 @@ grouped by that rule, not by how interesting it is.
    ✅ shipped. API_LAYER is now the blocker: five sessions add routes to one
    file, and it is the only unshipped prompt that makes the others cheaper.
 
-   TEST_HARNESS    OPERATIONS    ASR    NEBIUS_EXECUTOR
-   any time        needs the     needs  blocked on
-                   machine       Spark  credentials
+   TEST_HARNESS ✅ OPERATIONS    ASR    NEBIUS_EXECUTOR
+                   needs the     needs  four decisions
+                   machine       Spark  resolved 2 Sep
 ```
 
 Shipped rows are struck through. A prompt for a shipped capability is a record
@@ -50,7 +54,7 @@ all three cases differs from the prompt in at least one decision.
 | 7 | `NEBIUS_EXECUTOR.md` | `providers/nebius*`, ingest route | credentials | anything |
 | 8 | ~~`FRONTEND.md`~~ | ✅ shipped 3 Sep | — | — |
 | 9 | ~~`MORNING_INTERVIEW.md`~~ | ✅ shipped 3 Sep — server half and `app/morning/` | — | — |
-| 10 | `TEST_HARNESS.md` | `.github/`, `scripts/gates/` | — | everything |
+| 10 | ~~`TEST_HARNESS.md`~~ | ✅ shipped 17 Sep — `scripts/gate.py`, CI | — | — |
 | 11 | `JUDGE_MODE.md` | `deploy/judge/` | 4, 6, 9 | 12 |
 | 12 | `EVAL_SCORING.md` | `eval_runs` rows, the curve | a judge | 11 |
 | 13 | `SUBMISSION.md` | `docs/NEBIUS_USAGE.md`, the write-up | 11, 12 | — |
@@ -59,7 +63,9 @@ all three cases differs from the prompt in at least one decision.
 
 **Three collision surfaces, not two.** Two sessions must never both be in
 `apps/web/app/`, in `secondshift/night/`, or in **`api/app.py`** — which is a
-single 368-line file that five of these sessions need to add routes to.
+single file that five of these sessions need to add routes to. It was 368 lines
+when this was written and is 473 now, which is the collision getting worse
+rather than the estimate being wrong.
 
 That third one was missed when this index was first written, and it is the reason
 `API_LAYER.md` exists and should run early: it splits the file into
@@ -127,8 +133,8 @@ Found 2 Sep. Each is now a prompt above.
    intention.
 5. **The API layer had no owner**, and `api/routes/` — which
    `ARCHITECTURE.md`'s directory tree asserted — does not exist. The real
-   package is `secondshift/api/`, a flat set of modules with `app.py` at 368
-   lines. The tree now says that instead.
+   package is `secondshift/api/`, a flat set of modules with `app.py` at 473
+   lines as of 19 Sep. The tree now says that instead.
 6. **Nothing produced a week-8 eval score.** `SUBMISSION.md` declares a
    dependency on it. The submission's centerpiece had no owner at all.
 7. **Nobody owned the machine.** Four prompts mention deploying; none owns the

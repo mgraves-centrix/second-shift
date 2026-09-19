@@ -14,19 +14,26 @@ background.
 
 ## Why this one, and why early
 
-`apps/api/secondshift/api/app.py` is **one 368-line file** holding every route,
-the context factory, the response mappers and the static mount.
-`docs/ARCHITECTURE.md` specifies `api/routes/` in its own directory tree. **It
-does not exist.**
+`apps/api/secondshift/api/app.py` is **one file** holding every route, the
+context factory, the response mappers and the static mount. It was 368 lines
+when this prompt was written and is **473 as of 19 Sep**, which is the problem
+getting worse rather than the estimate being wrong. `docs/ARCHITECTURE.md`
+specifies `api/routes/` in its own directory tree. **It does not exist.**
 
 That is a scheduling problem, not a tidiness one. Five of the sessions in
 `00_INDEX.md` need to add routes: `MORNING_INTERVIEW` (decisions and answers),
 `ARTIFACTS` (serving files), `NIGHT_PIPELINE` (run on demand), `JUDGE_MODE` (run
 the night), and `NEBIUS_EXECUTOR` (telemetry ingest). All five would edit the
-same file. **Until this lands, `api/app.py` is a third collision surface and the
-index was wrong to name only two.**
+same file.
 
-Do this first and those five become parallel. Do it late and they queue.
+> **Three of those five shipped before this did, and paid the cost.** The
+> argument for doing this early was that it makes them parallel; they were run
+> in sequence instead, and `app.py` grew by a hundred lines in the process. Only
+> `JUDGE_MODE` and `NEBIUS_EXECUTOR` are left to de-collide, so the case for
+> this prompt is now the file's size and `ARCHITECTURE.md` describing a tree
+> that does not exist — not the scheduling win, which has largely been spent.
+> Weigh it against `JUDGE_MODE` on that basis rather than on the paragraph
+> above.
 
 ## What already exists — do not invent any of it
 
@@ -113,10 +120,18 @@ for it. Decide with those two facts, not with convention.
 
 ```bash
 git status --short && openspec list && openspec list --specs
-apps/api/.venv/bin/python -m pytest apps/api/tests -q          # 302 pass today
-npm --prefix apps/web run test && npm --prefix apps/web run typecheck
-scripts/check-no-environment.sh && scripts/check-american-english.sh
+python3 scripts/gate.py
 ```
+
+**One command, and it is the one CI runs.** Ten gates in order — airlock, the
+two repository guards, specs, the orchestrator suite, web unit/types/build, a
+browser test, and a mutation check — stopping at the first failure with that
+gate's exit code. About 85 seconds. `docs/development/GATES.md` has the table.
+
+The hand-run list this prompt used to carry here was six commands typed in a
+remembered order, and `TEST_HARNESS.md` shipped on 17 Sep specifically to
+replace it. If you find yourself running the pieces separately, run the gate
+instead: it is the only definition of passing this project has.
 
 All green before starting. Then propose, clarify, apply, verify, sync, archive.
 

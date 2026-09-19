@@ -6,6 +6,22 @@ tailnet, no credentials.
 **Independent of everything. Owns files nothing else touches, so it can run
 alongside any other session.**
 
+> **Shipped 17 Sep — `2026-09-17-add-test-harness`. This is a record of what was
+> asked, not a session to run.**
+>
+> `python3 scripts/gate.py` runs ten gates in order and stops at the first
+> failure with that gate's exit code; `.github/workflows/gate.yml` calls the
+> same file and never restates the gates. The suite it describes below as "302
+> Python tests, 25 web tests" is 666 and 56 now.
+>
+> Two things landed that this prompt did not ask for. A **browser gate** drives
+> a seeded night against a real orchestrator on a free port and asserts
+> rendering from geometry rather than from ARIA. And a **mutation gate**
+> reintroduces defects this project has actually shipped and requires the gate
+> that should catch each one to fail — which is the answer to the "a harness
+> that has never caught anything is a hypothesis" demand at the end of this
+> file. See `docs/development/GATES.md`.
+
 ---
 
 Build the test harness. Read `openspec/constitution.md`, `CLAUDE.md`, and
@@ -123,6 +139,11 @@ scripts/check-no-environment.sh && scripts/check-american-english.sh
 
 All green before starting. That command list is the thing you are replacing;
 keep it working until the replacement is proven.
+
+> **It was replaced.** The loop above is what every other prompt in this
+> directory still told a session to type, in a remembered order, until this one
+> shipped. It is now `python3 scripts/gate.py` — one command, the same one CI
+> runs, and the only definition of "passing" there is.
 
 ## Verification — the harness must be shown to catch things
 
