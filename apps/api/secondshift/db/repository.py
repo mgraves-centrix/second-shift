@@ -516,6 +516,18 @@ class Repository:
             (run_id,),
         ).fetchall()
 
+    def get_artifact(self, artifact_id: str) -> sqlite3.Row | None:
+        """One artifact row, or None. Read-only, by identity.
+
+        By id rather than by path, because the route that reads this is the one
+        a browser reaches: a URL that carried a path would make directory
+        traversal a check somebody has to remember, and the id makes it
+        unexpressible instead.
+        """
+        return self._conn.execute(
+            "SELECT * FROM artifacts WHERE id = ?", (artifact_id,)
+        ).fetchone()
+
     def insert_artifact(
         self,
         *,

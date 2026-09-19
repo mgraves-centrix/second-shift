@@ -216,6 +216,18 @@ class EventDetailResponse(BaseModel):
     model_calls: list[ModelCallResponse]
 
 
+class ArtifactRefResponse(BaseModel):
+    """What a stage produced, and how to fetch it.
+
+    `path` is what a reader sees; `artifact_id` is what `GET /artifacts/{id}`
+    takes. A response carrying only the path would list files nobody can open,
+    which is what it did until 19 Sep.
+    """
+
+    artifact_id: str
+    path: str
+
+
 class StageLineResponse(BaseModel):
     """One stage, as the morning reports it.
 
@@ -228,7 +240,7 @@ class StageLineResponse(BaseModel):
     stage: str
     status: str
     reason: str | None
-    artifacts: list[str]
+    artifacts: list[ArtifactRefResponse]
 
 
 class NightLineResponse(BaseModel):

@@ -12,13 +12,19 @@
 // learned in `frontend`, where the surface list had to be moved out of
 // `Shell.tsx` for exactly that reason.
 
+/** One artifact, and how to fetch it. */
+export interface ArtifactRef {
+  artifact_id: string;
+  path: string;
+}
+
 /** One stage of a night, as the briefing reports it. */
 export interface StageLine {
   stage: string;
   status: string;
   /** Present for a failed stage, absent for a skipped one. See `stageReason`. */
   reason: string | null;
-  artifacts: string[];
+  artifacts: ArtifactRef[];
 }
 
 export interface NightLine {
@@ -135,6 +141,16 @@ export function stageReason(stage: StageLine): string | null {
 export function artifactLabel(path: string, night: NightLine): string {
   const prefix = `${night.night_of}/${night.run_id}/`;
   return path.startsWith(prefix) ? path.slice(prefix.length) : path;
+}
+
+/**
+ * Where to fetch an artifact. By id, never by path.
+ *
+ * The route takes an id precisely so a URL cannot express a path, which makes
+ * directory traversal unexpressible rather than guarded.
+ */
+export function artifactHref(ref: ArtifactRef, apiBase = ""): string {
+  return `${apiBase}/artifacts/${encodeURIComponent(ref.artifact_id)}`;
 }
 
 /** Did this night produce anything at all? Principle 3's question, per run. */

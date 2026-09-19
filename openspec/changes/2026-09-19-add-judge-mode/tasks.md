@@ -36,12 +36,20 @@ Seven groups. Each leaves the gate green and is committed on its own.
 
 ## 3. Artifacts can be read back
 
-- [ ] 3.1 A route addressed by artifact id. No path in the URL.
-- [ ] 3.2 A row naming a missing file is a 404, never an empty 200.
-- [ ] 3.3 Content type from the recorded kind, never sniffed.
-- [ ] 3.4 The morning's artifact list links to it.
-- [ ] 3.5 Test the refusals, including that no request can reach outside the
+- [x] 3.1 A route addressed by artifact id. No path in the URL.
+- [x] 3.2 A row naming a missing file is a 404, never an empty 200.
+- [x] 3.3 Content type from the recorded kind, never sniffed.
+- [x] 3.4 The morning's artifact list links to it.
+- [x] 3.5 Test the refusals, including that no request can reach outside the
       artifact root, and that `model_call_payloads` is unreachable from here.
+- [x] 3.6 The briefing had to carry artifact **ids** as well as paths. It sent
+      paths alone, which was fine while nothing served artifacts and useless the
+      moment something did.
+- [x] 3.7 **The payload test was overbroad and is rewritten.** It grepped the
+      route's source for "payload" — which the comment explaining the exclusion
+      contains, so it forbade documenting the rule it checked. Asserted
+      behaviorally now: the response is byte-identical to the file, and no
+      registered route path mentions a payload.
 
 ## 4. The seed has an interview and real bytes
 

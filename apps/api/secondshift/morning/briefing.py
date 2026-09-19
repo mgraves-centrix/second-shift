@@ -30,6 +30,20 @@ ACTED_ON = ("decided", "deferred", "queued-for-tonight", "obsolete")
 
 
 @dataclass(frozen=True, slots=True)
+class ArtifactRef:
+    """One artifact, as the morning offers it.
+
+    Both halves are needed and neither substitutes for the other: the path is
+    what a person reads, and the id is what `GET /artifacts/{id}` takes. The
+    briefing carried paths alone until 19 Sep, which was fine while nothing
+    served artifacts and useless the moment something did.
+    """
+
+    artifact_id: str
+    path: str
+
+
+@dataclass(frozen=True, slots=True)
 class StageLine:
     """One stage, as the morning reports it.
 
@@ -50,7 +64,7 @@ class StageLine:
     stage: str
     status: str
     reason: str | None = None
-    artifacts: tuple[str, ...] = ()
+    artifacts: tuple[ArtifactRef, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,9 +211,11 @@ def for_run(repo: Repository, run_id: str) -> Briefing:
 
 
 def _night_line(repo: Repository, run) -> NightLine:
-    by_stage: dict[str, list[str]] = {}
+    by_stage: dict[str, list[ArtifactRef]] = {}
     for artifact in repo.artifacts_for_run(run["id"]):
-        by_stage.setdefault(artifact["stage"], []).append(artifact["path"])
+        by_stage.setdefault(artifact["stage"], []).append(
+            ArtifactRef(artifact_id=artifact["id"], path=artifact["path"])
+        )
 
     reasons = _failure_reasons(repo, run["id"])
     stages = tuple(

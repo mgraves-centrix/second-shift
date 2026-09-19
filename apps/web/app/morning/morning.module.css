@@ -164,6 +164,11 @@
   overflow-wrap: anywhere;
 }
 
+/* "Idea in, artifact out" is only demonstrated if the artifact opens. */
+.artifact { color: var(--muted); text-decoration: underline; }
+.artifact:hover { color: var(--text); }
+.artifact:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
 /* Three columns survives a phone now that the artifact label is a file name
  * rather than a path carrying the night and the run's ULID. Collapsing to one
  * column made six stages into eighteen lines, and a briefing you scroll is not

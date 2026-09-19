@@ -14,6 +14,7 @@ import { join } from "node:path";
 
 import {
   LEAVES_THE_MACHINE,
+  artifactHref,
   artifactLabel,
   loadBriefing,
   nothingWaiting,
@@ -216,7 +217,7 @@ test("a half-failed night still reports what it produced", () => {
     outcome: "degraded",
     effective_policy: "cloud-assisted",
     stages: [
-      stage({ stage: "brief", artifacts: ["brief.md"] }),
+      stage({ stage: "brief", artifacts: [{ artifact_id: "a1", path: "brief.md" }] }),
       stage({ stage: "research", status: "failed", reason: "no key" }),
       stage({ stage: "mockups", status: "skipped" }),
     ],
@@ -386,4 +387,18 @@ test("every registered surface resolves to a route on disk", () => {
 
 test("the morning surface carries the nav", () => {
   assert.match(MORNING, /<Nav\b/, "the morning surface lost its navigation");
+});
+
+test("an artifact is fetched by id, never by path", () => {
+  /** The route takes an id precisely so a URL cannot express a path. A link
+   * built from the path would put traversal back on the wire. */
+  const href = artifactHref({ artifact_id: "01JART", path: "../../etc/passwd" });
+
+  assert.equal(href, "/artifacts/01JART");
+  assert.ok(!href.includes(".."), "a path reached the URL");
+});
+
+test("the morning links its artifacts rather than printing them", () => {
+  assert.match(MORNING, /artifactHref\(/);
+  assert.match(MORNING, /<a\b/);
 });

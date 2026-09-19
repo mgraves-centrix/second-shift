@@ -178,6 +178,107 @@ class TestTheMorningIsReachable:
         assert body["questions"][0]["will_leave_the_machine"] is False
 
 
+class TestReadingAnArtifactBack:
+    """"Idea in, artifact out" is the product's whole claim, and until 19 Sep the
+    artifact could not be opened: the night wrote files and nothing served them.
+    """
+
+    @pytest.fixture
+    def written(self, repo, entry, tmp_path, monkeypatch):
+        from secondshift.artifacts.store import ENV_ARTIFACTS
+
+        monkeypatch.setenv(ENV_ARTIFACTS, str(tmp_path))
+        run_id = repo.insert_run(
+            entry_id=entry,
+            night_of="2026-09-19",
+            effective_policy="local-only",
+            policy_source="entry-default",
+            compute_profile="spark",
+        )
+        body = "# A brief\n\nThe shape that survives contact.\n"
+        target = tmp_path / "2026-09-19" / run_id / "brief.md"
+        target.parent.mkdir(parents=True)
+        target.write_text(body)
+        artifact_id = repo.insert_artifact(
+            run_id=run_id,
+            entry_id=entry,
+            stage="brief",
+            kind="brief",
+            path=f"2026-09-19/{run_id}/brief.md",
+            content_sha="x" * 64,
+            artifact_bytes=len(body),
+        )
+        return artifact_id, body, tmp_path
+
+    def test_an_artifact_is_returned_by_identity(self, client, written):
+        artifact_id, body, _ = written
+
+        response = client.get(f"/artifacts/{artifact_id}")
+
+        assert response.status_code == 200
+        assert response.text == body
+        assert response.headers["content-type"].startswith("text/markdown")
+
+    def test_an_unknown_artifact_is_refused(self, client):
+        assert client.get("/artifacts/01JNOTHINGHERE").status_code == 404
+
+    def test_a_row_whose_file_is_missing_is_a_404_not_an_empty_200(
+        self, client, written
+    ):
+        """The seeded night writes rows with no bytes behind them. An empty 200
+        would present that as an artifact containing nothing, which is a
+        different and worse claim than "it is not there"."""
+        artifact_id, _, root = written
+        (root / "2026-09-19").rename(root / "moved-away")
+
+        response = client.get(f"/artifacts/{artifact_id}")
+
+        assert response.status_code == 404
+        assert response.content != b""
+
+    def test_a_row_cannot_escape_the_artifact_root(
+        self, client, repo, entry, written
+    ):
+        """A stored path is data. This is the one place it becomes a filesystem
+        read, so the resolved file has to be under the root whatever the row
+        says."""
+        artifact_id, _, root = written
+        escaped = repo.insert_artifact(
+            run_id=repo.get_artifact(artifact_id)["run_id"],
+            entry_id=entry,
+            stage="brief",
+            kind="brief",
+            path="../../../../etc/passwd",
+            content_sha="y" * 64,
+            artifact_bytes=1,
+        )
+
+        assert client.get(f"/artifacts/{escaped}").status_code == 404
+
+    def test_nothing_travels_with_the_artifact(self, client, written, repo):
+        """`model_call_payloads` holds raw local-only content and the schema
+        says it must never reach a judge deployment.
+
+        Asserted behaviorally. The first version of this test grepped the
+        route's source for the word "payload" — which its own comment explaining
+        the exclusion contains, so the test forbade documenting the rule it was
+        checking. A test that fails on a comment is testing the comment.
+        """
+        artifact_id, body, _ = written
+
+        response = client.get(f"/artifacts/{artifact_id}")
+
+        assert response.content == body.encode(), (
+            "something was added to the artifact's bytes on the way out"
+        )
+
+    def test_no_route_serves_a_payload(self, client):
+        """The absence is structural: there is nowhere for that content to go."""
+        paths = {r.path for r in client.app.routes if hasattr(r, "path")}
+
+        assert not [p for p in paths if "payload" in p]
+
+
 class TestAnsweringOverHttp:
     @pytest.fixture
     def decision(self, repo, entry):

@@ -26,6 +26,7 @@ import { Nav } from "@/components/shell/Shell";
 import {
   LEAVES_THE_MACHINE,
   OUTCOMES,
+  artifactHref,
   artifactLabel,
   loadBriefing,
   nightSummary,
@@ -284,9 +285,17 @@ function Record({ nights }: { nights: NightLine[] }) {
                   </span>
                   <span className={styles.stageDetail}>
                     {stage.artifacts.length > 0
-                      ? stage.artifacts
-                          .map((a) => artifactLabel(a, night))
-                          .join(", ")
+                      ? stage.artifacts.map((a, i) => (
+                          <span key={a.artifact_id}>
+                            {i > 0 ? ", " : null}
+                            <a
+                              className={styles.artifact}
+                              href={artifactHref(a, API_BASE)}
+                            >
+                              {artifactLabel(a.path, night)}
+                            </a>
+                          </span>
+                        ))
                       : reason}
                   </span>
                 </li>
