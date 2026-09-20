@@ -107,9 +107,22 @@ Seven groups. Each leaves the gate green and is committed on its own.
       that a database at version 1 catches up by applying exactly `[2]`, so
       adding a third migration broke a test that was never about the third
       migration. It derives the expected list from what is on disk now.
-- [ ] 7.2 A check that a deployment package carries no `model_call_payloads`,
-      **and a test proving that check can fail.**
-- [ ] 7.3 Fix the README recipe.
+- [x] 7.2 `scripts/check-judge-package.py` refuses a database carrying
+      `model_call_payloads` rows or any unmarked row, with four tests — three of
+      which exist only to prove it refuses. Not wired into the Spark deploy: that
+      ships code only, no database and no brain. It is the container that bakes
+      a database in, so group 6 calls it.
+- [x] 7.2b **`model_call_payloads` stores paths, not text.** `prompt_path` and
+      `completion_path` point at files under `data/payloads/`, which is where
+      the content actually is — the schema's own PRIVACY comment reads as
+      though the table holds it, and my first draft of this check repeated
+      that. The rows are still worth refusing: they are an index of what the
+      subject thought about and when. The image must additionally not copy
+      those files, which is group 6's to enumerate.
+- [x] 7.3 README recipe now sets `SECOND_SHIFT_SYNTHETIC=1`, with a line saying
+      why it is not optional: seeded rows carry the flag already, but anything
+      *captured* against an instance stood up without it is written
+      `is_synthetic = 0`.
 
 ## 8. Verify and close
 

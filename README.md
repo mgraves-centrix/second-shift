@@ -159,10 +159,16 @@ and point the API at it:
 
 ```bash
 apps/api/.venv/bin/python -m secondshift_seed --seed 42 --db /tmp/night.db
-SECOND_SHIFT_DB=/tmp/night.db SECOND_SHIFT_PROFILE=cloud \
+SECOND_SHIFT_DB=/tmp/night.db SECOND_SHIFT_PROFILE=cloud SECOND_SHIFT_SYNTHETIC=1 \
   apps/api/.venv/bin/uvicorn secondshift.api.main:app --port 8080
 npm --prefix apps/web run dev
 ```
+
+`SECOND_SHIFT_SYNTHETIC=1` is not optional and was missing here until 19 Sep.
+The seeded rows carry the flag already; anything *captured* against an instance
+stood up without it is written `is_synthetic = 0` — a real-looking row on the
+deployment that is supposed to hold none. The parser is strict, so a typo raises
+at startup rather than quietly resolving to "real".
 
 Every row it writes carries `is_synthetic = 1`, and the rollup views exclude
 them, so a generated night can never be mistaken for a real one.
