@@ -156,7 +156,11 @@ Seven groups. Each leaves the gate green and is committed on its own.
       `telemetry`, `artifacts`, `synthetic-seed` and a new `judge-mode` spec —
       the twentieth canonical capability. Verified present one by one before
       anything moved.
-- [ ] 8.4b Archive, roadmap, and record anything deferred in the next
-      capability's entry rather than only here. **Held until 6.4 and 8.2–8.3
-      close**: archiving marks a change done, and the container has never been
-      built or run.
+- [x] 8.4b **Archived 20 Sep with three tasks open, on the subject's call.**
+      The three are verification gaps, not missing behavior — every requirement
+      is implemented and tested — and each is recorded in `SPEC_ROADMAP.md`'s
+      `judge-mode` entry as a table saying why it is open and what closes it,
+      rather than only here where nobody looks for work remaining.
+
+      The container build has a venue now: **the NAS runs containers**, so 6.4
+      is no longer environment-blocked, only unrun.

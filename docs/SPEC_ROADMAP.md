@@ -464,7 +464,7 @@ around it; the night pipeline is where it gets fixed.
 | ~~`retrieval`~~ | **Shipped 2 Sep** — `2026-09-02-add-retrieval`. Detail below. |
 | ~~`research`~~ | **Shipped 2 Sep** — `2026-09-02-add-research`. Redaction as construction rather than filtering; `query_redacted`'s first writer. Detail below. |
 | ~~`artifacts`~~ | **Shipped 2 Sep** — `2026-09-02-add-artifacts`. Files on disk, variant groups whose rank cannot be the generation order, and `outcomes`' first writer. Detail below. |
-| `judge-mode` | The demo instance: cloud profile, synthetic persona, labeled in-UI, "run the night". |
+| ~~`judge-mode`~~ | **Shipped 20 Sep** — `2026-09-19-add-judge-mode`. The demo instance, plus four defects the demo made visible. **Three verification gaps carried forward, listed below.** Detail below. |
 
 ### The capabilities this table was missing
 
@@ -1190,3 +1190,64 @@ separating "yes, take this one to the cloud" from any other queued answer, so
 treating a queued answer as authorization would send a local-only idea off the
 machine on an answer that said the opposite. That is a migration and a Privacy
 Airlock decision, not a wiring change.
+
+### `judge-mode` — shipped 20 Sep
+
+Twenty canonical capabilities. The product, demonstrable in one sitting, with
+none of the subject's real data in it.
+
+**Grounded by standing the thing up and looking at it.** A judge landed on a
+textarea reading "What's the idea?" — the capture screen, built for somebody at
+3am who already knows what this is. The interview, which this roadmap calls the
+product, rendered "Nothing is waiting on you", because the seeder wrote no
+decisions. And nothing could be opened: the seeder's own docstring said its
+artifacts "have no bytes behind them", and no route served them.
+
+**The open decision settled without a stopwatch.** The prompt says to time
+replay against a live run. There was nothing to time: `night/__main__.py` exits
+`EXIT_NO_REASONER` on `cloud`, and the comment says why it was added — a run
+against the bound echo wrote the prompt back as every artifact and marked every
+idea `answered`. Forcing it would reintroduce exactly that, and even then it
+would render an empty timeline.
+
+**The finding that outgrew the capability: a real night wrote zero `events`
+rows.** Measured at 0 events and 0 lanes against the seed's 1223 across 7.
+`record_event` was called from nowhere in `night/`, so the scrubber — the
+signature UI element — had never rendered a real night and structurally could
+not. The two real nights of 16 Sep were invisible in the night view. It was not
+a spec violation, which is why nothing caught it: `telemetry` requires events be
+renderable without parsing and never said the night must emit them, and the
+browser gate passes because it drives seeded data.
+
+**Four more defects came out of rendering rather than testing**, with the suite
+green each time: research opened a stage it never closed; a skipped stage drew
+as a failure, because the scrubber collapsed `warn` and `error` into one color
+while the morning already drew them apart; a new legend swatch had no
+`display`; and the explainer's own copy pointed at "the night below" when the
+night is a separate surface.
+
+**Synthetic containment was three sentences nobody enforced.** The eval tables
+had no `is_synthetic` column at all and the runner never filtered on one, so an
+eval run on a judge deployment wrote unmarked rows into the curve the whole
+submission rests on. `model_call_payloads` carried a PRIVACY comment saying it
+"must never be... included in a judge deployment" with nothing behind it. And
+the README's demo recipe omitted `SECOND_SHIFT_SYNTHETIC=1`, so anything
+captured against an instance stood up that way was written real.
+
+#### Carried forward — three gaps, and none closes locally
+
+These are **verification** gaps, not missing behavior: every requirement is
+implemented and tested. They are here rather than only in the archived change
+because a deferred obligation with no home is a dropped one.
+
+| gap | why it is open | closes when |
+|---|---|---|
+| The container has never been built | No docker daemon in the development environment. `deploy/judge/Dockerfile` is written and its shape is guarded by ten tests; its seed, check, `CMD` and `HEALTHCHECK` steps were each run by hand under the image's exact environment. **The build itself has not run.** | Built on the NAS, which runs containers. |
+| It has never been stood up and read | Follows from the above. The stranger test — what somebody with no context says the product is — is unanswered. | The same build. |
+| The night's events have only ever run against a scripted reasoner | The Spark has been the venue for every real night, and this shipped without one. **This project has twice shipped defects that passed locally and failed there.** | One real night on the Spark, which also closes `2026-09-17-the-night-revises-what-it-believes` at 6/7. |
+
+**What the next capability inherits.** `GET /artifacts/{id}` exists, so an
+interface may link an artifact rather than printing its path. `events` are
+written by the night, so anything reading a timeline sees real runs. And
+`check-judge-package.py` refuses a database carrying payload rows or unmarked
+ones — the container calls it at build, and any other packaging path should.
