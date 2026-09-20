@@ -144,11 +144,19 @@ Seven groups. Each leaves the gate green and is committed on its own.
 
 ## 8. Verify and close
 
-- [ ] 8.1 Full gate. Every new test shown able to fail, with the mutation named.
+- [x] 8.1 Full gate green at every group boundary. Thirty-two mutations across
+      the change, each killing its target and each named in the commit that
+      introduced it.
 - [ ] 8.2 Stand up the container, open all three surfaces, **read the
       screenshots**, and report what a stranger said the product was — their
       words.
 - [ ] 8.3 On the Spark: a real night, and confirm its timeline renders. This is
       the only way group 2 is actually proven, and it needs the machine.
-- [ ] 8.4 Sync, archive, roadmap, and record anything deferred in the next
-      capability's entry rather than only here.
+- [x] 8.4a **Synced.** Nine requirements and twenty-two scenarios merged into
+      `telemetry`, `artifacts`, `synthetic-seed` and a new `judge-mode` spec —
+      the twentieth canonical capability. Verified present one by one before
+      anything moved.
+- [ ] 8.4b Archive, roadmap, and record anything deferred in the next
+      capability's entry rather than only here. **Held until 6.4 and 8.2–8.3
+      close**: archiving marks a change done, and the container has never been
+      built or run.
