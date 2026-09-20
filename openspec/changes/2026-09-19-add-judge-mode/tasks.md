@@ -97,8 +97,16 @@ Seven groups. Each leaves the gate green and is committed on its own.
 
 ## 7. Synthetic containment, enforced
 
-- [ ] 7.1 Migration: `is_synthetic` on the eval tables; the runner sets it from
-      the deployment, never from a request; the views exclude it.
+- [x] 7.1 Migration `0003_eval_synthetic`: `is_synthetic` on all three eval
+      tables; the runner sets it from the deployment via `synthetic_flag()`,
+      never from an argument a caller picks; `recorded_runs` and
+      `awaiting_scoring` — the two reads a week-over-week comparison walks —
+      exclude it. There are no views over these tables; the curve is read by
+      the runner.
+- [x] 7.1b **A migration test had to change to survive being one.** It asserted
+      that a database at version 1 catches up by applying exactly `[2]`, so
+      adding a third migration broke a test that was never about the third
+      migration. It derives the expected list from what is on disk now.
 - [ ] 7.2 A check that a deployment package carries no `model_call_payloads`,
       **and a test proving that check can fail.**
 - [ ] 7.3 Fix the README recipe.

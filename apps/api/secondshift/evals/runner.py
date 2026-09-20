@@ -101,10 +101,23 @@ class EvalRunner:
         *,
         brain: BrainRepo | None = None,
         samples: int = 3,
+        is_synthetic: bool = False,
     ) -> None:
+        """
+        `is_synthetic` marks everything this runner writes, and is the
+        deployment's own determination rather than an argument a caller picks:
+        `__main__` reads it from `synthetic_flag()`, the same server-derived
+        route capture already takes.
+
+        It defaults to False because every row written before 19 Sep was written
+        on the personal instance, and the eval tables carried no such column at
+        all until then — so an evaluation run on a judge deployment wrote
+        unmarked rows into the curve the whole submission rests on.
+        """
         self._repo = repo
         self._brain = brain if brain is not None else BrainRepo()
         self._samples = samples
+        self._is_synthetic = is_synthetic
 
     # -- content -----------------------------------------------------------
 
@@ -123,9 +136,9 @@ class EvalRunner:
                 continue
             self._repo.connection.execute(
                 "INSERT INTO eval_prompts (id, slug, prompt, rubric_path, rubric_sha, "
-                "created_at_ms, active) VALUES (?, ?, ?, ?, ?, ?, 0)",
+                "created_at_ms, active, is_synthetic) VALUES (?, ?, ?, ?, ?, ?, 0, ?)",
                 (new_ulid(now_ms()), candidate.slug, candidate.prompt,
-                 str(rubric.path), rubric.sha, now_ms()),
+                 str(rubric.path), rubric.sha, now_ms(), int(self._is_synthetic)),
             )
             added += 1
         return added
@@ -169,9 +182,10 @@ class EvalRunner:
         eval_run_id = new_ulid(now_ms())
         self._repo.connection.execute(
             "INSERT INTO eval_runs (id, week_of, started_at_ms, brain_sha, code_sha, "
-            "judge_model, judge_provider, rubric_sha) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "judge_model, judge_provider, rubric_sha, is_synthetic) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (eval_run_id, week_of, now_ms(), head, code_sha,
-             AWAITING, AWAITING, rubric.sha),
+             AWAITING, AWAITING, rubric.sha, int(self._is_synthetic)),
         )
         return eval_run_id
 
@@ -199,8 +213,12 @@ class EvalRunner:
                 judge_model=r["judge_model"],
             )
             for r in self._repo.connection.execute(
+                # The curve is the real instance's. A demo deployment's scores
+                # are a number like any other once they are in the table, and
+                # there is no way to tell them apart afterwards — which is why
+                # the exclusion is here and not left to whoever reads it.
                 "SELECT id, week_of, rubric_sha, brain_sha, judge_model FROM eval_runs "
-                "ORDER BY started_at_ms"
+                "WHERE is_synthetic = 0 ORDER BY started_at_ms"
             )
         ]
 
@@ -208,7 +226,8 @@ class EvalRunner:
         return [
             r["id"]
             for r in self._repo.connection.execute(
-                "SELECT id FROM eval_runs WHERE judge_model = ? ORDER BY started_at_ms",
+                "SELECT id FROM eval_runs WHERE judge_model = ? AND is_synthetic = 0 "
+                "ORDER BY started_at_ms",
                 (AWAITING,),
             )
         ]
@@ -303,9 +322,10 @@ class EvalRunner:
 
         self._repo.connection.execute(
             "INSERT INTO eval_results (id, eval_run_id, eval_prompt_id, sample_index, "
-            "score, subscores_json) VALUES (?, ?, ?, ?, ?, ?)",
+            "score, subscores_json, is_synthetic) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (new_ulid(now_ms()), eval_run_id, prompt_id, sample,
-             float(judgement.total), json.dumps(judgement.scores)),
+             float(judgement.total), json.dumps(judgement.scores),
+             int(self._is_synthetic)),
         )
 
     # -- reading -----------------------------------------------------------

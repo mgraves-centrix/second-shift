@@ -19,6 +19,7 @@ import os
 import sys
 
 from ..brain.repo import BrainRepo, BrainUnavailable
+from ..config import synthetic_flag
 from ..db.connection import connect
 from ..db.migrate import migrate
 from ..db.repository import Repository
@@ -149,7 +150,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         migrate(conn)
         runner = EvalRunner(
-            Repository(conn), brain=BrainRepo(args.brain), samples=args.samples
+            Repository(conn),
+            brain=BrainRepo(args.brain),
+            samples=args.samples,
+            # Server-derived, never a flag on this command. A judge deployment
+            # that scored itself into the real curve would be unrecoverable:
+            # the whole claim is a week-1 to week-8 comparison, and there is no
+            # way to tell afterwards which rows came from where.
+            is_synthetic=synthetic_flag(),
         )
         return _dispatch(args, runner, load_rubric(args.rubric))
     finally:

@@ -43,7 +43,15 @@ class TestMigration0002:
         conn.execute(
             "INSERT INTO schema_version VALUES (1, 'initial', ?)", (now_ms(),)
         )
-        assert migrate.migrate(conn, directory) == [2]
+        # Every migration after 1, derived from what is on disk rather than
+        # listed here. This asserted `== [2]` until 19 Sep, so adding migration
+        # 3 broke a test that was never about migration 3 — a stepwise catch-up
+        # test that has to be edited for each new migration is testing the
+        # count, not the catch-up.
+        expected = [m.version for m in migrate.discover(directory) if m.version > 1]
+
+        assert migrate.migrate(conn, directory) == expected
+        assert expected, "there is no later migration for this to catch up to"
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
 
     def test_event_can_name_an_entry_and_be_read_back(self, repo):

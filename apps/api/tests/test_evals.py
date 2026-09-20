@@ -518,3 +518,105 @@ class TestStatusReportsThePinning:
         assert code == 0
         assert "judged by stub-judge" in out
         assert "awaiting scoring" not in out
+
+
+class TestAJudgeDeploymentCannotScoreItselfIntoTheCurve:
+    """The eval tables had no `is_synthetic` column at all until 19 Sep, and the
+    runner never filtered on one.
+
+    Ten other accumulating tables carried the flag and the rollup views excluded
+    it. These three did not, so an evaluation run on a judge deployment wrote
+    unmarked rows straight into the curve the whole submission rests on — and
+    nothing would have shown it afterwards, because a synthetic score is a
+    number like any other once it is in the table.
+    """
+
+    @pytest.fixture
+    def demo(self, repo, brain) -> EvalRunner:
+        """A runner as a judge deployment constructs one."""
+        return EvalRunner(repo, brain=brain, samples=3, is_synthetic=True)
+
+    def test_a_synthetic_deployment_marks_the_prompts_it_loads(
+        self, demo, rubric, repo
+    ):
+        _seed_and_activate(demo, rubric)
+
+        flags = {
+            r["is_synthetic"]
+            for r in repo.connection.execute("SELECT is_synthetic FROM eval_prompts")
+        }
+
+        assert flags == {1}
+
+    def test_a_synthetic_deployment_marks_the_run_it_opens(
+        self, demo, rubric, repo
+    ):
+        _seed_and_activate(demo, rubric)
+        run_id = demo.record_baseline(week_of="2026-09-21", rubric=rubric)
+
+        row = repo.connection.execute(
+            "SELECT is_synthetic FROM eval_runs WHERE id = ?", (run_id,)
+        ).fetchone()
+
+        assert row["is_synthetic"] == 1
+
+    def test_the_personal_instance_marks_nothing(self, runner, rubric, repo):
+        """The negative half, and the one that makes the flag mean something:
+        without it the rule could be `True` everywhere and both tests above
+        would still pass."""
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-09-21", rubric=rubric)
+
+        assert not repo.connection.execute(
+            "SELECT is_synthetic FROM eval_runs WHERE id = ?", (run_id,)
+        ).fetchone()["is_synthetic"]
+        assert {
+            r["is_synthetic"]
+            for r in repo.connection.execute("SELECT is_synthetic FROM eval_prompts")
+        } == {0}
+
+    def test_a_synthetic_run_is_not_in_the_curve(
+        self, runner, demo, rubric, repo
+    ):
+        """The measurement itself. A demo instance's run must not appear among
+        the runs a week-over-week comparison walks."""
+        _seed_and_activate(runner, rubric)
+        real = runner.record_baseline(week_of="2026-09-21", rubric=rubric)
+        fake = demo.record_baseline(week_of="2026-09-21", rubric=rubric)
+
+        listed = {r.eval_run_id for r in runner.recorded_runs()}
+
+        assert real in listed
+        assert fake not in listed
+
+    def test_a_synthetic_run_is_not_offered_for_scoring(
+        self, runner, demo, rubric
+    ):
+        """`awaiting_scoring` is what a person reaches for to finish a week.
+        Offering a demo's run there is how one gets scored by accident."""
+        _seed_and_activate(runner, rubric)
+        real = runner.record_baseline(week_of="2026-09-21", rubric=rubric)
+        fake = demo.record_baseline(week_of="2026-09-21", rubric=rubric)
+
+        waiting = set(runner.awaiting_scoring())
+
+        assert real in waiting
+        assert fake not in waiting
+
+    def test_every_eval_table_carries_the_flag(self, repo):
+        """Read from the schema rather than listed, so a fourth eval table added
+        by a later migration is audited the day it appears."""
+        names = [
+            r["name"]
+            for r in repo.connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' "
+                "AND name LIKE 'eval_%'"
+            )
+        ]
+
+        assert names
+        for name in names:
+            columns = {
+                c["name"] for c in repo.connection.execute(f"PRAGMA table_info({name})")
+            }
+            assert "is_synthetic" in columns, f"{name} can hold unmarked rows"
