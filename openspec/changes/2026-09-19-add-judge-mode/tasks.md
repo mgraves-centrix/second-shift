@@ -88,12 +88,30 @@ Seven groups. Each leaves the gate green and is committed on its own.
 
 ## 6. The container
 
-- [ ] 6.1 A Dockerfile carrying `config/models.toml`, the built export, and a
-      database seeded at image build time.
-- [ ] 6.2 `SECOND_SHIFT_SYNTHETIC=1`, `SECOND_SHIFT_PROFILE=cloud`.
-- [ ] 6.3 It must not carry the brain, a real database, or payloads.
-- [ ] 6.4 Build it and run it locally. A deploy target verified only on paper is
-      not verified.
+- [x] 6.1 `deploy/judge/Dockerfile`: a node stage builds the export, a
+      `python:3.12-slim` stage installs `apps/api` and `packages/seed` against
+      the same `constraints.txt` the Spark uses, then seeds the night and serves
+      it. Every `COPY` names exactly what it takes — an allowlist stays correct
+      when somebody adds a directory, and a denylist silently stops being one.
+- [x] 6.2 `SECOND_SHIFT_SYNTHETIC=1`, `SECOND_SHIFT_PROFILE=cloud`. The profile
+      is pinned rather than probed: a no-GPU VM resolves to `cloud` anyway, but
+      a demo whose capability report depends on a probe behaving as expected in
+      an environment nobody tested is a demo with a variable in it.
+- [x] 6.3 Enforced three ways: the `COPY` allowlist, `.dockerignore` as a
+      second line, and `check-judge-package.py` run at build against the
+      database that was just seeded — which passes trivially today, and is there
+      for the day somebody changes the line above it.
+- [ ] 6.4 **Still open, and deliberately.** Build it and run it. The docker
+      daemon is not reachable in this environment, and a deploy target verified
+      only on paper is not verified — so this stays unchecked rather than
+      claimed.
+
+      What *was* verified, short of a build: every `COPY` source exists and none
+      is excluded by `.dockerignore`; the seed and package-check steps were run
+      with the image's exact environment; the `CMD` was run and served; and the
+      `HEALTHCHECK` command exits 0 against it, reporting profile `cloud` with
+      `local-only` unavailable for the pinned reason. Ten tests guard the file's
+      shape, six mutations each killing one.
 
 ## 7. Synthetic containment, enforced
 

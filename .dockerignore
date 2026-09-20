@@ -1,0 +1,21 @@
+# A second line of defense, not the first: `deploy/judge/Dockerfile` names every
+# path it copies, so nothing arrives by being forgotten here. This narrows the
+# build context — and refuses to send anything holding real data even if a COPY
+# were widened by accident.
+
+.git
+**/.venv
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/.next
+apps/web/out
+
+# Never. The brain is the subject's memory, `data/` holds payload files — the
+# raw, unredacted content `model_call_payloads` points at — and a database here
+# would be a real one.
+data
+brain
+**/*.db
+**/*.db-wal
+**/*.db-shm
