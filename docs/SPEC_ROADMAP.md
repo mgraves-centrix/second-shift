@@ -1242,7 +1242,7 @@ because a deferred obligation with no home is a dropped one.
 
 | gap | why it is open | closes when |
 |---|---|---|
-| The container has never been built | No docker daemon in the development environment. `deploy/judge/Dockerfile` is written and its shape is guarded by ten tests; its seed, check, `CMD` and `HEALTHCHECK` steps were each run by hand under the image's exact environment. **The build itself has not run.** | Built on the NAS, which runs containers. |
+| The container has never been built | No docker daemon in the development environment. **Every step inside it has now been run outside it**, on 20 Sep: `npm ci` from the lockfile alone then `npm run build`, and — under Python 3.12.3, the image's exact version, in a fresh venv installed from `constraints.txt` — the seed, the package check, the `CMD`, and the literal `HEALTHCHECK` command, which served a demo of one night and three questions with one marked as leaving the machine. What is left unexercised is the container layering itself: the `COPY` semantics, the node-to-python stage copy, and the `useradd`/`chown`. Its shape is guarded by ten tests. | Built on the NAS, which runs containers. |
 | It has never been stood up and read | Follows from the above. The stranger test — what somebody with no context says the product is — is unanswered. | The same build. |
 | The night's events have only ever run against a scripted reasoner | The Spark has been the venue for every real night, and this shipped without one. **This project has twice shipped defects that passed locally and failed there.** | One real night on the Spark, which also closes `2026-09-17-the-night-revises-what-it-believes` at 6/7. |
 
