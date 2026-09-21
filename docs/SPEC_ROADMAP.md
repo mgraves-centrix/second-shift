@@ -1246,6 +1246,21 @@ because a deferred obligation with no home is a dropped one.
 | It has never been stood up and read | Follows from the above. The stranger test — what somebody with no context says the product is — is unanswered. | The same build. |
 | The night's events have only ever run against a scripted reasoner | The Spark has been the venue for every real night, and this shipped without one. **This project has twice shipped defects that passed locally and failed there.** | One real night on the Spark, which also closes `2026-09-17-the-night-revises-what-it-believes` at 6/7. |
 
+**Neither gap closes from a cloud development session, and that is now
+tested rather than assumed.** The container this work runs in sits behind a
+network shim: it has no route to the home LAN and is not on the tailnet —
+`tailscaled` is installed but not running, there is no tailnet interface, and
+bringing one up needs an auth key, which is a credential and a hard stop.
+
+One trap is worth recording, because it wasted a turn and would waste another.
+**The shim transparently accepts port 80 to any destination**, including
+reserved ranges that must never route, so a port-80 connect test reports success
+against addresses that do not exist. Probe a port the shim does not intercept —
+22 or 2375 — or the answer is meaningless.
+
+So the container build happens on a machine that runs containers, and the real
+night happens on the Spark, both driven from a session with a route to them.
+
 **What the next capability inherits.** `GET /artifacts/{id}` exists, so an
 interface may link an artifact rather than printing its path. `events` are
 written by the night, so anything reading a timeline sees real runs. And
