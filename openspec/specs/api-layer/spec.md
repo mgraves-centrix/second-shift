@@ -1,7 +1,16 @@
 # api-layer Specification
 
 ## Purpose
-TBD - created by archiving change 2026-09-21-add-api-layer. Update Purpose after archive.
+The shape of the HTTP surface, so that adding a route is a one-file change and
+moving one is provably not a behavior change. Every route lives in the module
+its capability owns; the exported web surface is mounted after all of them,
+because it answers everything that reaches it and a route behind it is a route
+nobody can call. The response models' deliberate absences are the Privacy
+Airlock expressed as a type — there is no field prompt or completion text could
+travel in — and nothing here authenticates or versions, because every consumer
+is deployed with the API on the one origin the always-on machine owns. If that
+stops being true, the capability with the new consumer carries the guard or the
+prefix on its own router, and no other module changes.
 
 ## Requirements
 
