@@ -62,26 +62,26 @@ attributable to the module that caused it.
 
 ## 6. Prove the split did what it claims
 
-- [ ] 6.1 Byte-equality test passes against the split layer.
-- [ ] 6.2 Orphan check: every public symbol in `context.py`, `mappers.py` and
+- [x] 6.1 Byte-equality test passes against the split layer.
+- [x] 6.2 Orphan check: every public symbol in `context.py`, `mappers.py` and
       each route module is referenced from outside its module. Anything that is
       not was moved without a caller and should not have been moved.
-- [ ] 6.3 Mutation pass: break the mount guard, break one mapper, break the
+- [x] 6.3 Mutation pass: break the mount guard, break one mapper, break the
       `app.state` lookup. Each must turn something red.
-- [ ] 6.4 Confirm `git diff --stat` on `apps/api/tests/` shows only additions.
+- [x] 6.4 Confirm `git diff --stat` on `apps/api/tests/` shows only additions.
       A modified test means the contract moved.
-- [ ] 6.5 Count: add a route to a scratch branch and check it touches one file.
+- [x] 6.5 Count: add a route to a scratch branch and check it touches one file.
       That is the success measure; measure it rather than assert it.
 
 ## 7. Correct what grounding this turned up
 
-- [ ] 7.1 `nebius-executor`'s proposal lists "an authenticated telemetry ingest
+- [x] 7.1 `nebius-executor`'s proposal lists "an authenticated telemetry ingest
       route" as a deliverable while its own decisions section resolves against
       building one. Correct the deliverables line to match the resolution.
       `tasks.md` and the spec are already consistent with it; only that line is
       wrong, and it is what put a question into `API_LAYER.md` that did not need
       asking.
-- [ ] 7.2 `docs/ARCHITECTURE.md:106` says `api/` holds "app.py, schemas,
+- [x] 7.2 `docs/ARCHITECTURE.md:106` says `api/` holds "app.py, schemas,
       endpoint modules". After this it is true. Update it to name the actual
       modules rather than leave it vague enough to have been true all along.
 

@@ -38,9 +38,13 @@ build variant and returns a handle; `await_result` polls it to completion.
 channel, which is what keeps this interface independent of any serialization
 format (ADR 0004).
 
-**An authenticated telemetry ingest route** on the orchestrator's API, accepting
-what `ingest_external` already validates and holding the recorder's lock rather
-than opening a second connection to the database.
+**Telemetry collected by the poller, not reported by the job.** `await_result`
+reads the telemetry the job wrote beside its artifacts and calls
+`ingest_external` locally, holding the recorder's lock rather than opening a
+second connection to the database. There is no inbound route: this line promised
+one until 21 Sep, ninety lines above the section that resolved against building
+it, and that stale promise is what put an authentication question into
+`API_LAYER.md` that did not need asking.
 
 **A cloud `Reasoner`** for the Token Factory turns ADR 0004 assigns to it —
 research synthesis, architect, critic — under `cloud-assisted` only. The airlock

@@ -103,7 +103,7 @@ second-shift/
 │   │   │   ├── evals/           seed, activate, baseline, status
 │   │   │   ├── retrieval/       embedding index + assembly
 │   │   │   ├── brain/           markdown read/write + git operations
-│   │   │   ├── api/             app.py, schemas, endpoint modules
+│   │   │   ├── api/             app, context, mappers, routes/ (one per capability)
 │   │   │   ├── night/           checkpointed stage machine  (planned)
 │   │   │   └── morning/         briefing + interview        (planned)
 │   │   └── tests/
