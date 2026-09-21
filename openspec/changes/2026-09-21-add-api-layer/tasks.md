@@ -28,10 +28,10 @@ only thing standing between a refactor and a rewrite.
 
 ## 3. Lift the mappers out
 
-- [ ] 3.1 `api/mappers.py`: `capability_payload`, `run_summary`, `model_call`,
+- [x] 3.1 `api/mappers.py`: `capability_payload`, `run_summary`, `model_call`,
       `entry_response` — moved verbatim, underscore dropped since they are now
       imported across modules.
-- [ ] 3.2 Gate. No test modified.
+- [x] 3.2 Gate. No test modified.
 
 ## 4. One module per capability
 

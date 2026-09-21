@@ -17,17 +17,16 @@ offered, and whether this deployment is synthetic.
 from __future__ import annotations
 
 import json
-import sqlite3
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.staticfiles import StaticFiles
 
-from ..airlock.capability import CapabilityReport
 from ..artifacts.store import artifact_root
 from ..db.connection import now_ms
 from .context import Context, build_context, get_context
 from .location import home_location
+from .mappers import capability_payload, entry_response, model_call, run_summary
 from ..morning import assemble
 from ..morning.interview import answer
 from .schemas import (
@@ -43,8 +42,6 @@ from .schemas import (
     QuestionResponse,
     StageLineResponse,
     InvocationNodeResponse,
-    ModelCallResponse,
-    PolicyAvailabilityResponse,
     RunStageResponse,
     RunSummaryResponse,
     TimelineEventResponse,
@@ -71,70 +68,6 @@ _MEDIA_TYPES = {
 }
 
 
-def _capability_payload(report: CapabilityReport) -> CapabilityResponse:
-    return CapabilityResponse(
-        profile=str(report.profile),
-        degraded=report.degraded,
-        degradation_reason=report.degradation_reason,
-        policies=[
-            PolicyAvailabilityResponse(
-                policy=str(a.policy), available=a.available, reason=a.reason
-            )
-            for a in report.policies
-        ],
-    )
-
-
-def _run_summary(row: sqlite3.Row) -> RunSummaryResponse:
-    keys = row.keys()
-    return RunSummaryResponse(
-        id=row["id"],
-        night_of=row["night_of"],
-        started_at_ms=row["started_at_ms"],
-        ended_at_ms=row["ended_at_ms"],
-        effective_policy=row["effective_policy"],
-        compute_profile=row["compute_profile"],
-        outcome=row["outcome"],
-        furthest_stage=row["furthest_stage"],
-        is_synthetic=bool(row["is_synthetic"]),
-        # Present when the row came from `list_runs`, which computes the frame.
-        first_event_ms=row["first_event_ms"] if "first_event_ms" in keys else None,
-        last_event_end_ms=row["last_event_end_ms"] if "last_event_end_ms" in keys else None,
-        event_count=row["event_count"] if "event_count" in keys else 0,
-        captured_tz=row["captured_tz"] if "captured_tz" in keys else None,
-        tz_offset_min=row["tz_offset_min"] if "tz_offset_min" in keys else None,
-    )
-
-
-def _model_call(row: sqlite3.Row) -> ModelCallResponse:
-    return ModelCallResponse(
-        id=row["id"],
-        ts_ms=row["ts_ms"],
-        provider=row["provider"],
-        model=row["model"],
-        policy=row["policy"],
-        prompt_tokens=row["prompt_tokens"],
-        completion_tokens=row["completion_tokens"],
-        total_tokens=row["total_tokens"],
-        estimated_cost_usd=row["estimated_cost_usd"],
-        latency_ms=row["latency_ms"],
-    )
-
-
-def _entry_response(row: sqlite3.Row, *, duplicate: bool) -> EntryResponse:
-    return EntryResponse(
-        id=row["id"],
-        created_at_ms=row["created_at_ms"],
-        received_at_ms=row["received_at_ms"],
-        captured_tz=row["captured_tz"],
-        policy=row["default_policy"],
-        status=row["status"],
-        title=row["title"],
-        text=row["raw_text"],
-        duplicate=duplicate,
-    )
-
-
 def create_app(context: Context) -> FastAPI:
     app = FastAPI(title="Second Shift — capture", version="0.1.0")
     # Read back by `get_context`. On the application rather than in a closure,
@@ -148,7 +81,7 @@ def create_app(context: Context) -> FastAPI:
     @app.get("/capabilities", response_model=CapabilityResponse)
     def capabilities(ctx: Context = Depends(get_context)) -> CapabilityResponse:
         """Every policy with its availability and reason. None are omitted."""
-        return _capability_payload(ctx.report)
+        return capability_payload(ctx.report)
 
     @app.post("/entries", response_model=EntryResponse)
     def capture(
@@ -171,7 +104,7 @@ def create_app(context: Context) -> FastAPI:
                     is_synthetic=ctx.is_synthetic,
                 )
             response.status_code = status.HTTP_200_OK
-            return _entry_response(existing, duplicate=True)
+            return entry_response(existing, duplicate=True)
 
         try:
             ctx.report.for_policy(request.policy)
@@ -201,7 +134,7 @@ def create_app(context: Context) -> FastAPI:
                 lat=request.lat if request.lat is not None else home.lat,
                 lon=request.lon if request.lon is not None else home.lon,
                 offered_capability_json=json.dumps(
-                    _capability_payload(ctx.report).model_dump()
+                    capability_payload(ctx.report).model_dump()
                 ),
                 entry_id=request.id,
                 is_synthetic=ctx.is_synthetic,
@@ -219,7 +152,7 @@ def create_app(context: Context) -> FastAPI:
             is_synthetic=ctx.is_synthetic,
         )
         response.status_code = status.HTTP_201_CREATED
-        return _entry_response(ctx.repo.get_entry(entry_id), duplicate=False)
+        return entry_response(ctx.repo.get_entry(entry_id), duplicate=False)
 
     @app.get("/runs", response_model=list[RunSummaryResponse])
     def runs(ctx: Context = Depends(get_context)) -> list[RunSummaryResponse]:
@@ -229,7 +162,7 @@ def create_app(context: Context) -> FastAPI:
         them because they are measurements; a viewer is not a measurement, and
         hiding the only nights that exist would leave nothing to look at.
         """
-        return [_run_summary(r) for r in ctx.repo.list_runs()]
+        return [run_summary(r) for r in ctx.repo.list_runs()]
 
     @app.get("/runs/{run_id}/timeline", response_model=TimelineResponse)
     def timeline(run_id: str, ctx: Context = Depends(get_context)) -> TimelineResponse:
@@ -267,7 +200,7 @@ def create_app(context: Context) -> FastAPI:
         lanes = sorted({e.lane for e in events})
 
         return TimelineResponse(
-            run=_run_summary(run),
+            run=run_summary(run),
             # How far each stage got. `runs.outcome` is null on every recorded
             # run — nothing closes a run yet — so a night that stopped part-way
             # says so here or nowhere, and "no empty mornings" is a query over
@@ -496,7 +429,7 @@ def create_app(context: Context) -> FastAPI:
             duration_ms=row["duration_ms"],
             agent_invocation_id=row["agent_invocation_id"],
             payload=payload if isinstance(payload, dict) else None,
-            model_calls=[_model_call(c) for c in calls],
+            model_calls=[model_call(c) for c in calls],
         )
 
     # Mounted last so every API route is matched first.
