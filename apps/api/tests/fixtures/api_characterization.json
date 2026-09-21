@@ -1,0 +1,363 @@
+{
+  "answer": {
+    "body": "{\n  \"decision_id\": \"<id000>\",\n  \"status\": \"decided\",\n  \"answered_at_ms\": \"<clock>\"\n}",
+    "bytes": 94,
+    "content_type": "application/json",
+    "key_paths": [
+      "answered_at_ms",
+      "decision_id",
+      "status"
+    ],
+    "sha256": "366396bcfa7264e8a5b39dc1cdae83e71ff57a4227258133aa5b5cd0fd052105",
+    "status": 200
+  },
+  "answer_conflict": {
+    "body": "{\n  \"detail\": \"decision '<id000>' was already answered differently\"\n}",
+    "bytes": 83,
+    "content_type": "application/json",
+    "key_paths": [
+      "detail"
+    ],
+    "sha256": "2fac117fa06c2bb3ff6d07cca61d3cfa715664c4203eff585b60645f9b9d2f7c",
+    "status": 409
+  },
+  "answer_replay": {
+    "body": "{\n  \"decision_id\": \"<id000>\",\n  \"status\": \"decided\",\n  \"answered_at_ms\": \"<clock>\"\n}",
+    "bytes": 94,
+    "content_type": "application/json",
+    "key_paths": [
+      "answered_at_ms",
+      "decision_id",
+      "status"
+    ],
+    "sha256": "366396bcfa7264e8a5b39dc1cdae83e71ff57a4227258133aa5b5cd0fd052105",
+    "status": 200
+  },
+  "answer_unknown_decision": {
+    "body": "{\n  \"detail\": \"decision 'not-a-decision' is unknown or already answered\"\n}",
+    "bytes": 69,
+    "content_type": "application/json",
+    "key_paths": [
+      "detail"
+    ],
+    "sha256": "22435f8ba6c9685f8c397c1743ee941e8d2b506ec28082db2642abd6f7490799",
+    "status": 404
+  },
+  "artifact": {
+    "body": "# [synthetic] voice answer for the interview\n\n[synthetic] Answering a morning question by speaking should land in the same place typing does, with no separate path.\n\n## What is settled\n\nA single page per week, generated overnight, grouped by subject rather than by the day a note was captured.\n\n## What is not\n\nWhether a note spanning two subjects is duplicated or assigned to one. Raised as a question rather than decided here.\n",
+    "bytes": 429,
+    "content_type": "text/markdown; charset=utf-8",
+    "sha256": "2d45df3721742aa1adfda388fd697a3ac3dc4d973d55c9874070b50a8b6a535a",
+    "status": 200
+  },
+  "artifact_unknown": {
+    "body": "{\n  \"detail\": \"unknown artifact 'not-an-artifact'\"\n}",
+    "bytes": 47,
+    "content_type": "application/json",
+    "key_paths": [
+      "detail"
+    ],
+    "sha256": "a6303023b39b054eab70c26c6bca4259b8c7be6f0e963439614351f19518bab1",
+    "status": 404
+  },
+  "artifact_without_a_file": {
+    "body": "{\n  \"detail\": \"artifact '<id000>' has no file at its recorded path\"\n}",
+    "bytes": 83,
+    "content_type": "application/json",
+    "key_paths": [
+      "detail"
+    ],
+    "sha256": "43f818c52d24245ab08a1adfce1c2da02e6fd8b60c01ac7f53d06306d6435cb9",
+    "status": 404
+  },
+  "capabilities": {
+    "body": "{\n  \"profile\": \"cloud\",\n  \"degraded\": false,\n  \"degradation_reason\": null,\n  \"policies\": [\n    {\n      \"policy\": \"local-only\",\n      \"available\": false,\n      \"reason\": \"profile pinned to 'cloud' by SECOND_SHIFT_PROFILE; no local reasoner is bound on this profile\"\n    },\n    {\n      \"policy\": \"cloud-assisted\",\n      \"available\": true,\n      \"reason\": null\n    }\n  ]\n}",
+    "bytes": 281,
+    "content_type": "application/json",
+    "key_paths": [
+      "degradation_reason",
+      "degraded",
+      "policies[].available",
+      "policies[].policy",
+      "policies[].reason",
+      "profile"
+    ],
+    "sha256": "938c845da59253dbad82053096f175e89dec8df96d39c2ef9783b3220f98f543",
+    "status": 200
+  },
+  "capture_divergent_replay": {
+    "body": "{\n  \"id\": \"<id000>\",\n  \"created_at_ms\": \"<t+0>\",\n  \"received_at_ms\": \"<clock>\",\n  \"captured_tz\": \"America/Los_Angeles\",\n  \"policy\": \"cloud-assisted\",\n  \"status\": \"queued\",\n  \"title\": \"a tool that notices when I repeat a mistake\",\n  \"text\": \"a tool that notices when I repeat a mistake\",\n  \"duplicate\": true\n}",
+    "bytes": 300,
+    "content_type": "application/json",
+    "key_paths": [
+      "captured_tz",
+      "created_at_ms",
+      "duplicate",
+      "id",
+      "policy",
+      "received_at_ms",
+      "status",
+      "text",
+      "title"
+    ],
+    "sha256": "d960213dce7e47ce5627f545ce3bef59902aa36729c347a2dcecd9e1bc0de009",
+    "status": 200
+  },
+  "capture_id_disagrees_with_instant": {
+    "body": "{\n  \"detail\": \"entry id '<id000>' carries instant <t+0> but created_at_ms is <t+60000>; they must agree\"\n}",
+    "bytes": 132,
+    "content_type": "application/json",
+    "key_paths": [
+      "detail"
+    ],
+    "sha256": "2373b9c87eb066d5c0a8e2bebff64260cad966b361ec9cb15936a8e3f4cdda39",
+    "status": 422
+  },
+  "capture_new": {
+    "body": "{\n  \"id\": \"<id000>\",\n  \"created_at_ms\": \"<t+0>\",\n  \"received_at_ms\": \"<clock>\",\n  \"captured_tz\": \"America/Los_Angeles\",\n  \"policy\": \"cloud-assisted\",\n  \"status\": \"queued\",\n  \"title\": \"a tool that notices when I repeat a mistake\",\n  \"text\": \"a tool that notices when I repeat a mistake\",\n  \"duplicate\": false\n}",
+    "bytes": 301,
+    "content_type": "application/json",
+    "key_paths": [
+      "captured_tz",
+      "created_at_ms",
+      "duplicate",
+      "id",
+      "policy",
+      "received_at_ms",
+      "status",
+      "text",
+      "title"
+    ],
+    "sha256": "d308bd2f010d84e44b223a8d373adb090cdbba6bdcd37c6add9e12e896c39785",
+    "status": 201
+  },
+  "capture_replay": {
+    "body": "{\n  \"id\": \"<id000>\",\n  \"created_at_ms\": \"<t+0>\",\n  \"received_at_ms\": \"<clock>\",\n  \"captured_tz\": \"America/Los_Angeles\",\n  \"policy\": \"cloud-assisted\",\n  \"status\": \"queued\",\n  \"title\": \"a tool that notices when I repeat a mistake\",\n  \"text\": \"a tool that notices when I repeat a mistake\",\n  \"duplicate\": true\n}",
+    "bytes": 300,
+    "content_type": "application/json",
+    "key_paths": [
+      "captured_tz",
+      "created_at_ms",
+      "duplicate",
+      "id",
+      "policy",
+      "received_at_ms",
+      "status",
+      "text",
+      "title"
+    ],
+    "sha256": "d960213dce7e47ce5627f545ce3bef59902aa36729c347a2dcecd9e1bc0de009",
+    "status": 200
+  },
+  "capture_unknown_policy": {
+    "body": "{\n  \"detail\": \"unknown policy 'telepathy'\"\n}",
+    "bytes": 39,
+    "content_type": "application/json",
+    "key_paths": [
+      "detail"
+    ],
+    "sha256": "f795edd7e11b114dc86c8293cf794840183afc29f8c48d37eee0446f2555fbc0",
+    "status": 422
+  },
+  "event": {
+    "body": "{\n  \"id\": 17,\n  \"run_id\": \"<id000>\",\n  \"ts_ms\": \"<t+0>\",\n  \"lane\": \"interviewer\",\n  \"kind\": \"note\",\n  \"label\": \"interviewer opened\",\n  \"severity\": \"info\",\n  \"duration_ms\": null,\n  \"agent_invocation_id\": \"<id001>\",\n  \"payload\": null,\n  \"model_calls\": [\n    {\n      \"id\": \"<id002>\",\n      \"ts_ms\": \"<t+1360140>\",\n      \"provider\": \"local-vllm\",\n      \"model\": \"local-reasoner\",\n      \"policy\": \"cloud-assisted\",\n      \"prompt_tokens\": 3484,\n      \"completion_tokens\": 941,\n      \"total_tokens\": 4641,\n      \"estimated_cost_usd\": 0.0,\n      \"latency_ms\": 19285\n    },\n    {\n      \"id\": \"<id003>\",\n      \"ts_ms\": \"<t+2871480>\",\n      \"provider\": \"token-factory\",\n      \"model\": \"hosted-reasoner-mini\",\n      \"policy\": \"cloud-assisted\",\n      \"prompt_tokens\": 2070,\n      \"completion_tokens\": 662,\n      \"total_tokens\": 3494,\n      \"estimated_cost_usd\": 0.0024336,\n      \"latency_ms\": 19094\n    },\n    {\n      \"id\": \"<id004>\",\n      \"ts_ms\": \"<t+3222540>\",\n      \"provider\": \"local-vllm\",\n      \"model\": \"local-reasoner\",\n      \"policy\": \"cloud-assisted\",\n      \"prompt_tokens\": 2033,\n      \"completion_tokens\": 1163,\n      \"total_tokens\": 3196,\n      \"estimated_cost_usd\": 0.0,\n      \"latency_ms\": 2243\n    }\n  ]\n}",
+    "bytes": 993,
+    "content_type": "application/json",
+    "key_paths": [
+      "agent_invocation_id",
+      "duration_ms",
+      "id",
+      "kind",
+      "label",
+      "lane",
+      "model_calls[].completion_tokens",
+      "model_calls[].estimated_cost_usd",
+      "model_calls[].id",
+      "model_calls[].latency_ms",
+      "model_calls[].model",
+      "model_calls[].policy",
+      "model_calls[].prompt_tokens",
+      "model_calls[].provider",
+      "model_calls[].total_tokens",
+      "model_calls[].ts_ms",
+      "payload",
+      "run_id",
+      "severity",
+      "ts_ms"
+    ],
+    "sha256": "77af4a34e2b2f624a362872204f2395eb5fcf3495fc6e28a61a0b324390fe3ee",
+    "status": 200
+  },
+  "event_unknown": {
+    "body": "{\n  \"detail\": \"unknown event 999999\"\n}",
+    "bytes": 33,
+    "content_type": "application/json",
+    "key_paths": [
+      "detail"
+    ],
+    "sha256": "66178e5e52329bc8a6c737301010a7f6cf6a609e35798efbe9c3b503a50ace60",
+    "status": 404
+  },
+  "event_without_model_calls": {
+    "body": "{\n  \"id\": 1,\n  \"run_id\": null,\n  \"ts_ms\": \"<t+0>\",\n  \"lane\": \"capture\",\n  \"kind\": \"note\",\n  \"label\": \"captured under cloud-assisted\",\n  \"severity\": \"info\",\n  \"duration_ms\": null,\n  \"agent_invocation_id\": null,\n  \"payload\": null,\n  \"model_calls\": []\n}",
+    "bytes": 211,
+    "content_type": "application/json",
+    "key_paths": [
+      "agent_invocation_id",
+      "duration_ms",
+      "id",
+      "kind",
+      "label",
+      "lane",
+      "payload",
+      "run_id",
+      "severity",
+      "ts_ms"
+    ],
+    "sha256": "1e4574350c79542da7d418c28ffb0d8751218a2dd97c1cb4a87d31b7db05bdda",
+    "status": 200
+  },
+  "health": {
+    "body": "{\n  \"status\": \"ok\"\n}",
+    "bytes": 15,
+    "content_type": "application/json",
+    "key_paths": [
+      "status"
+    ],
+    "sha256": "61ac5857feb130a1dc475db36bbe21604fddf30024110bb2bea9d8b23e8b1b44",
+    "status": 200
+  },
+  "morning": {
+    "body": "{\n  \"nights\": [],\n  \"questions\": [\n    {\n      \"decision_id\": \"<id000>\",\n      \"entry_id\": \"<id001>\",\n      \"question\": \"[synthetic] Should a note that spans two topics be filed under both, or under the one it is mostly about?\",\n      \"rationale\": \"I built the grouping and both readings produce a coherent digest. They diverge on the notes that matter most \\u2014 the ones written while thinking across two things at once. Duplicating makes the week look busier than it was; picking one loses the connection. I could not choose without knowing which failure you would rather read.\",\n      \"blocking_stage\": null,\n      \"will_leave_the_machine\": false\n    },\n    {\n      \"decision_id\": \"<id002>\",\n      \"entry_id\": \"<id001>\",\n      \"question\": \"[synthetic] The critic ranked the third build above the first. Keep its ranking, or the order they were generated in?\",\n      \"rationale\": \"The critic's note says the third handles an empty week and the first does not, which is the case you described. But it scored lower on everything else, so promoting it trades the common case for the edge one. That is a judgment about what you will actually open.\",\n      \"blocking_stage\": null,\n      \"will_leave_the_machine\": false\n    },\n    {\n      \"decision_id\": \"<id003>\",\n      \"entry_id\": \"<id004>\",\n      \"question\": \"[synthetic] May I search the web for how other people schedule a weekly review?\",\n      \"rationale\": \"The brief asserts Sunday evening and the brain holds nothing about your week. I stopped rather than build a schedule on an assumption I invented. Searching means the topic of this idea leaves the machine.\",\n      \"blocking_stage\": null,\n      \"will_leave_the_machine\": true\n    }\n  ],\n  \"interviewer_error\": null\n}",
+    "bytes": 1648,
+    "content_type": "application/json",
+    "key_paths": [
+      "interviewer_error",
+      "questions[].blocking_stage",
+      "questions[].decision_id",
+      "questions[].entry_id",
+      "questions[].question",
+      "questions[].rationale",
+      "questions[].will_leave_the_machine"
+    ],
+    "sha256": "46686511b0891e358fd768f468a715942fc806d6772d4cbb31e2b0cc2f01219b",
+    "status": 200
+  },
+  "morning_after_answering": {
+    "body": "{\n  \"nights\": [],\n  \"questions\": [\n    {\n      \"decision_id\": \"<id000>\",\n      \"entry_id\": \"<id001>\",\n      \"question\": \"[synthetic] The critic ranked the third build above the first. Keep its ranking, or the order they were generated in?\",\n      \"rationale\": \"The critic's note says the third handles an empty week and the first does not, which is the case you described. But it scored lower on everything else, so promoting it trades the common case for the edge one. That is a judgment about what you will actually open.\",\n      \"blocking_stage\": null,\n      \"will_leave_the_machine\": false\n    },\n    {\n      \"decision_id\": \"<id002>\",\n      \"entry_id\": \"<id003>\",\n      \"question\": \"[synthetic] May I search the web for how other people schedule a weekly review?\",\n      \"rationale\": \"The brief asserts Sunday evening and the brain holds nothing about your week. I stopped rather than build a schedule on an assumption I invented. Searching means the topic of this idea leaves the machine.\",\n      \"blocking_stage\": null,\n      \"will_leave_the_machine\": true\n    }\n  ],\n  \"interviewer_error\": null\n}",
+    "bytes": 1047,
+    "content_type": "application/json",
+    "key_paths": [
+      "interviewer_error",
+      "questions[].blocking_stage",
+      "questions[].decision_id",
+      "questions[].entry_id",
+      "questions[].question",
+      "questions[].rationale",
+      "questions[].will_leave_the_machine"
+    ],
+    "sha256": "8f77167d4fb46c5c4d8b844069f732d0c07dc79af39cb3b55ee322bf584de61f",
+    "status": 200
+  },
+  "morning_including_nights": {
+    "bytes": 3158,
+    "content_type": "application/json",
+    "key_paths": [
+      "interviewer_error",
+      "nights[].effective_policy",
+      "nights[].entry_id",
+      "nights[].night_of",
+      "nights[].outcome",
+      "nights[].run_id",
+      "nights[].stages[].artifacts[].artifact_id",
+      "nights[].stages[].artifacts[].path",
+      "nights[].stages[].reason",
+      "nights[].stages[].stage",
+      "nights[].stages[].status",
+      "questions[].blocking_stage",
+      "questions[].decision_id",
+      "questions[].entry_id",
+      "questions[].question",
+      "questions[].rationale",
+      "questions[].will_leave_the_machine"
+    ],
+    "sha256": "f2458261e0c3d1e9a6cd2a249745079855047ebf72a8212cc146075a67234d06",
+    "status": 200
+  },
+  "runs": {
+    "body": "[\n  {\n    \"id\": \"<id000>\",\n    \"night_of\": \"2026-08-27\",\n    \"started_at_ms\": \"<t+0>\",\n    \"ended_at_ms\": null,\n    \"effective_policy\": \"cloud-assisted\",\n    \"compute_profile\": \"spark\",\n    \"outcome\": null,\n    \"furthest_stage\": null,\n    \"is_synthetic\": true,\n    \"first_event_ms\": \"<t+0>\",\n    \"last_event_end_ms\": \"<t+30390064>\",\n    \"event_count\": 1227,\n    \"captured_tz\": \"America/Los_Angeles\",\n    \"tz_offset_min\": -420\n  }\n]",
+    "bytes": 370,
+    "content_type": "application/json",
+    "key_paths": [
+      "[].captured_tz",
+      "[].compute_profile",
+      "[].effective_policy",
+      "[].ended_at_ms",
+      "[].event_count",
+      "[].first_event_ms",
+      "[].furthest_stage",
+      "[].id",
+      "[].is_synthetic",
+      "[].last_event_end_ms",
+      "[].night_of",
+      "[].outcome",
+      "[].started_at_ms",
+      "[].tz_offset_min"
+    ],
+    "sha256": "d86793f1b22f4c7b9ff20c51c3a504fb27e01ef812054a486c7f9f8a932a84ec",
+    "status": 200
+  },
+  "timeline": {
+    "bytes": 273459,
+    "content_type": "application/json",
+    "key_paths": [
+      "events[].agent_invocation_id",
+      "events[].duration_ms",
+      "events[].id",
+      "events[].kind",
+      "events[].label",
+      "events[].lane",
+      "events[].severity",
+      "events[].ts_ms",
+      "invocations[].depth",
+      "invocations[].ended_at_ms",
+      "invocations[].id",
+      "invocations[].outcome",
+      "invocations[].parent_invocation_id",
+      "invocations[].stage",
+      "invocations[].started_at_ms",
+      "lanes[]",
+      "run.captured_tz",
+      "run.compute_profile",
+      "run.effective_policy",
+      "run.ended_at_ms",
+      "run.event_count",
+      "run.first_event_ms",
+      "run.furthest_stage",
+      "run.id",
+      "run.is_synthetic",
+      "run.last_event_end_ms",
+      "run.night_of",
+      "run.outcome",
+      "run.started_at_ms",
+      "run.tz_offset_min",
+      "stages[].ended_at_ms",
+      "stages[].seq",
+      "stages[].stage",
+      "stages[].started_at_ms",
+      "stages[].status"
+    ],
+    "sha256": "efca00c92ed2f536290b636126de893ae166a6d3f379300cb13acb6190dcbb77",
+    "status": 200
+  },
+  "timeline_unknown_run": {
+    "body": "{\n  \"detail\": \"unknown run 'not-a-run'\"\n}",
+    "bytes": 36,
+    "content_type": "application/json",
+    "key_paths": [
+      "detail"
+    ],
+    "sha256": "6f7accefbf8fed52348e5aac6e7f97e0aba9ea210cf6417af381a98c053353fe",
+    "status": 404
+  }
+}

@@ -5,14 +5,14 @@ only thing standing between a refactor and a rewrite.
 
 ## 1. Characterize before moving anything
 
-- [ ] 1.1 Seed a fixed database (`--seed 42`) and capture every route's status,
+- [x] 1.1 Seed a fixed database (`--seed 42`) and capture every route's status,
       content type and body to a fixture file checked into the test tree.
-- [ ] 1.2 Write the equality test against those fixtures. It runs against the
+- [x] 1.2 Write the equality test against those fixtures. It runs against the
       current, unsplit `app.py`.
-- [ ] 1.3 **Prove it can fail**: rename one field in a response model, watch the
+- [x] 1.3 **Prove it can fail**: rename one field in a response model, watch the
       test go red, revert. Record what the failure said. A test that stays green
       here is comparing nothing and the rest of this change is unverified.
-- [ ] 1.4 Capture the routes with no fixture-able body too — `/artifacts/{id}`
+- [x] 1.4 Capture the routes with no fixture-able body too — `/artifacts/{id}`
       returns bytes and a content type, and its 404s are three distinct
       messages. Those are part of the contract.
 
