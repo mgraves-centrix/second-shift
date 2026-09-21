@@ -20,22 +20,26 @@ at once only if the set of files they write is disjoint. Everything below is
 grouped by that rule, not by how interesting it is.
 
 ```
-   API_LAYER ──────┐   (run early: it de-collides four later sessions)
+   API_LAYER ─────✅┐
    CONFIGURATION ✅┤
                    ├──> NIGHT_PIPELINE ✅> ARTIFACTS ✅┐
-   AGENTS ────────✅┘        │                         ├──> JUDGE_MODE ──> SUBMISSION
+   AGENTS ────────✅┘        │                         ├──> JUDGE_MODE ✅> SUBMISSION
                              ├──> RESEARCH ✅─────────┤                      ^
    RETRIEVAL ───────────────✅┘                        │                      │
                                                        │       EVAL_SCORING ──┘
-   FRONTEND ✅> MORNING_INTERVIEW ✅────────────────────┘
-
-   ✅ shipped. API_LAYER is now the blocker: five sessions add routes to one
-   file, and it is the only unshipped prompt that makes the others cheaper.
-
-   TEST_HARNESS ✅ OPERATIONS    ASR    NEBIUS_EXECUTOR
-                   needs the     needs  four decisions
-                   machine       Spark  resolved 2 Sep
+   FRONTEND ✅> MORNING_INTERVIEW ✅────────────────────┘        curve ✅
+                                                                scoring needs
+   TEST_HARNESS ✅ OPERATIONS ✅  ASR    NEBIUS_EXECUTOR         a judge
+                                 needs  a credential, which
+                                 Spark  is on the machine
 ```
+
+**✅ shipped. Everything unshipped is waiting on the same thing.** `ASR`,
+`NEBIUS_EXECUTOR`, the scoring half of `EVAL_SCORING`, and the verification half
+of `OPERATIONS` and `JUDGE_MODE` all need the always-on machine — for a model,
+for a credential that is on it, for a reboot, or for a container runtime.
+`docs/SPEC_ROADMAP.md`'s "Owed verification" section is the one list of what a
+session there owes, and it is where to look before opening any of these.
 
 Shipped rows are struck through. A prompt for a shipped capability is a record
 of what was asked, not a session to run — read it for the reasoning, and read
@@ -44,7 +48,7 @@ all three cases differs from the prompt in at least one decision.
 
 | # | Prompt | Owns | Runs after | Parallel with |
 |---|---|---|---|---|
-| 0 | `API_LAYER.md` | `api/`, `api/app.py` | — | 8, 10 |
+| 0 | ~~`API_LAYER.md`~~ | ✅ shipped 21 Sep — nine routes in five modules under `api/routes/` | — | — |
 | 1 | ~~`CONFIGURATION.md`~~ | ✅ shipped 2 Sep | — | — |
 | 2 | ~~`AGENTS.md`~~ | ✅ shipped 2 Sep | — | — |
 | 3 | ~~`RETRIEVAL.md`~~ | ✅ shipped 2 Sep | — | — |
@@ -55,19 +59,23 @@ all three cases differs from the prompt in at least one decision.
 | 8 | ~~`FRONTEND.md`~~ | ✅ shipped 3 Sep | — | — |
 | 9 | ~~`MORNING_INTERVIEW.md`~~ | ✅ shipped 3 Sep — server half and `app/morning/` | — | — |
 | 10 | ~~`TEST_HARNESS.md`~~ | ✅ shipped 17 Sep — `scripts/gate.py`, CI | — | — |
-| 11 | `JUDGE_MODE.md` | `deploy/judge/` | 4, 6, 9 | 12 |
-| 12 | `EVAL_SCORING.md` | `eval_runs` rows, the curve | a judge | 11 |
-| 13 | `SUBMISSION.md` | `docs/NEBIUS_USAGE.md`, the write-up | 11, 12 | — |
-| — | `OPERATIONS.md` | `deploy/`, the machine | — | everything |
+| 11 | ~~`JUDGE_MODE.md`~~ | ✅ shipped 20 Sep — `deploy/judge/`. The container has never been built; that needs a machine with a container runtime | — | — |
+| 12 | `EVAL_SCORING.md` | the week-8 run. **The curve shipped 21 Sep** | a judge, which needs Token Factory | — |
+| 13 | `SUBMISSION.md` | the write-up. **`docs/NEBIUS_USAGE.md` was written 21 Sep**, with three claims marked not yet run and the query for each | 12 | — |
+| — | ~~`OPERATIONS.md`~~ | ✅ shipped 21 Sep — `python -m secondshift.ops`. The reboot and the on-machine restore are owed | — | — |
 | — | `ASR.md` | `providers/asr*`, spike F | — | everything |
 
-**Three collision surfaces, not two.** Two sessions must never both be in
-`apps/web/app/`, in `secondshift/night/`, or in **`api/app.py`** — which is a
-single file that five of these sessions need to add routes to. **368 lines when
-this was written, 473 on 19 Sep, 539 on 21 Sep** — a trend rather than a figure,
-because the figure ages: the 473 here was wrong two days after it was written.
-Every session that touches the API leaves the file bigger, and each one reads
-all of it first.
+**Two collision surfaces now, and the third is closed.** Two sessions must never
+both be in `apps/web/app/` or in `secondshift/night/`.
+
+The third was `api/app.py`, a single file five sessions needed to add routes to:
+368 lines when this was written, 473 on 19 Sep, 539 on 21 Sep. `api-layer`
+shipped that day and it is 79 lines with no route in it; a route now lives in
+`api/routes/<capability>.py` and adding one touches one file, measured rather
+than asserted. Three of the five sessions ran in sequence before the split and
+paid the cost, so the scheduling argument was largely spent by the time it
+landed — recorded because it is the second time this index's own ordering advice
+was right and ignored.
 
 That third one was missed when this index was first written, and it is the reason
 `API_LAYER.md` exists and should run early: it splits the file into
