@@ -27,6 +27,8 @@ import hashlib
 import json
 import re
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -235,7 +237,8 @@ def capture(client: TestClient, world: dict[str, Any]) -> dict[str, dict]:
     return out
 
 
-def build_world(tmp: Path) -> tuple[TestClient, dict[str, Any]]:
+@contextmanager
+def build_world(tmp: Path) -> Iterator[tuple[TestClient, dict[str, Any]]]:
     """A generated night, a client over it, and the ids the capture needs.
 
     The one place the world is built, so the record and the test that checks it
@@ -243,6 +246,11 @@ def build_world(tmp: Path) -> tuple[TestClient, dict[str, Any]]:
     rather than pytest fixtures for the same reason: the regeneration script has
     no fixtures, and a capture produced under conditions the test does not
     reproduce is a capture of nothing.
+
+    A context manager because it opens a connection, and an unclosed sqlite3
+    connection raises during interpreter finalization — which `filterwarnings =
+    ["error"]` correctly turns into a failure, attributed to whichever test
+    happened to be running when the collector got to it.
     """
     import os
 
@@ -322,15 +330,17 @@ def build_world(tmp: Path) -> tuple[TestClient, dict[str, Any]]:
         # carries questions and no nights.
         "synthetic_client": app_for(True),
     }
-    return app_for(False), world
+    try:
+        yield app_for(False), world
+    finally:
+        conn.close()
 
 
 def write_golden() -> int:
     """Regenerate the record. Deliberate, and never run by the test suite."""
     import tempfile
 
-    with tempfile.TemporaryDirectory() as tmp:
-        client, world = build_world(Path(tmp))
+    with tempfile.TemporaryDirectory() as tmp, build_world(Path(tmp)) as (client, world):
         GOLDEN.parent.mkdir(parents=True, exist_ok=True)
         GOLDEN.write_text(
             json.dumps(capture(client, world), indent=2, sort_keys=True) + "\n"

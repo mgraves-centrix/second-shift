@@ -18,13 +18,13 @@ only thing standing between a refactor and a rewrite.
 
 ## 2. Lift the context out
 
-- [ ] 2.1 `api/context.py`: move `Context` and `build_context` verbatim; add
+- [x] 2.1 `api/context.py`: move `Context` and `build_context` verbatim; add
       `get_context(request)` reading `request.app.state.context`.
-- [ ] 2.2 `app.py` re-exports `Context` and `build_context`, so
+- [x] 2.2 `app.py` re-exports `Context` and `build_context`, so
       `from secondshift.api.app import Context, create_app` keeps working. Three
       test files and `main.py` import from there.
-- [ ] 2.3 `create_app` sets `app.state.context` before including anything.
-- [ ] 2.4 Gate. No test modified.
+- [x] 2.3 `create_app` sets `app.state.context` before including anything.
+- [x] 2.4 Gate. No test modified.
 
 ## 3. Lift the mappers out
 

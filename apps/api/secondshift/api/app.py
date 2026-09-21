@@ -18,20 +18,15 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.staticfiles import StaticFiles
 
-from ..airlock.capability import CapabilityReport, build_report
+from ..airlock.capability import CapabilityReport
 from ..artifacts.store import artifact_root
-from ..config import ResolvedProfile, resolve_profile
-from ..db.connection import connect, now_ms
-from ..db.migrate import migrate
-from ..db.repository import Repository
-from ..telemetry.pricing import PricingTable
-from ..telemetry.recorder import Recorder
+from ..db.connection import now_ms
+from .context import Context, build_context, get_context
 from .location import home_location
 from ..morning import assemble
 from ..morning.interview import answer
@@ -57,6 +52,10 @@ from .schemas import (
 )
 from .titles import derive_title
 
+#: Re-exported: `main.py` and the tests import the context from here, and moving
+#: it out of this module is not a reason to make them say so.
+__all__ = ["Context", "build_context", "create_app"]
+
 
 #: The exported PWA, when it has been built. Serving it from the API keeps the
 #: capture app and its API on one origin — no CORS, no second process to be down
@@ -70,38 +69,6 @@ _MEDIA_TYPES = {
     ".txt": "text/plain; charset=utf-8",
     ".json": "application/json",
 }
-
-
-@dataclass
-class Context:
-    """Everything a request handler needs, resolved once at startup."""
-
-    repo: Repository
-    recorder: Recorder
-    profile: ResolvedProfile
-    report: CapabilityReport
-    is_synthetic: bool
-
-
-def build_context(
-    db_path: str,
-    *,
-    is_synthetic: bool = False,
-    profile: ResolvedProfile | None = None,
-) -> Context:
-    conn = connect(db_path)
-    migrate(conn)
-    repo = Repository(conn)
-    resolved = profile if profile is not None else resolve_profile()
-    return Context(
-        repo=repo,
-        recorder=Recorder(
-            repo, pricing=PricingTable.load(), compute_profile=str(resolved.profile)
-        ),
-        profile=resolved,
-        report=build_report(resolved),
-        is_synthetic=is_synthetic,
-    )
 
 
 def _capability_payload(report: CapabilityReport) -> CapabilityResponse:
@@ -170,9 +137,9 @@ def _entry_response(row: sqlite3.Row, *, duplicate: bool) -> EntryResponse:
 
 def create_app(context: Context) -> FastAPI:
     app = FastAPI(title="Second Shift — capture", version="0.1.0")
-
-    def get_context() -> Context:
-        return context
+    # Read back by `get_context`. On the application rather than in a closure,
+    # so a route declared in another module can reach it.
+    app.state.context = context
 
     @app.get("/health")
     def health() -> dict[str, str]:

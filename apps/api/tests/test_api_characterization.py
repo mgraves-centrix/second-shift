@@ -33,8 +33,8 @@ def captured(tmp_path_factory) -> dict:
     requests — one of them a quarter-megabyte timeline — is the expensive part,
     and every case reads the same capture.
     """
-    client, world = build_world(tmp_path_factory.mktemp("characterize"))
-    return capture(client, world)
+    with build_world(tmp_path_factory.mktemp("characterize")) as (client, world):
+        return capture(client, world)
 
 
 def _case_names() -> list[str]:
