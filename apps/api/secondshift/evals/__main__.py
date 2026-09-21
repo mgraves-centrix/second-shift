@@ -24,7 +24,7 @@ from ..db.connection import connect
 from ..db.migrate import migrate
 from ..db.repository import Repository
 from .content import Rubric, load_prompts, load_rubric
-from .runner import EvalRunner
+from .runner import EvalRunner, NotComparable
 
 DEFAULT_DB = os.path.expanduser("~/second-shift-data/second-shift.db")
 DEFAULT_CANDIDATES = "config/evals/candidates.md"
@@ -128,12 +128,66 @@ def _dispatch(args, runner: EvalRunner, rubric: Rubric) -> int:
             print(f"  overall mean {summary.mean:.2f}")
         return 0
 
+    if args.command == "curve":
+        return _curve(runner, args.args)
+
     return 2
+
+
+def _curve(runner: EvalRunner, ids: list[str]) -> int:
+    """The comparison the submission rests on, or the reason there isn't one.
+
+    With no arguments it takes the oldest and newest scored runs, because
+    picking two identifiers by hand out of a table on another machine is how the
+    wrong pair gets compared.
+    """
+    if len(ids) == 2:
+        earlier_id, later_id = ids
+    elif ids:
+        print("curve takes two eval run ids, or none to take the oldest and newest",
+              file=sys.stderr)
+        return 2
+    else:
+        scored = [r for r in runner.recorded_runs() if not r.awaiting]
+        if len(scored) < 2:
+            print(f"{len(scored)} scored run(s): nothing to compare yet. The curve is "
+                  "a comparison, and a comparison needs two.", file=sys.stderr)
+            return 1
+        earlier_id, later_id = scored[0].eval_run_id, scored[-1].eval_run_id
+
+    try:
+        curve = runner.curve(earlier_id, later_id)
+    except (NotComparable, ValueError) as exc:
+        print(f"not comparable: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"{curve.earlier.eval_run_id}  brain {curve.earlier.brain_sha[:12]}"
+          f"  mean {curve.earlier.mean:5.2f}")
+    print(f"{curve.later.eval_run_id}  brain {curve.later.brain_sha[:12]}"
+          f"  mean {curve.later.mean:5.2f}")
+    print(f"judged by {curve.earlier.judge_model}, rubric {curve.earlier.rubric_sha[:12]}")
+    print()
+    for delta in curve.dimensions:
+        print(f"  {delta.dimension:16s} {delta.earlier:5.2f} -> {delta.later:5.2f}"
+              f"  {delta.difference:+5.2f}")
+    print()
+    # The spread is never optional. A difference shown without it is the version
+    # that gets screenshotted, and it is not evidence.
+    print(f"  difference {curve.difference:+.2f}  against a spread of {curve.spread:.2f}")
+    print(f"  {curve.agreeing_dimensions} of {len(curve.dimensions)} dimensions moved the same way")
+    if curve.moved:
+        print("  larger than the sampling spread")
+    else:
+        print("  inside the sampling spread: not shown to have moved")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="secondshift.evals")
-    parser.add_argument("command", choices=["seed", "activate", "baseline", "summarize", "status"])
+    parser.add_argument(
+        "command",
+        choices=["seed", "activate", "baseline", "summarize", "status", "curve"],
+    )
     parser.add_argument("args", nargs="*")
     parser.add_argument("--db", default=os.environ.get("SECOND_SHIFT_DB", DEFAULT_DB))
     parser.add_argument("--brain", default=None)

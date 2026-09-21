@@ -13,6 +13,7 @@ baseline pinned rather than the one on disk.
 
 from __future__ import annotations
 
+import json
 import statistics
 from dataclasses import dataclass, field
 
@@ -22,7 +23,7 @@ from ..db.ids import new_ulid
 from ..db.repository import Repository
 from ..telemetry.failures import BadOutput
 from .content import PromptCandidate, Rubric
-from .judge import Judge, Judgement, UnreadableJudgement
+from .judge import DIMENSIONS, Judge, Judgement, UnreadableJudgement
 
 #: A run with no judge recorded has inputs but no scores. Stored in the judge
 #: column rather than a status column: the absence *is* the state, and a
@@ -32,6 +33,15 @@ AWAITING = "awaiting-scoring"
 
 class NoJudgeConfigured(RuntimeError):
     """Scoring was attempted with nothing to score with."""
+
+
+class NotComparable(RuntimeError):
+    """Two runs that cannot be compared without the answer meaning something else.
+
+    Raised rather than warned. A warning on a report that ends up in a
+    submission is a warning nobody sees, and every condition that raises this
+    changes what the reported number is a measurement *of*.
+    """
 
 
 class RubricMismatch(RuntimeError):
@@ -62,6 +72,70 @@ class PromptSummary:
         evidence.
         """
         return statistics.stdev(self.samples) if len(self.samples) > 1 else 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class DimensionDelta:
+    """One rubric dimension across two runs.
+
+    Carried because an overall mean that moved by 0.4 could be five dimensions
+    improving slightly or `interrogation` improving substantially while `voice`
+    regresses — and for a product whose thesis is that the brain learned this
+    person's judgement, the second is the finding.
+    """
+
+    dimension: str
+    earlier: float
+    later: float
+
+    @property
+    def difference(self) -> float:
+        return self.later - self.earlier
+
+
+@dataclass(frozen=True, slots=True)
+class Curve:
+    """Two runs, and whether the difference between them survives the noise."""
+
+    earlier: RunSummary
+    later: RunSummary
+    dimensions: list[DimensionDelta]
+
+    @property
+    def difference(self) -> float:
+        return self.later.mean - self.earlier.mean
+
+    @property
+    def spread(self) -> float:
+        """The wider of the two runs', which is what the difference must clear."""
+        return max(_spread_of(self.earlier), _spread_of(self.later))
+
+    @property
+    def moved(self) -> bool:
+        """Whether the difference is larger than the sampling spread.
+
+        Not a significance test. Six prompts and a handful of samples make a
+        t-test arithmetic dressed as rigor; this is a statement a reader can
+        check by eye, and it does not imply a p-value nobody computed.
+        """
+        return abs(self.difference) > self.spread
+
+    @property
+    def agreeing_dimensions(self) -> int:
+        """How many dimensions moved the same way the overall mean did.
+
+        An overall mean can be carried by one dimension. A claim about the whole
+        rubric needs more than one of its five to agree.
+        """
+        if self.difference == 0:
+            return 0
+        sign = 1 if self.difference > 0 else -1
+        return sum(1 for d in self.dimensions if d.difference * sign > 0)
+
+
+def _spread_of(summary: RunSummary) -> float:
+    values = [s for p in summary.prompts for s in p.samples]
+    return statistics.stdev(values) if len(values) > 1 else 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -329,6 +403,108 @@ class EvalRunner:
         )
 
     # -- reading -----------------------------------------------------------
+
+    def curve(self, earlier_id: str, later_id: str) -> Curve:
+        """Compare two runs, or refuse to.
+
+        Every refusal below is a way the reported number would measure something
+        other than what it appears to. They raise rather than warn: this output
+        ends up in a submission, and a warning on a report nobody re-reads is
+        not a guard.
+        """
+        earlier = self.summarize(earlier_id)
+        later = self.summarize(later_id)
+
+        synthetic = [
+            run_id
+            for run_id in (earlier_id, later_id)
+            if self._repo.connection.execute(
+                "SELECT is_synthetic FROM eval_runs WHERE id = ?", (run_id,)
+            ).fetchone()["is_synthetic"]
+        ]
+        if synthetic:
+            raise NotComparable(
+                f"{', '.join(synthetic)} is synthetic. A generated run's scores are "
+                "numbers like any other once they are in the table, which is why they "
+                "are excluded here rather than left to whoever reads the output."
+            )
+
+        for summary in (earlier, later):
+            if not summary.prompts:
+                raise NotComparable(
+                    f"{summary.eval_run_id} has no results; it has been recorded "
+                    "but never scored"
+                )
+            if not summary.complete:
+                raise NotComparable(
+                    f"{summary.eval_run_id} is incomplete. A partial run is not "
+                    "comparable to a whole one: averaging over the samples that "
+                    "survived hides which prompts did not."
+                )
+
+        if earlier.rubric_sha != later.rubric_sha:
+            raise NotComparable(
+                f"different rubrics — {earlier.rubric_sha[:12]} and "
+                f"{later.rubric_sha[:12]}. A rubric hash is pinned to a measurement "
+                "so that two runs graded against different text cannot be compared "
+                "without anyone noticing."
+            )
+        if earlier.judge_model != later.judge_model:
+            raise NotComparable(
+                f"different judges — {earlier.judge_model} and {later.judge_model}. "
+                "Two judges are two instruments, and a curve across instruments is "
+                "not a curve."
+            )
+        if earlier.brain_sha and earlier.brain_sha == later.brain_sha:
+            raise NotComparable(
+                f"both runs pin brain {earlier.brain_sha[:12]}. The brain did not "
+                "change between them, so the difference is sampling noise and "
+                "reporting it as a result would be reporting the noise."
+            )
+
+        return Curve(
+            earlier=earlier, later=later, dimensions=self._dimensions(earlier_id, later_id)
+        )
+
+    def _dimensions(self, earlier_id: str, later_id: str) -> list[DimensionDelta]:
+        """Per dimension, read from `subscores_json` — which nothing read back
+        until this.
+
+        A dimension absent from a run's subscores is left out rather than
+        reported as zero. Zero is a real score meaning the worst possible
+        answer, and the same argument that makes an unparseable judgement a
+        typed failure makes a missing dimension one here.
+        """
+        earlier = self._subscores(earlier_id)
+        later = self._subscores(later_id)
+        return [
+            DimensionDelta(
+                dimension=name,
+                earlier=statistics.fmean(earlier[name]),
+                later=statistics.fmean(later[name]),
+            )
+            for name in DIMENSIONS
+            if earlier.get(name) and later.get(name)
+        ]
+
+    def _subscores(self, eval_run_id: str) -> dict[str, list[float]]:
+        out: dict[str, list[float]] = {}
+        for row in self._repo.connection.execute(
+            "SELECT subscores_json FROM eval_results WHERE eval_run_id = ?",
+            (eval_run_id,),
+        ):
+            if not row["subscores_json"]:
+                continue
+            try:
+                parsed = json.loads(row["subscores_json"])
+            except json.JSONDecodeError:
+                # Unreadable detail is skipped rather than counted as zero, for
+                # the same reason an unreadable judgement is a typed failure.
+                continue
+            for name, value in parsed.items():
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    out.setdefault(name, []).append(float(value))
+        return out
 
     def summarize(self, eval_run_id: str) -> RunSummary:
         run = self._repo.connection.execute(

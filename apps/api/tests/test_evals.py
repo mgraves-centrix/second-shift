@@ -21,6 +21,7 @@ from secondshift.evals.runner import (
     AWAITING,
     EvalRunner,
     NoJudgeConfigured,
+    NotComparable,
     RubricMismatch,
 )
 
@@ -620,3 +621,274 @@ class TestAJudgeDeploymentCannotScoreItselfIntoTheCurve:
                 c["name"] for c in repo.connection.execute(f"PRAGMA table_info({name})")
             }
             assert "is_synthetic" in columns, f"{name} can hold unmarked rows"
+
+
+class TestTheCurveRefusesMoreThanItReports:
+    """The submission's centerpiece is a comparison, and comparisons go wrong
+    quietly. Every refusal here is a way the reported number would measure
+    something other than what it appears to."""
+
+    @pytest.fixture
+    def two_runs(self, runner, rubric, brain):
+        """Two scored runs over two brain states, which is the only shape that
+        is actually comparable."""
+        _seed_and_activate(runner, rubric)
+        first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+        runner.score(first, judge=_FixedJudge(GOOD), generate=_generate, rubric=rubric)
+
+        (Path(brain.path) / "profile.md").write_text("# Profile\n\nWeek eight belief.\n")
+        for args in (["add", "-A"], ["commit", "-q", "-m", "week eight"]):
+            subprocess.run(["git", "-C", str(brain.path), *args], check=True, capture_output=True)
+
+        second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
+        runner.score(second, judge=_FixedJudge({d: 5 for d in DIMENSIONS}), generate=_generate, rubric=rubric)
+        return first, second
+
+    def test_two_comparable_runs_produce_a_curve(self, runner, two_runs):
+        first, second = two_runs
+
+        curve = runner.curve(first, second)
+
+        assert curve.difference > 0
+        assert len(curve.dimensions) == len(DIMENSIONS)
+
+    def test_the_difference_is_reported_against_the_spread(self, runner, two_runs):
+        """A difference without a spread is the version that gets screenshotted."""
+        first, second = two_runs
+
+        curve = runner.curve(first, second)
+
+        assert curve.spread == 0.0, "the stub judge is deterministic, so there is no spread"
+        assert curve.moved is True
+
+    def test_a_difference_inside_the_noise_is_not_a_change(self, runner, rubric, brain):
+        """A real difference, and still not a change.
+
+        The first draft of this test used two judges whose means were exactly
+        equal, so `moved` was False for the wrong reason — replacing the spread
+        comparison with `difference != 0` left it green. A test for "inside the
+        noise" needs a difference that is not zero.
+        """
+        _seed_and_activate(runner, rubric)
+        first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+        runner.score(first, judge=_VaryingJudge([1, 5, 3]), generate=_generate, rubric=rubric)
+
+        (Path(brain.path) / "profile.md").write_text("# Profile\n\nLater.\n")
+        for args in (["add", "-A"], ["commit", "-q", "-m", "later"]):
+            subprocess.run(["git", "-C", str(brain.path), *args], check=True, capture_output=True)
+        second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
+        runner.score(second, judge=_VaryingJudge([3, 4, 3]), generate=_generate, rubric=rubric)
+
+        curve = runner.curve(first, second)
+
+        assert curve.difference != 0, "a zero difference would prove nothing here"
+        assert abs(curve.difference) < curve.spread
+        assert curve.moved is False
+
+    def test_the_same_brain_is_refused(self, runner, rubric):
+        """The one most likely to happen by accident: run the week-8 eval
+        without the brain having moved, and the curve reports sampling noise."""
+        _seed_and_activate(runner, rubric)
+        first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+        runner.score(first, judge=_FixedJudge(GOOD), generate=_generate, rubric=rubric)
+        second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
+        runner.score(second, judge=_FixedJudge(GOOD), generate=_generate, rubric=rubric)
+
+        with pytest.raises(NotComparable, match="brain did not change"):
+            runner.curve(first, second)
+
+    def test_a_different_rubric_is_refused(self, runner, rubric, two_runs, tmp_path, repo):
+        first, second = two_runs
+        repo.connection.execute(
+            "UPDATE eval_runs SET rubric_sha = 'deadbeefdeadbeef' WHERE id = ?", (second,)
+        )
+
+        with pytest.raises(NotComparable, match="different rubrics"):
+            runner.curve(first, second)
+
+    def test_a_different_judge_is_refused(self, runner, two_runs, repo):
+        """Two judges are two instruments."""
+        first, second = two_runs
+        repo.connection.execute(
+            "UPDATE eval_runs SET judge_model = 'some-other-model' WHERE id = ?", (second,)
+        )
+
+        with pytest.raises(NotComparable, match="different judges"):
+            runner.curve(first, second)
+
+    def test_an_incomplete_run_is_refused(self, runner, two_runs, repo):
+        """Averaging over the samples that survived hides which prompts did not."""
+        first, second = two_runs
+        repo.connection.execute(
+            "DELETE FROM eval_results WHERE eval_run_id = ? AND sample_index = 2", (second,)
+        )
+
+        with pytest.raises(NotComparable, match="incomplete"):
+            runner.curve(first, second)
+
+    def test_a_synthetic_run_is_refused(self, runner, two_runs, repo):
+        first, second = two_runs
+        repo.connection.execute("UPDATE eval_runs SET is_synthetic = 1 WHERE id = ?", (second,))
+
+        with pytest.raises(NotComparable, match="synthetic"):
+            runner.curve(first, second)
+
+    def test_an_unscored_run_is_refused(self, runner, rubric, two_runs):
+        first, _ = two_runs
+        unscored = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
+
+        with pytest.raises(NotComparable, match="never scored"):
+            runner.curve(first, unscored)
+
+    def test_a_regression_hidden_by_the_mean_is_visible(self, runner, rubric, brain):
+        """The case the per-dimension breakdown exists for, and the one that will
+        not occur by accident in a fixture: the overall mean improves while one
+        dimension goes backwards."""
+        _seed_and_activate(runner, rubric)
+        first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+        runner.score(
+            first,
+            judge=_FixedJudge({**{d: 3 for d in DIMENSIONS}, "voice": 5}),
+            generate=_generate,
+            rubric=rubric,
+        )
+
+        (Path(brain.path) / "profile.md").write_text("# Profile\n\nLouder.\n")
+        for args in (["add", "-A"], ["commit", "-q", "-m", "louder"]):
+            subprocess.run(["git", "-C", str(brain.path), *args], check=True, capture_output=True)
+        second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
+        runner.score(
+            second,
+            judge=_FixedJudge({**{d: 5 for d in DIMENSIONS}, "voice": 1}),
+            generate=_generate,
+            rubric=rubric,
+        )
+
+        curve = runner.curve(first, second)
+        voice = next(d for d in curve.dimensions if d.dimension == "voice")
+
+        assert curve.difference > 0, "the overall mean improved"
+        assert voice.difference < 0, "and voice regressed, which the mean hides"
+        assert curve.agreeing_dimensions == len(DIMENSIONS) - 1
+
+
+class _FixedJudge:
+    """The same per-dimension scores every time.
+
+    `StubJudge` varies its scores with the output on purpose, so a test can tell
+    one result from another. A curve needs the opposite: the difference between
+    two runs is the thing under test, so everything else has to hold still.
+    """
+
+    name = "fixed"
+    version = "1"
+
+    def __init__(self, scores: dict[str, int]) -> None:
+        self._scores = dict(scores)
+
+    def score(self, *, output: str, rubric: str, prompt: str) -> Judgement:
+        return Judgement(dict(self._scores))
+
+
+class _VaryingJudge:
+    """A judge whose scores vary by sample, so a spread exists to compare against."""
+
+    name = "varying"
+    version = "1"
+
+    def __init__(self, scores: list[int]) -> None:
+        self._scores = scores
+        self._calls = 0
+
+    def score(self, *, output: str, rubric: str, prompt: str) -> Judgement:
+        value = self._scores[self._calls % len(self._scores)]
+        self._calls += 1
+        return Judgement({d: value for d in DIMENSIONS})
+
+
+class TestTheCurveCommand:
+    """`status` once printed the hash of the file it had just read and exited
+    zero either way. The curve's exit code is part of its report for the same
+    reason: this output goes into a submission, and "it printed something" is
+    not the same as "there was something to print"."""
+
+    def _run(self, tmp_path, rubric_path, *args) -> int:
+        return main([
+            "curve",
+            *args,
+            "--db", str(tmp_path / "second-shift.db"),
+            "--rubric", str(rubric_path),
+            "--brain", str(tmp_path / "brain"),
+        ])
+
+    def test_nothing_to_compare_exits_non_zero(self, runner, rubric, tmp_path, capsys):
+        """Today's real answer, and the one it must not dress up as a report."""
+        code = self._run(tmp_path, rubric.path)
+
+        assert code == 1
+        assert "nothing to compare yet" in capsys.readouterr().err
+
+    def test_one_scored_run_is_still_not_a_curve(self, runner, rubric, tmp_path, capsys):
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+        runner.score(run_id, judge=StubJudge(), generate=_generate, rubric=rubric)
+
+        code = self._run(tmp_path, rubric.path)
+
+        assert code == 1
+        assert "1 scored run" in capsys.readouterr().err
+
+    def test_a_refusal_is_reported_on_stderr_and_exits_non_zero(
+        self, runner, rubric, tmp_path, capsys
+    ):
+        _seed_and_activate(runner, rubric)
+        first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+        runner.score(first, judge=StubJudge(), generate=_generate, rubric=rubric)
+        second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
+        runner.score(second, judge=StubJudge(), generate=_generate, rubric=rubric)
+
+        code = self._run(tmp_path, rubric.path)
+
+        assert code == 1
+        assert "brain did not change" in capsys.readouterr().err
+
+    def test_a_comparison_prints_the_spread_beside_the_difference(
+        self, runner, rubric, brain, tmp_path, capsys
+    ):
+        """There is no output shape that shows a difference without its spread."""
+        _seed_and_activate(runner, rubric)
+        first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+        runner.score(first, judge=_FixedJudge({d: 3 for d in DIMENSIONS}),
+                     generate=_generate, rubric=rubric)
+        (Path(brain.path) / "profile.md").write_text("# Profile\n\nLater.\n")
+        for args in (["add", "-A"], ["commit", "-q", "-m", "later"]):
+            subprocess.run(["git", "-C", str(brain.path), *args], check=True, capture_output=True)
+        second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
+        runner.score(second, judge=_FixedJudge({d: 5 for d in DIMENSIONS}),
+                     generate=_generate, rubric=rubric)
+
+        code = self._run(tmp_path, rubric.path)
+        out = capsys.readouterr().out
+
+        assert code == 0
+        assert "difference" in out and "spread" in out
+        assert "dimensions moved the same way" in out
+        for dimension in DIMENSIONS:
+            assert dimension in out
+
+    def test_two_identifiers_are_taken_in_order(self, runner, rubric, tmp_path, capsys):
+        """A wrong pair compared by hand is the failure the no-argument form avoids."""
+        _seed_and_activate(runner, rubric)
+        first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+        runner.score(first, judge=StubJudge(), generate=_generate, rubric=rubric)
+
+        code = self._run(tmp_path, rubric.path, first, first)
+
+        assert code == 1
+        assert "brain did not change" in capsys.readouterr().err
+
+    def test_one_identifier_is_refused_as_a_usage_error(self, runner, rubric, tmp_path, capsys):
+        code = self._run(tmp_path, rubric.path, "only-one")
+
+        assert code == 2
+        assert "two eval run ids" in capsys.readouterr().err
