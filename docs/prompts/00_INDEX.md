@@ -63,9 +63,11 @@ all three cases differs from the prompt in at least one decision.
 
 **Three collision surfaces, not two.** Two sessions must never both be in
 `apps/web/app/`, in `secondshift/night/`, or in **`api/app.py`** — which is a
-single file that five of these sessions need to add routes to. It was 368 lines
-when this was written and is 473 now, which is the collision getting worse
-rather than the estimate being wrong.
+single file that five of these sessions need to add routes to. **368 lines when
+this was written, 473 on 19 Sep, 539 on 21 Sep** — a trend rather than a figure,
+because the figure ages: the 473 here was wrong two days after it was written.
+Every session that touches the API leaves the file bigger, and each one reads
+all of it first.
 
 That third one was missed when this index was first written, and it is the reason
 `API_LAYER.md` exists and should run early: it splits the file into
@@ -133,8 +135,8 @@ Found 2 Sep. Each is now a prompt above.
    intention.
 5. **The API layer had no owner**, and `api/routes/` — which
    `ARCHITECTURE.md`'s directory tree asserted — does not exist. The real
-   package is `secondshift/api/`, a flat set of modules with `app.py` at 473
-   lines as of 19 Sep. The tree now says that instead.
+   package is `secondshift/api/`, a flat set of modules with `app.py` at 539
+   lines as of 21 Sep. The tree now says that instead.
 6. **Nothing produced a week-8 eval score.** `SUBMISSION.md` declares a
    dependency on it. The submission's centerpiece had no owner at all.
 7. **Nobody owned the machine.** Four prompts mention deploying; none owns the

@@ -15,9 +15,14 @@ background.
 ## Why this one, and why early
 
 `apps/api/secondshift/api/app.py` is **one file** holding every route, the
-context factory, the response mappers and the static mount. It was 368 lines
-when this prompt was written and is **473 as of 19 Sep**, which is the problem
-getting worse rather than the estimate being wrong. `docs/ARCHITECTURE.md`
+context factory, the response mappers and the static mount.
+
+**368 lines when this prompt was written, 473 on 19 Sep, 539 on 21 Sep.** A
+trend rather than a figure, because the figure ages: the 473 was written into
+this file on 19 Sep and was wrong two days later, when `judge-mode` added the
+artifact route. That is the argument — not any one number, but that every
+session which touches the API leaves this file bigger, and each one had to read
+all of it first. `docs/ARCHITECTURE.md`
 specifies `api/routes/` in its own directory tree. **It does not exist.**
 
 That is a scheduling problem, not a tidiness one. Five of the sessions in
@@ -37,15 +42,21 @@ same file.
 
 ## What already exists — do not invent any of it
 
-- Six routes: `GET /health`, `GET /capabilities`, `POST /entries`,
-  `GET /runs`, `GET /runs/{run_id}/timeline`, `GET /events/{event_id}`.
+- **Nine routes, not the six this line used to claim**: `GET /health`,
+  `GET /capabilities`, `POST /entries`, `GET /runs`,
+  `GET /runs/{run_id}/timeline`, `GET /morning`,
+  `POST /decisions/{decision_id}/answer`, `GET /artifacts/{artifact_id}`,
+  `GET /events/{event_id}`. The last three arrived with `morning-interview`,
+  `morning-screen` and `judge-mode` — each a session that added a route to this
+  one file, which is the collision the prompt is about, happening.
 - `Context` — a frozen-ish dataclass carrying `repo`, `recorder`, `profile`,
   `report`, `is_synthetic` — built once at startup by `build_context(db_path,
   is_synthetic=, profile=)` and injected with `Depends(get_context)`.
 - `create_app(context)` returns the `FastAPI` app. Tests build a `Context`
-  directly and wrap it in `TestClient`; that pattern is load-bearing and there
-  are 40+ tests relying on it.
-- `schemas.py`, 214 lines of Pydantic response models, several carrying comments
+  directly and wrap it in `TestClient`; that pattern is load-bearing and **74
+  test functions across six files rely on it**. A split that changes how a test
+  builds an app rewrites all of them, which is how a refactor stops being one.
+- `schemas.py`, 301 lines of Pydantic response models, several carrying comments
   explaining what they deliberately **do not** contain — `TimelineEventResponse`
   has no payload field, `EventDetailResponse` has no field prompt or completion
   text could travel in. Those absences are the contract; preserve them.
@@ -58,7 +69,8 @@ same file.
   does not recognize rather than resolving to false — do not reintroduce a
   permissive parse. `python -m secondshift.config show` prints what both
   resolved to and where from.
-- Two migrations: `0001_initial.sql` and `0002_capture.sql`.
+- Three migrations: `0001_initial.sql`, `0002_capture.sql` and
+  `0003_eval_synthetic.sql`.
 
 ## The open decision
 
