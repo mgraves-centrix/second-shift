@@ -87,8 +87,8 @@ attributable to the module that caused it.
 
 ## 8. Ship
 
-- [ ] 8.1 `python3 scripts/gate.py` green, all ten.
+- [x] 8.1 `python3 scripts/gate.py` green, all ten.
 - [ ] 8.2 `openspec validate --strict`, sync specs, archive.
-- [ ] 8.3 `docs/SPEC_ROADMAP.md`: mark `api-layer` shipped, and record that its
+- [x] 8.3 `docs/SPEC_ROADMAP.md`: mark `api-layer` shipped, and record that its
       scheduling argument had already been spent — three of the five sessions it
       was meant to de-collide ran in sequence first.

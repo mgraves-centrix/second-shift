@@ -477,7 +477,7 @@ A deferred obligation with no home is a dropped one, so they have a home now.
 |---|---|---|
 | ~~`agents`~~ | **Shipped 2 Sep** — `2026-09-02-add-agents`. Six drafted prompts, pinned by content hash; `deadbeef` is gone. Detail below. | — |
 | ~~`configuration`~~ | **Shipped 2 Sep** — `2026-09-02-add-configuration`. Thirteen `SECOND_SHIFT_*` settings, each with the layer it resolved from, and a tree scan that fails when the registry falls behind. Detail below. | — |
-| `api-layer` | `api/app.py` is one file five sessions need to add routes to; `api/routes/` is in `ARCHITECTURE.md`'s own tree and does not exist. | nothing, but it de-collides five later sessions |
+| ~~`api-layer`~~ | **Shipped 21 Sep** — `2026-09-21-add-api-layer`. Nine routes in five modules under `api/routes/`; `app.py` is 79 lines and declares none of them. Adding a route now touches one file, measured rather than asserted. Detail below. | — |
 | ~~`test-harness`~~ | **Shipped 17 Sep** — `2026-09-17-add-test-harness`. `python3 scripts/gate.py` runs every gate; CI runs that file. A browser test of the night view, and a mutation check over shipped defects. See `docs/development/GATES.md`. | nothing |
 | `operations` | The machine: reboot story, backups, a recovery procedure someone has actually executed. Nobody owns it. | nothing, and that is the problem |
 | `eval-scoring` | The week-8 run and the curve. `SUBMISSION.md` declares a dependency on it that reads as satisfied and is not. | `submission` |
@@ -1266,3 +1266,64 @@ interface may link an artifact rather than printing its path. `events` are
 written by the night, so anything reading a timeline sees real runs. And
 `check-judge-package.py` refuses a database carrying payload rows or unmarked
 ones — the container calls it at build, and any other packaging path should.
+
+### `api-layer` — shipped 21 Sep
+
+Twenty-one canonical capabilities. Nine routes in five modules, and `app.py`
+down from 539 lines to 79 with none of them in it.
+
+**The scheduling argument was already spent.** This prompt existed to de-collide
+five sessions that each needed to add a route to one file. Three of them —
+`morning-interview`, `morning-screen`, `judge-mode` — ran in sequence before it
+did, and `app.py` grew from 368 lines to 539 in the process, each session
+reading all of it to add one function. What was left to justify the work was the
+file's size and `ARCHITECTURE.md` describing an `api/routes/` that did not exist,
+not the parallelism, which had been spent. Recorded because it is the second
+time a prompt's ordering advice was right and ignored, and the cost is legible
+in one number.
+
+**Both open decisions were framed around a route that had been decided against
+nineteen days earlier.** The prompt parked whether authentication is a per-route
+concern this layer supports, and whether the paths carry `/v1`. Both hinged on
+`nebius-executor` adding an inbound telemetry ingest endpoint. That design
+argued three shapes and took the third — the job reports nothing, and
+`await_result`, which already polls, collects its telemetry and calls
+`ingest_external` locally. With no inbound path there is nothing to authenticate
+and no consumer to version for. **What kept the questions alive was one stale
+line**: that proposal's deliverables list still promised "an authenticated
+telemetry ingest route", ninety lines above the section resolving not to build
+one. `tasks.md` and the spec never inherited the error, so the drift lived
+entirely in the sentence a later reader would quote. ADR 0013 records the
+decisions; the line now matches them.
+
+**Characterizing the layer caught two holes in the characterization first.**
+Twenty-three cases over every route and every refusal each one has. Reading
+`/events/1` verified all ten fields of `ModelCallResponse` against an empty
+list, because that event's invocation made no model call; and asking a
+non-synthetic deployment for a briefing about a synthetic night returned no
+nights, taking three more response models with it. A test now asserts every
+response-model field appears somewhere in the record, so the next hole fails
+rather than passes.
+
+**The split silently defeated two constitution guards, and that is the finding
+worth keeping.** Since FastAPI 0.141 an included router is stored in
+`app.routes` as one lazy proxy and the routes behind it are not in that list.
+Three tests in `test_morning_api.py` read it as a flat list of paths. One
+asserts a presence and failed loudly. The other two assert an *absence* — no
+route serving a payload, no route taking an instruction, which are Principle 2
+and the scope boundary expressed as URL shape — and would have gone on passing
+against an empty set. Both now read `app.openapi()["paths"]`, and a fourth test
+pins that the surface is not empty. **An assertion that nothing matches is worth
+nothing unless there was something to match**, and nothing in the repository was
+checking that.
+
+**The measure was measured.** Adding a route to `routes/system.py` on a clean
+tree touches one file. That was the whole stated success criterion and it is
+cheaper to run it than to claim it.
+
+**What the next capability inherits.** A route goes in `routes/<capability>.py`
+and is added to `ROUTERS`; nothing else changes. A capability needing
+authentication declares it on its own router — ADR 0013 — and no other module is
+touched or exempted. `assert_web_mounted_last` refuses an application whose web
+surface is not its last route, so the failure where the PWA answers an API call
+with HTML cannot be introduced quietly.
