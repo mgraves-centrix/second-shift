@@ -327,7 +327,7 @@ def expected_local_model() -> str:
     return _local_config().get("reasoner_model", "")
 
 
-def _served_models(host: str, port: int, timeout: float) -> list[str] | None:
+def served_models(host: str, port: int, timeout: float) -> list[str] | None:
     """Identifiers a reachable endpoint reports for itself, or None if it cannot say."""
     url = f"http://{host}:{port}/v1/models"
     try:
@@ -377,7 +377,7 @@ def _check_endpoint(
         )
 
     expected = expected_model if expected_model is not None else expected_local_model()
-    served = _served_models(host, port, identity_timeout)
+    served = served_models(host, port, identity_timeout)
 
     if served is None:
         return Capability(

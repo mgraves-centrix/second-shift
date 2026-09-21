@@ -60,6 +60,7 @@ def deploy(tmp_path):
             SPARK_HOST="target.example.invalid",
             SPARK_USER="deployer",
             SPARK_PATH=str(tmp_path / "target"),
+            SPARK_BACKUPS=str(tmp_path / "backups"),
             STUB_REMOTE_RUBRIC_SHA=remote_sha,
             STUB_BUILD_MARKER=str(marker),
         )
@@ -80,6 +81,54 @@ def deploy(tmp_path):
 
 def _shipped_sha() -> str:
     return hashlib.sha256(RUBRIC.read_bytes()).hexdigest()
+
+
+class TestTheDeployIsNotDestructiveUntilItHasToBe:
+    """The old shape was `rm -rf` the tree, then build a venv into the hole.
+
+    An install that failed halfway left no working deployment and no way back to
+    one. Nothing is destroyed now until a complete tree has landed beside the
+    live one and a backup has been taken with it.
+    """
+
+    def test_it_refuses_without_a_backup_destination(self, deploy, tmp_path):
+        """Required like the host and the account, and for one more reason: a
+        default destination is how a copy of every captured idea ends up
+        somewhere nobody chose."""
+        import os
+        import subprocess
+
+        env = dict(os.environ)
+        env.update(
+            SPARK_HOST="target.example.invalid",
+            SPARK_USER="deployer",
+            SPARK_PATH=str(tmp_path / "target"),
+        )
+        env.pop("SPARK_BACKUPS", None)
+
+        completed = subprocess.run(
+            ["bash", str(DEPLOY)], cwd=REPO_ROOT, env=env, capture_output=True, text=True
+        )
+
+        assert completed.returncode != 0
+        assert "SPARK_BACKUPS" in completed.stderr
+
+    def test_the_backup_runs_before_the_live_tree_is_touched(self):
+        """Read from the script, because the ordering is the whole guarantee and
+        a stub cannot observe the order of two things it answers identically."""
+        script = DEPLOY.read_text()
+
+        backup_at = script.index("secondshift.ops backup")
+        destroy_at = script.index("rm -rf '${REMOTE}'")
+        assert backup_at < destroy_at
+
+    def test_the_incoming_tree_is_not_the_live_one(self):
+        """A staging path that resolved to the live path would destroy it on
+        arrival, which is the failure this ordering exists to remove."""
+        script = DEPLOY.read_text()
+
+        assert 'INCOMING="${REMOTE}.incoming"' in script
+        assert 'rm -rf ${INCOMING}' in script
 
 
 def test_a_differing_rubric_on_the_target_stops_the_deploy(deploy):

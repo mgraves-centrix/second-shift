@@ -70,6 +70,20 @@ class TestTheReasonerUnit:
         was the whole argument for NVFP4."""
         assert "--gpu-memory-utilization 0.30" in _service(unit)["ExecStart"]
 
+    def test_it_publishes_on_loopback_only(self, unit):
+        """The running container publishes 0.0.0.0. The unit does not.
+
+        That difference is the one part of the reconciliation that is a privacy
+        question rather than an uptime one: a reasoner on every interface is
+        reachable by anything that reaches the machine, and everything it is
+        asked is somebody's idea. Principle 2 makes the machine's reachability
+        an airlock decision, not an operations convenience.
+        """
+        exec_start = _service(unit)["ExecStart"]
+
+        assert "-p 127.0.0.1:" in exec_start
+        assert "-p 0.0.0.0:" not in exec_start
+
     def test_it_does_not_carry_the_published_recipe_s_broken_flags(self, unit):
         """--moe-backend marlin is refused for this checkpoint, and
         num_speculative_tokens alone is rejected without a method."""
