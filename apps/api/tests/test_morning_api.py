@@ -20,6 +20,21 @@ from secondshift.config import resolve_profile
 from secondshift.db.connection import now_ms
 
 
+def served_paths(client: TestClient) -> set[str]:
+    """Every path the application actually serves.
+
+    Read from the generated schema rather than from `app.routes`, because since
+    FastAPI 0.141 an included router is stored in that list as one lazy proxy
+    object and the routes behind it are not. Three guards in this file read it
+    as a flat list of paths. When the layer was split into one router per
+    capability, one of them failed — and the other two, which assert an
+    *absence*, would have gone on passing against an empty set. Those two are
+    the Privacy Airlock and the scope boundary expressed as URL shape, so the
+    quiet failure was the expensive one.
+    """
+    return set(client.app.openapi()["paths"])
+
+
 def _client(repo, recorder, *, is_synthetic: bool = False) -> TestClient:
     resolved = resolve_profile(env={"SECOND_SHIFT_PROFILE": "cloud"})
     return TestClient(
@@ -274,9 +289,7 @@ class TestReadingAnArtifactBack:
 
     def test_no_route_serves_a_payload(self, client):
         """The absence is structural: there is nowhere for that content to go."""
-        paths = {r.path for r in client.app.routes if hasattr(r, "path")}
-
-        assert not [p for p in paths if "payload" in p]
+        assert not [p for p in served_paths(client) if "payload" in p]
 
 
 class TestAnsweringOverHttp:
@@ -365,20 +378,22 @@ class TestNoChatInterface:
     prompt calls it the single most likely way this capability goes wrong. The
     guard is the URL shape: every answer route carries a decision id."""
 
+    def test_the_surface_is_not_empty(self, client):
+        """The two tests below assert that nothing matches.
+
+        That is worth nothing unless there was something to match, and this is
+        the assumption that quietly stopped holding when the layer was split.
+        """
+        assert "/decisions/{decision_id}/answer" in served_paths(client)
+
     def test_there_is_no_route_that_takes_an_instruction(self, client):
-        paths = {
-            r.path for r in client.app.routes if hasattr(r, "path")
-        }
+        paths = served_paths(client)
 
         for suspicious in ("/chat", "/message", "/ask", "/interview"):
             assert suspicious not in paths
 
     def test_every_answer_route_carries_a_decision_id(self, client):
-        answering = [
-            r.path
-            for r in client.app.routes
-            if hasattr(r, "path") and "answer" in r.path
-        ]
+        answering = [p for p in served_paths(client) if "answer" in p]
 
         assert answering == ["/decisions/{decision_id}/answer"]
 

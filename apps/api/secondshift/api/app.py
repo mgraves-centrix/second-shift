@@ -1,71 +1,35 @@
-"""The capture API, and the night it recorded.
+"""The application: the routes it serves, and the web surface under them.
 
-`GET /capabilities` tells the surface which policies it may offer and why any are
-unavailable; `POST /entries` records a captured idea. `GET /runs`,
-`GET /runs/{id}/timeline` and `GET /events/{id}` read back what a night wrote.
+Every route lives in `routes/`, one module per capability. This module builds
+the application, hands it the context those routes read, includes them, and
+mounts the exported PWA last.
 
-The timeline routes are read-only, and the split between the last two is a
-contract rather than a convenience: the timeline response has no field for an
-event payload, so a renderer cannot parse JSON to draw a frame even by mistake.
-
-Everything about an entry is decided by the client before it is sent — the
-identifier, the instant, the timezone, the policy. The server records what it
-receives and adds only what the client cannot know: when it arrived, what it was
-offered, and whether this deployment is synthetic.
+Last matters. The mount answers everything that reaches it, so a route included
+after it is a route nobody can call — and the symptom is the page being returned
+to a caller that wanted data, which reads as a frontend bug for as long as it
+takes to find. `assert_web_mounted_last` refuses to return an application in
+that state.
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, Response, status
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.routing import Mount
 
-from ..artifacts.store import artifact_root
-from ..db.connection import now_ms
-from .context import Context, build_context, get_context
-from .location import home_location
-from .mappers import capability_payload, entry_response, model_call, run_summary
-from ..morning import assemble
-from ..morning.interview import answer
-from .schemas import (
-    AnswerRequest,
-    ArtifactRefResponse,
-    AnswerResponse,
-    BriefingResponse,
-    CapabilityResponse,
-    CaptureRequest,
-    EntryResponse,
-    EventDetailResponse,
-    NightLineResponse,
-    QuestionResponse,
-    StageLineResponse,
-    InvocationNodeResponse,
-    RunStageResponse,
-    RunSummaryResponse,
-    TimelineEventResponse,
-    TimelineResponse,
-)
-from .titles import derive_title
+from .context import Context, build_context
+from .routes import ROUTERS
 
 #: Re-exported: `main.py` and the tests import the context from here, and moving
-#: it out of this module is not a reason to make them say so.
-__all__ = ["Context", "build_context", "create_app"]
-
+#: it into its own module is not a reason to make them say so.
+__all__ = ["Context", "assert_web_mounted_last", "build_context", "create_app"]
 
 #: The exported PWA, when it has been built. Serving it from the API keeps the
 #: capture app and its API on one origin — no CORS, no second process to be down
 #: at 2am, and `NEXT_PUBLIC_API_BASE` can stay empty.
 WEB_EXPORT = Path(__file__).resolve().parents[3] / "web" / "out"
-
-#: Content types for what the night writes. From the suffix rather than sniffed:
-#: sniffing is how a renderer ends up deciding that somebody's idea is HTML.
-_MEDIA_TYPES = {
-    ".md": "text/markdown; charset=utf-8",
-    ".txt": "text/plain; charset=utf-8",
-    ".json": "application/json",
-}
 
 
 def create_app(context: Context) -> FastAPI:
@@ -74,366 +38,43 @@ def create_app(context: Context) -> FastAPI:
     # so a route declared in another module can reach it.
     app.state.context = context
 
-    @app.get("/health")
-    def health() -> dict[str, str]:
-        return {"status": "ok"}
+    for router in ROUTERS:
+        app.include_router(router)
 
-    @app.get("/capabilities", response_model=CapabilityResponse)
-    def capabilities(ctx: Context = Depends(get_context)) -> CapabilityResponse:
-        """Every policy with its availability and reason. None are omitted."""
-        return capability_payload(ctx.report)
-
-    @app.post("/entries", response_model=EntryResponse)
-    def capture(
-        request: CaptureRequest,
-        response: Response,
-        ctx: Context = Depends(get_context),
-    ) -> EntryResponse:
-        existing = ctx.repo.get_entry(request.id)
-        if existing is not None:
-            # A replay. Idempotent and silent: not an error, not a second row,
-            # and no failure recorded — routine client retries must not dominate
-            # the failure ledger.
-            if (existing["raw_text"] or "") != request.text:
-                ctx.recorder.record_event(
-                    lane="capture",
-                    kind="note",
-                    label="replay with divergent content; stored version kept",
-                    entry_id=request.id,
-                    severity="warn",
-                    is_synthetic=ctx.is_synthetic,
-                )
-            response.status_code = status.HTTP_200_OK
-            return entry_response(existing, duplicate=True)
-
-        try:
-            ctx.report.for_policy(request.policy)
-        except KeyError:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail=f"unknown policy {request.policy!r}",
-            ) from None
-
-        home = home_location()
-        try:
-            entry_id = ctx.recorder.record_entry(
-                created_at_ms=request.created_at_ms,
-                received_at_ms=now_ms(),
-                captured_tz=request.captured_tz,
-                tz_offset_min=request.tz_offset_min,
-                modality=request.modality,
-                # Policy is recorded as INTENT. It is never filtered by what the
-                # current profile can honor; a policy the profile cannot honor is a
-                # quarantine decision made later, not a capture-time rewrite.
-                default_policy=request.policy,
-                status="queued",
-                capture_profile=request.capture_profile or str(ctx.profile.profile),
-                raw_text=request.text,
-                title=request.title or derive_title(request.text),
-                source_device=request.source_device,
-                lat=request.lat if request.lat is not None else home.lat,
-                lon=request.lon if request.lon is not None else home.lon,
-                offered_capability_json=json.dumps(
-                    capability_payload(ctx.report).model_dump()
-                ),
-                entry_id=request.id,
-                is_synthetic=ctx.is_synthetic,
-            )
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
-            ) from exc
-
-        ctx.recorder.record_event(
-            lane="capture",
-            kind="note",
-            label=f"captured under {request.policy}",
-            entry_id=entry_id,
-            is_synthetic=ctx.is_synthetic,
-        )
-        response.status_code = status.HTTP_201_CREATED
-        return entry_response(ctx.repo.get_entry(entry_id), duplicate=False)
-
-    @app.get("/runs", response_model=list[RunSummaryResponse])
-    def runs(ctx: Context = Depends(get_context)) -> list[RunSummaryResponse]:
-        """Recorded nights, newest first.
-
-        Synthetic runs are included and marked, not filtered. Rollups exclude
-        them because they are measurements; a viewer is not a measurement, and
-        hiding the only nights that exist would leave nothing to look at.
-        """
-        return [run_summary(r) for r in ctx.repo.list_runs()]
-
-    @app.get("/runs/{run_id}/timeline", response_model=TimelineResponse)
-    def timeline(run_id: str, ctx: Context = Depends(get_context)) -> TimelineResponse:
-        """A whole night, in one response.
-
-        Whole because a windowed query would put a fetch in the middle of a
-        drag. At roughly a thousand events a night this is small; when it stops
-        being small, the window is a rendering concern before it is a query one.
-        """
-        run = ctx.repo.run_summary(run_id)
-        if run is None:
-            # Refused rather than answered with an empty night, which would be
-            # indistinguishable from a night in which nothing happened.
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"unknown run {run_id!r}"
-            )
-
-        rows = ctx.repo.timeline(run_id)
-        events = [
-            TimelineEventResponse(
-                id=r["id"],
-                ts_ms=r["ts_ms"],
-                lane=r["lane"],
-                kind=r["kind"],
-                label=r["label"],
-                severity=r["severity"],
-                duration_ms=r["duration_ms"],
-                agent_invocation_id=r["agent_invocation_id"],
-            )
-            for r in rows
-        ]
-        # The lane an event recorded, never the role of whatever produced it: an
-        # event may record a lane its producer's role does not match, and a
-        # stage boundary has no producer at all.
-        lanes = sorted({e.lane for e in events})
-
-        return TimelineResponse(
-            run=run_summary(run),
-            # How far each stage got. `runs.outcome` is null on every recorded
-            # run — nothing closes a run yet — so a night that stopped part-way
-            # says so here or nowhere, and "no empty mornings" is a query over
-            # exactly this table.
-            stages=[
-                RunStageResponse(
-                    stage=s["stage"],
-                    seq=s["seq"],
-                    status=s["status"],
-                    started_at_ms=s["started_at_ms"],
-                    ended_at_ms=s["ended_at_ms"],
-                )
-                for s in ctx.repo.stages_for_run(run_id)
-            ],
-            lanes=lanes,
-            events=events,
-            invocations=[
-                InvocationNodeResponse(
-                    id=i["id"],
-                    parent_invocation_id=i["parent_invocation_id"],
-                    depth=i["depth"],
-                    stage=i["stage"],
-                    outcome=i["outcome"],
-                    started_at_ms=i["started_at_ms"],
-                    ended_at_ms=i["ended_at_ms"],
-                )
-                for i in ctx.repo.invocation_tree(run_id)
-            ],
-        )
-
-    @app.get("/morning", response_model=BriefingResponse)
-    def morning(ctx: Context = Depends(get_context)) -> BriefingResponse:
-        """What the night did and what it could not decide.
-
-        Covers every run since the last decision a person *acted* on. Fetching
-        this does not advance that boundary — rendering a briefing is not the
-        same as reading one, and a GET that consumed its own delta would lose a
-        morning because somebody opened the app while walking.
-
-        Assembled from rows with no model call, so a night that ran while the
-        interviewer was down still reports what it produced. Principle 3.
-        """
-        briefing = assemble(ctx.repo, include_synthetic=ctx.is_synthetic)
-        return BriefingResponse(
-            nights=[
-                NightLineResponse(
-                    run_id=n.run_id,
-                    entry_id=n.entry_id,
-                    night_of=n.night_of,
-                    outcome=n.outcome,
-                    effective_policy=n.effective_policy,
-                    stages=[
-                        StageLineResponse(
-                            stage=s.stage,
-                            status=s.status,
-                            reason=s.reason,
-                            artifacts=[
-                                ArtifactRefResponse(
-                                    artifact_id=a.artifact_id, path=a.path
-                                )
-                                for a in s.artifacts
-                            ],
-                        )
-                        for s in n.stages
-                    ],
-                )
-                for n in briefing.nights
-            ],
-            questions=[
-                QuestionResponse(
-                    decision_id=q.decision_id,
-                    entry_id=q.entry_id,
-                    question=q.question,
-                    rationale=q.rationale,
-                    blocking_stage=q.blocking_stage,
-                    will_leave_the_machine=q.will_leave_the_machine,
-                )
-                for q in briefing.questions
-            ],
-            interviewer_error=briefing.interviewer_error,
-        )
-
-    @app.post("/decisions/{decision_id}/answer", response_model=AnswerResponse)
-    def answer_decision(
-        decision_id: str,
-        body: AnswerRequest,
-        ctx: Context = Depends(get_context),
-    ) -> AnswerResponse:
-        """Answer one question the system asked.
-
-        The path carries the decision id, so there is no route here that takes
-        an instruction with nowhere to attach it. That is the scope boundary in
-        the URL shape rather than in a rule somebody has to remember: a general
-        chat interface is excluded by name, and this is how it stays excluded.
-        """
-        try:
-            answer(
-                ctx.repo,
-                decision_id,
-                text=body.answer,
-                status=body.status,
-                modality=body.modality,
-            )
-        except ValueError as exc:
-            row = ctx.repo.connection.execute(
-                "SELECT answer, status, answered_at_ms FROM decisions WHERE id = ?",
-                (decision_id,),
-            ).fetchone()
-            if row is None:
-                # An answer to a question nobody asked has nothing to mean.
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-                ) from exc
-            if row["answer"] != body.answer or row["status"] != body.status:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"decision {decision_id!r} was already answered differently",
-                ) from exc
-            # The same answer again: a retry after a response that never
-            # arrived. Refusing it told the screen the answer was not recorded,
-            # and the person could not get past a question they had answered.
-        else:
-            row = ctx.repo.connection.execute(
-                "SELECT status, answered_at_ms FROM decisions WHERE id = ?",
-                (decision_id,),
-            ).fetchone()
-        return AnswerResponse(
-            decision_id=decision_id,
-            status=row["status"],
-            answered_at_ms=row["answered_at_ms"],
-        )
-
-    @app.get("/artifacts/{artifact_id}")
-    def artifact(artifact_id: str, ctx: Context = Depends(get_context)) -> Response:
-        """One artifact's content, by identity.
-
-        "Idea in, artifact out" is the whole claim and until now the artifact
-        could not be opened: the night wrote files and nothing served them, so
-        every interface listed paths a reader had no way to follow.
-
-        The URL carries an id and never a path, so traversal is not a check that
-        can be forgotten — it cannot be expressed. The stored path is relative to
-        the configured root, and the resolved file is still required to sit under
-        it, because a row is data and `..` in one would otherwise be obeyed.
-
-        `model_call_payloads` is not reachable from here and this response has no
-        field it could travel in — the same structural argument `/events/{id}`
-        makes. That table is local-only content by construction.
-        """
-        row = ctx.repo.get_artifact(artifact_id)
-        if row is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"unknown artifact {artifact_id!r}",
-            )
-
-        root = artifact_root().resolve()
-        target = (root / row["path"]).resolve()
-        if not target.is_relative_to(root):
-            # The row escaped its root. Refused rather than served: a stored
-            # path is data, and this is the one place it becomes a filesystem
-            # read.
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"unknown artifact {artifact_id!r}",
-            )
-        try:
-            body = target.read_bytes()
-        except OSError:
-            # A row naming a file that is not there is a defect, and answering
-            # it with an empty 200 would hide one. The seeded night writes rows
-            # with no bytes behind them, and that is exactly the case this must
-            # not paper over.
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"artifact {artifact_id!r} has no file at its recorded path",
-            ) from None
-
-        return Response(
-            content=body,
-            media_type=_MEDIA_TYPES.get(target.suffix, "application/octet-stream"),
-        )
-
-    @app.get("/events/{event_id}", response_model=EventDetailResponse)
-    def event_detail(
-        event_id: int, ctx: Context = Depends(get_context)
-    ) -> EventDetailResponse:
-        """One event in full, for the one a person is looking at.
-
-        Every model call its invocation made, rather than the one the event
-        corresponds to: `events` carries no model call id, so a single answer
-        would be adjacency presented as fact. An invocation makes one to three.
-        """
-        row = ctx.repo.get_event(event_id)
-        if row is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"unknown event {event_id}"
-            )
-
-        payload = None
-        if row["payload_json"]:
-            try:
-                payload = json.loads(row["payload_json"])
-            except json.JSONDecodeError:
-                # Unreadable detail is reported as absent rather than failing the
-                # request: the event itself is still worth showing.
-                payload = None
-
-        # Counts and costs only. `model_call_payloads` holds what was said, and
-        # the constitution names an export path that includes it as a Privacy
-        # Airlock violation — so it is not joined here and the response has no
-        # field it could travel in.
-        calls = (
-            ctx.repo.model_calls_for_invocation(row["agent_invocation_id"])
-            if row["agent_invocation_id"]
-            else []
-        )
-        return EventDetailResponse(
-            id=row["id"],
-            run_id=row["run_id"],
-            ts_ms=row["ts_ms"],
-            lane=row["lane"],
-            kind=row["kind"],
-            label=row["label"],
-            severity=row["severity"],
-            duration_ms=row["duration_ms"],
-            agent_invocation_id=row["agent_invocation_id"],
-            payload=payload if isinstance(payload, dict) else None,
-            model_calls=[model_call(c) for c in calls],
-        )
-
-    # Mounted last so every API route is matched first.
-    if WEB_EXPORT.is_dir():
-        app.mount("/", StaticFiles(directory=WEB_EXPORT, html=True), name="web")
-
+    _mount_web(app)
+    assert_web_mounted_last(app)
     return app
+
+
+def _mount_web(app: FastAPI) -> None:
+    if not WEB_EXPORT.is_dir():
+        # Not built. The API still serves; the PWA is a separate build step and
+        # a test run has no reason to have performed it.
+        return
+    app.mount("/", StaticFiles(directory=WEB_EXPORT, html=True), name="web")
+
+
+def assert_web_mounted_last(app: FastAPI) -> None:
+    """Refuse an application whose web surface is not its last route.
+
+    An invariant rather than a step, so it can be checked again later: called
+    from `create_app` it sees everything registered there, and a test can call
+    it on an application that has had a route added since.
+
+    An application with no web surface passes. There is nothing to be last, and
+    the PWA is a separate build step a test run has no reason to have performed.
+    """
+    mounts = [i for i, route in enumerate(app.routes) if _is_web_mount(route)]
+    if not mounts:
+        return
+    if mounts[-1] != len(app.routes) - 1:
+        after = app.routes[mounts[-1] + 1 :]
+        raise RuntimeError(
+            "the web surface must be mounted after every route, because it "
+            "answers everything that reaches it: "
+            f"{[getattr(r, 'path', r) for r in after]} would never match"
+        )
+
+
+def _is_web_mount(route: object) -> bool:
+    return isinstance(route, Mount) and getattr(route, "name", None) == "web"

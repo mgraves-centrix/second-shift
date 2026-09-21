@@ -38,27 +38,27 @@ only thing standing between a refactor and a rewrite.
 Each step is its own commit and its own gate run, so a byte difference is
 attributable to the module that caused it.
 
-- [ ] 4.1 `routes/system.py` — `/health`, `/capabilities`.
-- [ ] 4.2 `routes/capture.py` — `/entries`. **This is the route that must not
+- [x] 4.1 `routes/system.py` — `/health`, `/capabilities`.
+- [x] 4.2 `routes/capture.py` — `/entries`. **This is the route that must not
       break**; capture is live and taking real ideas. Run the replay and the
       disagreeing-instant cases directly after this step, not at the end.
-- [ ] 4.3 `routes/night.py` — `/runs`, `/runs/{id}/timeline`, `/events/{id}`.
-- [ ] 4.4 `routes/morning.py` — `/morning`, `/decisions/{id}/answer`.
-- [ ] 4.5 `routes/artifacts.py` — `/artifacts/{id}`.
-- [ ] 4.6 `routes/__init__.py` documents the rule and both exceptions
+- [x] 4.3 `routes/night.py` — `/runs`, `/runs/{id}/timeline`, `/events/{id}`.
+- [x] 4.4 `routes/morning.py` — `/morning`, `/decisions/{id}/answer`.
+- [x] 4.5 `routes/artifacts.py` — `/artifacts/{id}`.
+- [x] 4.6 `routes/__init__.py` documents the rule and both exceptions
       (`/events` under night, `/decisions` under morning), because a rule with
       unwritten exceptions is not a rule.
-- [ ] 4.7 Each route keeps its docstring. Several are the only written record of
+- [x] 4.7 Each route keeps its docstring. Several are the only written record of
       why a route is shaped the way it is — the decision id in the path, the
       timeline's missing payload field, the morning GET that does not advance
       its own boundary.
 
 ## 5. Guard the mount
 
-- [ ] 5.1 `create_app` raises if anything is registered after the static mount.
-- [ ] 5.2 Test: construct an app with a route registered after the mount, assert
+- [x] 5.1 `create_app` raises if anything is registered after the static mount.
+- [x] 5.2 Test: construct an app with a route registered after the mount, assert
       construction fails.
-- [ ] 5.3 Test: `GET /runs` returns JSON, not the exported page.
+- [x] 5.3 Test: `GET /runs` returns JSON, not the exported page.
 
 ## 6. Prove the split did what it claims
 
