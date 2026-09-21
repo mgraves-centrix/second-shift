@@ -41,8 +41,30 @@ retrieved itself as memory; fixed in `c814131`.
 **Closed 17 Sep.** A live search ran through the research stage's real code path
 with the Tavily credential (`add-research` 5.1): the redacted query was the only
 thing sent, five results came back for one credit in 1.2s, and the one
-`tool_calls` row holds the redacted query and no entry text. Nothing on this list
-is owed.
+`tool_calls` row holds the redacted query and no entry text.
+
+### Open, as of 21 Sep — what a machine session owes
+
+Consolidated here because each of these is recorded in its own capability's
+section below, and a reader deciding what a Spark session should do needs one
+list rather than six. The detail stays where it is; this is the index.
+
+| What | Owed by | Detail |
+|---|---|---|
+| A reboot, with the API, brain sync and reasoner serving afterward | `operations` | `docs/operations/RECOVERY.md` |
+| A restore of the **real** data onto a scratch path, diffed and timed | `operations` | The mechanism is rehearsed against a generated night; that disk and that data are not. |
+| `ops doctor` run there, which subsumes `config show` | `operations` | Its `data ownership` check exists because a service running as the wrong account has corrupted the write-ahead log on that machine. |
+| The reasoner container reconciled with its unit | `operations` | The container was started by hand and publishes on every interface; the unit binds loopback. A privacy question, not an uptime one. |
+| A backup schedule, once its destination is decided | `operations` | Blocked on a clarification marker, not on code. |
+| The judge container built, stood up, and read by a stranger | `judge-mode` | Three gaps, below. The NAS runs containers. |
+| One real night, to exercise the night's events against a live reasoner | `night-pipeline` | Also closes `2026-09-17-the-night-revises-what-it-believes` at 7/7. |
+| Live dispatch and telemetry collection against Nebius | `nebius-executor` | The credentials exist — on that machine, at `~/.config/second-shift/secrets.env`. Not a missing credential; a missing route to where it is. |
+| The week-8 eval run and the curve | `eval-scoring` | `SUBMISSION.md` depends on it and nothing else produces it. |
+| Spike F, and `Transcriber` | `asr` | The model runs on the Spark and nowhere else. |
+
+**None of these closes from a cloud development session**, and that is tested
+rather than assumed — see the note under `judge-mode` for how, and for the trap
+that made an earlier test of it report the wrong answer.
 
 Nightly research is on as of 17 Sep: the night unit reads an optional file
 holding the Tavily key alone, never the machine's secrets file, which also holds
@@ -479,7 +501,7 @@ A deferred obligation with no home is a dropped one, so they have a home now.
 | ~~`configuration`~~ | **Shipped 2 Sep** — `2026-09-02-add-configuration`. Thirteen `SECOND_SHIFT_*` settings, each with the layer it resolved from, and a tree scan that fails when the registry falls behind. Detail below. | — |
 | ~~`api-layer`~~ | **Shipped 21 Sep** — `2026-09-21-add-api-layer`. Nine routes in five modules under `api/routes/`; `app.py` is 79 lines and declares none of them. Adding a route now touches one file, measured rather than asserted. Detail below. | — |
 | ~~`test-harness`~~ | **Shipped 17 Sep** — `2026-09-17-add-test-harness`. `python3 scripts/gate.py` runs every gate; CI runs that file. A browser test of the night view, and a mutation check over shipped defects. See `docs/development/GATES.md`. | nothing |
-| `operations` | The machine: reboot story, backups, a recovery procedure someone has actually executed. Nobody owns it. | nothing, and that is the problem |
+| ~~`operations`~~ | **Shipped 21 Sep** — `2026-09-21-add-operations`. `python -m secondshift.ops` backs up, verifies, restores and checks. `deploy.sh` installs then swaps, taking a backup before anything is destroyed. The procedure says per step whether anybody has run it. Detail below. | — |
 | `eval-scoring` | The week-8 run and the curve. `SUBMISSION.md` declares a dependency on it that reads as satisfied and is not. | `submission` |
 
 **Six capabilities shipped on 2 Sep and the sections below are not in ship
@@ -1246,7 +1268,7 @@ because a deferred obligation with no home is a dropped one.
 | It has never been stood up and read | Follows from the above. The stranger test — what somebody with no context says the product is — is unanswered. | The same build. |
 | The night's events have only ever run against a scripted reasoner | The Spark has been the venue for every real night, and this shipped without one. **This project has twice shipped defects that passed locally and failed there.** | One real night on the Spark, which also closes `2026-09-17-the-night-revises-what-it-believes` at 6/7. |
 
-**Neither gap closes from a cloud development session, and that is now
+**No gap here closes from a cloud development session, and that is now
 tested rather than assumed.** The container this work runs in sits behind a
 network shim: it has no route to the home LAN and is not on the tailnet —
 `tailscaled` is installed but not running, there is no tailnet interface, and
@@ -1327,3 +1349,65 @@ authentication declares it on its own router — ADR 0013 — and no other modul
 touched or exempted. `assert_web_mounted_last` refuses an application whose web
 surface is not its last route, so the failure where the PWA answers an API call
 with HTML cannot be introduced quietly.
+
+### `operations` — shipped 21 Sep
+
+Twenty-two canonical capabilities. `grep -rn backup` over this repository
+returned three unrelated docstrings the morning this started.
+
+**The mechanism was settled by measurement, because writing the obvious thing
+would have been wrong in the worst available way.** The database runs in
+write-ahead logging mode, so committed transactions live outside the `.db` file
+until a checkpoint. After five hundred committed inserts with no checkpoint,
+copying `second-shift.db` alone produces a database in which **the table does
+not exist** — `CREATE TABLE` was in the write-ahead log too. That copy restores
+cleanly and presents an empty database, which reads as a successful recovery of
+a machine that had nothing on it. SQLite's online backup API, taken while
+another connection held an open write transaction, got all five hundred
+committed rows, excluded the uncommitted one, and passed `integrity_check`. The
+demonstration is a test rather than a paragraph.
+
+**A manifest is what makes a restore checkable.** Per-table counts enumerated
+from the database rather than listed — a hard-coded table list is a list a
+migration adds to and nobody updates — plus the schema version, artifact count
+and bytes, and a digest per member. Without it a restore can only be judged by
+whether it crashed.
+
+**`deploy.sh` stopped being destructive first.** It did `rm -rf` on the target
+tree and then built a venv into the hole, so an install that failed left no
+working deployment and no way back to one. It now ships to a staging path, takes
+a backup from there with the target's **system** `python3` — `secondshift.ops`
+imports nothing outside the standard library, which a test pins precisely so
+that line works on a first deploy, where the installed code predates the tool —
+and only then replaces the live tree, finishing with `doctor`.
+
+**Two checks in `doctor` were narrowed after reading their output.** The first
+draft failed `data ownership` for any path not under the running account's home,
+which cries wolf every time somebody points the tooling at a scratch copy; it
+now only checks the `~`-derived default, which is the case that actually follows
+whoever is running and is how a unit started as root writes a database the
+operator never looks at. And a missing local reasoner failed everywhere, which
+would fail on the judge container by design — it is now reported as expected on
+the cloud profile.
+
+**What is not claimed.** There is no route from a cloud session to that machine,
+so the procedure was executed here, against a generated night with a concurrent
+writer: 0.116s to back up 1,896 rows across 17 tables, 0.120s to restore,
+byte-identical dumps. `RECOVERY.md` marks every step **exercised**, **rehearsed**
+or **never run**, and says what those numbers do not measure — that disk and
+that data. Marking the whole document "unverified" was rejected: it would have
+covered both the untried steps and the ones the gate runs on every commit, and
+flattening those into one word is how a document stops being read.
+
+**Two questions are recorded and unanswered**, both the user's. Where backups
+are kept and on what schedule — ADR 0014 settles that a backup may never leave
+the boundary that holds the brain, so the question is which on-premises target,
+never whether. And whether the reasoner container becomes its supervised unit
+now, which needs to know what is mid-flight on a machine this session cannot
+reach.
+
+**What the next capability inherits.** `python -m secondshift.ops doctor` is a
+one-command answer to "is this machine well", and it runs in the judge container
+too. A backup is takeable by hand today, to anywhere the operator names. And
+`deploy.sh` is safe to run without thinking, which is what it claimed to be
+before it destroyed the tree first.
