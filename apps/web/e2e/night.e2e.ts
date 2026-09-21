@@ -104,3 +104,53 @@ test("a bar too short to see is still wider than a tick", async () => {
     `the narrowest bar is ${(narrowest * 100).toFixed(3)}% of the plot — narrower than the minimum`,
   );
 });
+
+test("scrubbing the whole night touches each mark about once, not once per frame", async () => {
+  // The property Spike D measured and nothing has guarded since: the cost of a
+  // frame is proportional to the marks the playhead CROSSES, not to the size of
+  // the night. That is what holds 0.1ms per steady frame at 1,223 events and at
+  // 9,784, and it is the reason DOM won over canvas here.
+  //
+  // Counted as attribute writes rather than timed in milliseconds. A wall clock
+  // on a CI runner is a coin flip, and this property is not — but more than
+  // that, a timing assertion would pass the exact regression this exists to
+  // catch: Spike D measured the re-rendering implementation at 1.8ms on a night
+  // this small, comfortably inside a 16.7ms budget. It only falls over on a
+  // night eight times longer, which is the night nobody tests against.
+  const slider = page.getByRole("slider");
+  await slider.focus();
+  await page.keyboard.press("Home");
+
+  const marks = await page.locator("[data-past]").count();
+  const steps = 40;
+
+  await page.evaluate(() => {
+    const counter = { writes: 0 };
+    (window as unknown as { __scrubWrites: { writes: number } }).__scrubWrites = counter;
+    new MutationObserver((records) => {
+      counter.writes += records.length;
+    }).observe(document.querySelector('[role="slider"]')!, {
+      attributes: true,
+      attributeFilter: ["data-past"],
+      subtree: true,
+    });
+  });
+
+  for (let i = 0; i < steps; i += 1) await page.keyboard.press("PageUp");
+
+  const writes = await page.evaluate(
+    () => (window as unknown as { __scrubWrites: { writes: number } }).__scrubWrites.writes,
+  );
+
+  assert.ok(
+    writes > marks / 2,
+    `only ${writes} marks were touched crossing a night of ${marks} — the playhead did ` +
+      "not cross it, so this test proved nothing",
+  );
+  assert.ok(
+    writes <= marks * 2,
+    `crossing ${marks} marks in ${steps} steps wrote data-past ${writes} times. Crossing ` +
+      `each once is ${marks}; re-rendering every step would be about ${marks * steps}. ` +
+      "The scrubber is redrawing rather than moving.",
+  );
+});

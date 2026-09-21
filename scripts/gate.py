@@ -46,7 +46,15 @@ GATES: list[tuple[str, list[str]]] = [
     ("api", PYTEST + [str(API / "tests")]),
     ("web unit", ["npm", "--prefix", str(WEB), "test"]),
     ("web types", ["npm", "--prefix", str(WEB), "run", "typecheck"]),
-    ("web build", ["npm", "--prefix", str(WEB), "run", "build"]),
+    # Built from clean, every time. On 21 Sep the browser gate spent a day
+    # testing a chunk that did not match its source: a warm `.next/cache`
+    # re-emitted the playhead's transform in its pre-fix form — percentages of
+    # a one-pixel element — while `Scrubber.tsx` on disk had said pixels since
+    # 2 Sep. Five browser tests passed against bytes nobody had written. The
+    # browser gate exists precisely to answer "what does the browser actually
+    # get", and a build cache is the one thing that can make that answer stale.
+    # Measured cost of not trusting it: 16.2s warm against 19.9s clean.
+    ("web build", ["npm", "--prefix", str(WEB), "run", "build:clean"]),
     ("browser", ["npm", "--prefix", str(WEB), "run", "e2e"]),
     ("mutations", [sys.executable, str(ROOT / "scripts/check-mutations.py")]),
 ]

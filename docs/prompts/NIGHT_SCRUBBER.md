@@ -1,7 +1,25 @@
 # Night scrubber prompt
 
-Paste as the first message of a fresh session. Entirely local — no Spark, no
-tailnet, no credentials.
+**Shipped 2 Sep as `night-timeline`. This is a record of what was asked, not a
+session to run.** The prompt's own loop says `openspec new change
+add-night-timeline`, which is the change that is now in
+`openspec/changes/archive/2026-09-02-add-night-timeline/` — this file and that
+one are the two halves of one piece of work, and the index table below never
+carried a row for "night-scrubber" because there was never a separate capability
+to ship.
+
+Read it for the reasoning. Two things in it are worth knowing were answered:
+
+- **The open decision was decided by measurement**, as it demanded.
+  `scripts/spikes/spike-d-scrubber-rendering/FINDINGS.md` has the numbers: DOM,
+  incrementally, at 0.1ms per steady frame against a 16.7ms budget — and flat in
+  night size, where canvas grows linearly. Do not re-open it by preference.
+- **Its verification list was complete except for one item**, and that gap
+  stood until 21 Sep. "Frame time at 20x, asserted against a budget rather than
+  eyeballed" had been measured once by the spike and guarded by nothing. It is
+  now `night.e2e.ts`'s sixth test — counted as attribute writes rather than
+  milliseconds, because the re-rendering implementation is *inside* a frame
+  budget on a night this small and only falls over on one eight times longer.
 
 ---
 

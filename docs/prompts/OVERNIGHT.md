@@ -201,12 +201,17 @@ window, which is correct but will make anything that checks look degraded.
 ```bash
 git status --short && git log --oneline -1
 openspec list && openspec list --specs
-apps/api/.venv/bin/python -m pytest apps/api/tests -q
-npm --prefix apps/web run test && npm --prefix apps/web run typecheck
-openspec validate --specs --strict
-scripts/check-no-environment.sh
-scripts/check-american-english.sh
+python3 scripts/gate.py
 ```
+
+**One command, and it is the one CI runs.** Ten gates in order — airlock, the
+two repository guards, specs, the orchestrator suite, web unit/types/build, a
+browser test, and a mutation check — stopping at the first failure with that
+gate's exit code. About 100 seconds. `docs/development/GATES.md` has the table.
+
+Run it **unpiped**. Its exit status is the whole point, and a pipeline's status
+is the last command's: `scripts/gate.py | tail -2` reports success for a red
+gate, which is how a red commit reached this branch on 21 Sep.
 
 All must pass before you touch anything. A red suite before you start means you
 cannot tell what you broke.
@@ -230,11 +235,8 @@ and stop there, then `/opsx:apply`, then the verification below, then
 ### Verify — all of it, every time
 
 ```bash
-apps/api/.venv/bin/python -m pytest apps/api/tests -q
-npm --prefix apps/web run test
+python3 scripts/gate.py
 openspec validate <change> --strict
-scripts/check-no-environment.sh
-scripts/check-american-english.sh
 
 # on the target machine, which is where defects have already hidden twice
 SPARK_HOST=<host> SPARK_USER=<user> ./deploy/spark/deploy.sh

@@ -21,7 +21,7 @@ the script; it never restates the gates.
 | api | The full orchestrator suite. Warnings are errors. |
 | web unit | Pure-function tests under `node --test`. |
 | web types | `tsc --noEmit`. |
-| web build | The static export the orchestrator serves. |
+| web build | The static export the orchestrator serves, **built from clean every time**. On 21 Sep a warm `.next/cache` re-emitted a chunk that did not match its source — the playhead's transform in its pre-fix form, percentages of a one-pixel element, which `Scrubber.tsx` had not said since 2 Sep — and five browser tests passed against bytes nobody had written. The browser gate exists to answer what the browser actually gets, and a build cache is the one thing that can make that answer stale. Costs 3.7 seconds. |
 | browser | A seeded night, a real orchestrator on a free port, and the installed Chrome. Asserts rendering from geometry, never from ARIA. |
 | mutations | Reintroduces defects this project has shipped and requires the gate that should catch each to fail. |
 

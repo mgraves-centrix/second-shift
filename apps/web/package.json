@@ -9,6 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "node --test 'tests/*.test.ts'",
+    "build:clean": "rm -rf .next out && next build",
     "e2e": "node --test 'e2e/*.e2e.ts'"
   },
   "dependencies": {
