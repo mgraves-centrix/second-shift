@@ -128,11 +128,13 @@ Found 2 Sep. Each is now a prompt above.
    (`2026-09-02-add-night-pipeline`). It also had no test; both are fixed, and
    the refusal-to-double-close its docstring always claimed is now checked. An
    open run means a process died, not the normal case.
-4. **`docs/NEBIUS_USAGE.md` does not exist.** `SUBMISSION.md` still lists it as a
-   deliverable and describes what it has to argue; it was a day-7 item and did
-   not happen. `ARCHITECTURE.md`'s directory tree used to assert it as a file on
-   disk — that entry is gone, because a tree is not the place to record an
-   intention.
+4. ~~**`docs/NEBIUS_USAGE.md` does not exist.**~~ **Closed 21 Sep.** The split
+   argued from ADR 0004, the rates from `config/pricing.toml`, the per-role
+   model bindings, and a status table that marks three claims **not yet run**
+   and names the query that will produce each rather than estimating them. It
+   was a day-7 item that did not happen, and `ARCHITECTURE.md`'s tree asserted
+   it as a file on disk for weeks — that entry went on 16 Sep, because a tree is
+   not the place to record an intention.
 5. **The API layer had no owner**, and `api/routes/` — which
    `ARCHITECTURE.md`'s directory tree asserted — does not exist. The real
    package is `secondshift/api/`, a flat set of modules with `app.py` at 539

@@ -16,11 +16,19 @@ background.
 criteria, two of which are named in this repository: Technological
 Implementation and Design.
 
-Nobody has owned the deliverable. `docs/ARCHITECTURE.md` lists
-`NEBIUS_USAGE.md` in its own directory tree with the annotation *evidence doc
-for the judging criterion*, and **the file does not exist.** It was a day-7
-deliverable in `WEEK_ONE.md` and it did not happen. That is what an unowned
-deliverable looks like: named, agreed, and absent for five weeks.
+Nobody owned the deliverable. `docs/ARCHITECTURE.md` used to list
+`NEBIUS_USAGE.md` in its directory tree, annotated *evidence doc for the judging
+criterion*, while the file did not exist — a day-7 item in `WEEK_ONE.md` that
+did not happen. The drift pass of 16 Sep removed the tree entry rather than the
+obligation, because a tree is not the place to record an intention.
+
+**Written 21 Sep**, with the split argued from ADR 0004, the rates from
+`config/pricing.toml`, the per-role model bindings, and — this is the part worth
+reading — a status table that marks three claims **not yet run** and names the
+query that will produce each. They are one blocker, not three: the Nebius
+credentials exist and are on the always-on machine. What that leaves for this
+session is the write-up around it, and filling those three rows once a machine
+session has produced them.
 
 Everything this session produces is read by a judge who will not read the code.
 
@@ -32,7 +40,7 @@ Everything this session produces is read by a judge who will not read the code.
   and its `week_of` says so on purpose. **Do not present it as day 3.** The
   honesty is worth more than the tidiness, and the run pins the brain it actually
   measured.
-- Eight numbered ADRs, each recording a decision and what it cost.
+- Fourteen numbered ADRs as of 21 Sep, each recording a decision and what it cost. Count them (`ls docs/decisions/*.md | wc -l`) rather than quoting this line; it said eight until today.
 - `config/pricing.toml` with rates read from the Token Factory console, so every
   cost figure is reproducible rather than estimated.
 - `cost_per_accepted_artifact` and `night_totals` are views, not stored numbers.
