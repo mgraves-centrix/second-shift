@@ -1,10 +1,22 @@
 # API layer prompt
 
-Paste as the first message of a fresh session. Entirely local — no Spark, no
-tailnet, no credentials.
+**Shipped 21 Sep as `api-layer`. This is a record of what was asked, not a
+session to run.** `openspec/changes/archive/2026-09-21-add-api-layer/` is what
+happened, and it differs from this file in one way worth knowing.
 
-**Run this early. It is a refactor that removes a collision, and every session
-that adds a route is cheaper after it and serialized before it.**
+**Both of the open decisions below were framed around a route that had already
+been decided against.** The prompt says authentication "changes the moment
+`nebius-executor` adds an inbound ingest route", and rests the versioning
+question on that route having an external consumer. That design argued three
+transports on 2 Sep and took the one with **no inbound path**: the job writes
+telemetry beside its artifacts and the poller collects it. What kept the
+questions alive for nineteen days was a single stale line in that proposal's
+deliverables list, ninety lines above the section resolving against the route.
+
+Both are now settled in `docs/decisions/0013-the-api-has-no-auth-and-no-version.md`:
+no authentication in this layer, scoped to a capability if one ever needs it,
+and no `/v1`. Read the sections below for the reasoning that got there, not for
+a decision to make.
 
 ---
 

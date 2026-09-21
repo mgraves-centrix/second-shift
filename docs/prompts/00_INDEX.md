@@ -51,7 +51,7 @@ all three cases differs from the prompt in at least one decision.
 | 4 | ~~`NIGHT_PIPELINE.md`~~ | ✅ shipped 2 Sep | — | — |
 | 5 | ~~`RESEARCH.md`~~ | ✅ shipped 2 Sep | — | — |
 | 6 | ~~`ARTIFACTS.md`~~ | ✅ shipped 2 Sep | — | — |
-| 7 | `NEBIUS_EXECUTOR.md` | `providers/nebius*`, ingest route | credentials | anything |
+| 7 | `NEBIUS_EXECUTOR.md` | `providers/nebius*`, the poller's telemetry collection | a credential, which lives on the machine | anything |
 | 8 | ~~`FRONTEND.md`~~ | ✅ shipped 3 Sep | — | — |
 | 9 | ~~`MORNING_INTERVIEW.md`~~ | ✅ shipped 3 Sep — server half and `app/morning/` | — | — |
 | 10 | ~~`TEST_HARNESS.md`~~ | ✅ shipped 17 Sep — `scripts/gate.py`, CI | — | — |

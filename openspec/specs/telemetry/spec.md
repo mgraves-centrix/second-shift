@@ -74,9 +74,13 @@ span.
 All such telemetry MUST be serialized through the orchestrator's own writer. No
 external caller may open its own connection to the database.
 
-The authenticated transport that carries this telemetry from a remote job is
-delivered with the Nebius executor, not here. This requirement covers the
-recorder-side contract that transport depends on.
+Whatever collects that telemetry calls this locally. `nebius-executor`'s design
+argued three transports and took the one with no inbound path — the job writes
+its telemetry beside its artifacts and the poller reads it — so there is no
+remote caller and nothing here to authenticate. This paragraph promised an
+authenticated remote transport until 21 Sep, nineteen days after that was
+decided against; the requirement above never depended on it, which is why
+nothing downstream inherited the error.
 
 #### Scenario: Remote work attaches under its dispatcher
 - **WHEN** telemetry is submitted for work dispatched from a known invocation

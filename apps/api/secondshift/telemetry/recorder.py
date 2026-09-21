@@ -377,10 +377,15 @@ class Recorder:
 
         Returns the mapping from the caller's local ids to recorded ids.
 
-        The authenticated transport that carries this from a remote job is
-        delivered with the Nebius executor. This is the recorder-side contract
-        that transport depends on: it validates the dispatcher exists, so an
-        unknown or forged parent cannot create orphaned rows.
+        Called locally by whatever collected the telemetry, never over a
+        network: `nebius-executor`'s design argued three transports and took the
+        one with no inbound path, so `await_result` — which already polls —
+        reads what the job wrote beside its artifacts and calls this. This line
+        promised an authenticated remote transport until 21 Sep, nineteen days
+        after that was decided against.
+
+        It validates that the dispatcher exists, so an unknown or forged parent
+        cannot create orphaned rows.
         """
         with self._lock:
             dispatcher = self._repo.get_invocation(dispatching_invocation_id)
