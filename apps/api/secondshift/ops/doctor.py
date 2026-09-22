@@ -19,8 +19,9 @@ from pathlib import Path
 from .. import config
 from ..db.migrate import discover
 
-#: A backup older than this is reported. Long enough that a machine which
-#: missed one night is not noisy, short enough that a schedule which stopped is
+#: A backup older than this is reported. Backups are taken nightly, ordered
+#: after the night pipeline, so this is three missed nights — long enough that
+#: one skipped night is not noisy, short enough that a schedule which stopped is
 #: caught in the same week.
 STALE_BACKUP_MS = 3 * 24 * 60 * 60 * 1000
 
@@ -54,6 +55,7 @@ def run_checks(
     checks.append(_ownership(by_name[config.ENV_DB]))
     checks.append(_reasoner(by_name, environment))
     checks.append(_backups(backups, now_ms))
+    checks.append(_backups_elsewhere(backups, db_path))
     return checks
 
 
@@ -174,6 +176,31 @@ def _reasoner(by_name, environment: dict[str, str]) -> Check:
             f"{host}:{port} serves {', '.join(served) or 'nothing'}, expected {expected}",
         )
     return Check("local reasoner", True, f"{host}:{port} serving {expected}")
+
+
+def _backups_elsewhere(backups: Path | None, db_path: Path) -> Check:
+    """Whether the backups are on a disk other than the one they protect.
+
+    The nightly schedule writes to a network share. An unmounted share is an
+    ordinary empty directory on the local disk, so every backup succeeds, the
+    staleness check above reports them fresh, and all of them are on the one
+    device whose failure this capability exists for. `ops backup` refuses to
+    create that state; this reports a machine that is already in it.
+    """
+    from .backup import same_device
+
+    if backups is None or not backups.is_dir():
+        return Check("backup location", False, "no backup directory to check")
+    if not db_path.exists():
+        return Check("backup location", False, "no database to compare against")
+    if same_device(db_path, backups):
+        return Check(
+            "backup location",
+            False,
+            f"{backups} is on the same device as the database; if it is a "
+            "network share, it is not mounted",
+        )
+    return Check("backup location", True, f"{backups} is on another device")
 
 
 def _backups(backups: Path | None, now_ms: int | None) -> Check:

@@ -47,7 +47,12 @@ def _stamp() -> str:
 def _backup(args) -> int:
     db, artifacts = _paths(args)
     destination = Path(args.to) / _stamp()
-    manifest = create_backup(db_path=db, artifacts_root=artifacts, destination=destination)
+    manifest = create_backup(
+        db_path=db,
+        artifacts_root=artifacts,
+        destination=destination,
+        same_device_ok=args.same_device_ok,
+    )
     rows = sum(manifest.tables.values())
     print(f"wrote {destination}")
     print(f"  database    {rows} rows across {len(manifest.tables)} tables, schema {manifest.schema_version}")
@@ -109,6 +114,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--to",
         required=True,
         help="where the backup goes. Required, and there is no default.",
+    )
+    take.add_argument(
+        "--same-device-ok",
+        action="store_true",
+        help=(
+            "write to the same disk as the database. For a rehearsal; a real "
+            "backup there would be lost with the original."
+        ),
     )
     take.set_defaults(fn=_backup)
 

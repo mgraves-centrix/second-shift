@@ -1,0 +1,32 @@
+# The nightly backup. No timer of its own.
+#
+# Ordered after the night rather than scheduled for a time somebody guessed the
+# night would be done by: a night's duration varies with the queue and with how
+# much the reasoner had to think about it. `second-shift-night.user.service`
+# carries the matching `Wants=`, which is also why this runs after a night that
+# FAILED — that is the night most worth holding a copy of, and `Wants=` does not
+# care how the unit it wanted exited.
+#
+# Nights stopping means backups stopping. That is deliberate, and
+# `secondshift.ops doctor` is what turns it into a visible silence: it reports a
+# newest backup older than three nights.
+
+[Unit]
+Description=Second Shift nightly backup
+After=second-shift-night.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/second-shift
+Environment=SECOND_SHIFT_DB=%h/second-shift-data/second-shift.db
+Environment=SECOND_SHIFT_ARTIFACTS=%h/second-shift-data/artifacts
+# The destination, and nothing else. No leading `-`: a missing file fails this
+# unit loudly rather than starting a backup with nowhere to put it, and the
+# file is not in the repository because a network path is environment.
+#
+#   SECOND_SHIFT_BACKUPS=/path/to/the/share/second-shift-backups
+EnvironmentFile=%h/.config/second-shift/backup.env
+# No --same-device-ok. If the share is not mounted its mount point is an
+# ordinary directory on the local disk, and a copy there is lost with the
+# original; the refusal is the point.
+ExecStart=%h/second-shift/apps/api/.venv/bin/python -m secondshift.ops backup --to ${SECOND_SHIFT_BACKUPS}

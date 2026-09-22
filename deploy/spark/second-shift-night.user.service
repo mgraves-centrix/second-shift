@@ -1,6 +1,10 @@
 [Unit]
 Description=Second Shift night pipeline (work the queued entries)
 After=network.target
+# Pulled in when the night runs, and ordered after it by its own `After=`.
+# `Wants=` rather than `Requires=` in both directions: a backup that fails must
+# not mark the night failed, and a night that failed must still get a backup.
+Wants=second-shift-backup.service
 # Six attempts, ten minutes apart: the last starts fifty minutes after the
 # first, inside the hour the limit is counted over.
 StartLimitIntervalSec=3600

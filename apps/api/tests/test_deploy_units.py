@@ -137,6 +137,68 @@ class TestTheEmbedderUnit:
         assert f":{reasoner_port}:" not in _service(unit)["ExecStart"]
 
 
+class TestTheNightlyBackup:
+    """Ordered after the night, not timed to be later than it.
+
+    A night's duration varies with the queue and with how much the reasoner had
+    to think, so a clock time is a guess. The coupling is also what makes nights
+    stopping mean backups stopping, which is the signal the schedule was chosen
+    for rather than an oversight.
+    """
+
+    BACKUP = UNITS / "second-shift-backup.user.service"
+    NIGHT = UNITS / "second-shift-night.user.service"
+
+    def _unit(self, path: Path) -> dict[str, str]:
+        parser = configparser.RawConfigParser(strict=False)
+        parser.optionxform = str
+        parser.read_string(path.read_text())
+        return dict(parser["Unit"])
+
+    def test_it_runs_after_the_night(self):
+        assert "second-shift-night.service" in self._unit(self.BACKUP)["After"]
+
+    def test_the_night_pulls_it_in(self):
+        """`Wants=`, not `Requires=`: a backup that fails must not mark the
+        night failed, and a night that failed must still get a backup — that is
+        the night most worth holding a copy of."""
+        night = self._unit(self.NIGHT)
+
+        assert "second-shift-backup.service" in night.get("Wants", "")
+        assert "second-shift-backup.service" not in night.get("Requires", "")
+
+    def test_a_missing_destination_fails_the_unit(self):
+        """No leading `-` on `EnvironmentFile=`. Starting a backup with nowhere
+        to put it is a worse error than systemd refusing to start at all."""
+        service = _service(self.BACKUP)
+
+        assert "EnvironmentFile=-" not in self.BACKUP.read_text()
+        assert "backup.env" in service["EnvironmentFile"]
+
+    def test_the_destination_is_not_in_this_repository(self):
+        """It is a path on somebody's network. `check-no-environment.sh` would
+        catch a literal one; this catches a default, which it would not."""
+        service = _service(self.BACKUP)
+
+        assert "${SECOND_SHIFT_BACKUPS}" in service["ExecStart"]
+
+    def test_it_does_not_waive_the_same_disk_guard(self):
+        """If the share is not mounted, its mount point is an ordinary
+        directory on the local disk, and a copy there is lost with the
+        original.
+
+        Asserted on the parsed `ExecStart` rather than on the file's text,
+        because the file explains in a comment why the flag is absent — and a
+        substring search would read that explanation as the flag.
+        """
+        assert "--same-device-ok" not in _service(self.BACKUP)["ExecStart"]
+
+    def test_it_has_no_timer_of_its_own(self):
+        """A second schedule would drift from the night's and take a backup
+        mid-run for no reason."""
+        assert not (UNITS / "second-shift-backup.user.timer").exists()
+
+
 def test_the_units_are_installable():
     """Each names where it is wanted, or `systemctl enable` has nothing to do."""
     for unit in REASONER_UNITS:

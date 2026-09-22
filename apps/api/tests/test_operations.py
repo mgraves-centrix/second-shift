@@ -25,6 +25,46 @@ from secondshift.ops.backup import (
 )
 
 
+def _backup(db_path, artifacts_root, destination):
+    """A backup for a test, which is always onto the same disk.
+
+    `tmp_path` is one directory on one filesystem, so every fixture here is the
+    local-rehearsal case that `--same-device-ok` exists for. The guard itself is
+    tested in `TestABackupWillNotLandOnTheDiskItProtects`, which is the only
+    place that should be calling `create_backup` without it.
+    """
+    return create_backup(
+        db_path=db_path,
+        artifacts_root=artifacts_root,
+        destination=destination,
+        same_device_ok=True,
+    )
+
+
+@pytest.fixture
+def other_device(tmp_path):
+    """A directory on a different storage device from `tmp_path`.
+
+    A real second filesystem rather than a patched `st_dev`: the thing under
+    test is a comparison of two devices, and replacing the comparison with an
+    answer would test the test. `/dev/shm` is tmpfs on Linux and `/tmp` here is
+    not, which is the whole requirement.
+    """
+    import os
+    import shutil
+    import tempfile
+
+    shm = Path("/dev/shm")
+    if not (shm.is_dir() and os.access(shm, os.W_OK)):
+        pytest.skip("no writable second filesystem to compare against")
+    if os.stat(shm).st_dev == os.stat(tmp_path).st_dev:
+        pytest.skip("/dev/shm is the same device as the temporary directory")
+
+    made = Path(tempfile.mkdtemp(dir=shm, prefix="second-shift-"))
+    yield made
+    shutil.rmtree(made, ignore_errors=True)
+
+
 @pytest.fixture
 def machine(tmp_path):
     """A data directory shaped like the one on the always-on machine."""
@@ -106,9 +146,7 @@ class TestTheMechanismIsTheRightMechanism:
 class TestWhatABackupRecords:
     def test_the_manifest_counts_every_table(self, machine, tmp_path):
         db, artifacts = machine
-        manifest = create_backup(
-            db_path=db, artifacts_root=artifacts, destination=tmp_path / "b"
-        )
+        manifest = _backup(db, artifacts, tmp_path / "b")
 
         assert manifest.tables["entries"] == 1
         assert manifest.tables["runs"] == 0
@@ -116,18 +154,14 @@ class TestWhatABackupRecords:
 
     def test_it_counts_the_artifacts(self, machine, tmp_path):
         db, artifacts = machine
-        manifest = create_backup(
-            db_path=db, artifacts_root=artifacts, destination=tmp_path / "b"
-        )
+        manifest = _backup(db, artifacts, tmp_path / "b")
 
         assert manifest.artifact_files == 1
         assert manifest.artifact_bytes == (artifacts / "2026-08-27" / "brief.md").stat().st_size
 
     def test_it_digests_every_member(self, machine, tmp_path):
         db, artifacts = machine
-        manifest = create_backup(
-            db_path=db, artifacts_root=artifacts, destination=tmp_path / "b"
-        )
+        manifest = _backup(db, artifacts, tmp_path / "b")
 
         assert {m.path for m in manifest.members} == {
             DATABASE,
@@ -138,9 +172,7 @@ class TestWhatABackupRecords:
     def test_it_names_the_brain_as_excluded_with_a_reason(self, machine, tmp_path):
         """Silence would let an operator conclude the brain was included."""
         db, artifacts = machine
-        manifest = create_backup(
-            db_path=db, artifacts_root=artifacts, destination=tmp_path / "b"
-        )
+        manifest = _backup(db, artifacts, tmp_path / "b")
 
         assert "brain" in manifest.excluded
         assert "mirror" in manifest.excluded["brain"]
@@ -148,11 +180,7 @@ class TestWhatABackupRecords:
     def test_a_machine_that_has_never_run_a_night_still_backs_up(self, machine, tmp_path):
         """Refusing over a missing artifacts tree refuses the case that matters most."""
         db, _ = machine
-        manifest = create_backup(
-            db_path=db,
-            artifacts_root=tmp_path / "never-existed",
-            destination=tmp_path / "b",
-        )
+        manifest = _backup(db, tmp_path / "never-existed", tmp_path / "b")
 
         assert manifest.artifact_files == 0
         assert manifest.tables["entries"] == 1
@@ -161,24 +189,18 @@ class TestWhatABackupRecords:
 class TestARefusal:
     def test_a_destination_that_already_holds_a_backup(self, machine, tmp_path):
         db, artifacts = machine
-        create_backup(db_path=db, artifacts_root=artifacts, destination=tmp_path / "b")
+        _backup(db, artifacts, tmp_path / "b")
 
         with pytest.raises(BackupRefused, match="already holds a backup"):
-            create_backup(
-                db_path=db, artifacts_root=artifacts, destination=tmp_path / "b"
-            )
+            _backup(db, artifacts, tmp_path / "b")
 
     def test_a_database_that_is_not_there(self, tmp_path):
         with pytest.raises(BackupRefused, match="no database at"):
-            create_backup(
-                db_path=tmp_path / "absent.db",
-                artifacts_root=tmp_path,
-                destination=tmp_path / "b",
-            )
+            _backup(tmp_path / "absent.db", tmp_path, tmp_path / "b")
 
     def test_restoring_onto_an_occupied_path(self, machine, tmp_path):
         db, artifacts = machine
-        create_backup(db_path=db, artifacts_root=artifacts, destination=tmp_path / "b")
+        _backup(db, artifacts, tmp_path / "b")
 
         with pytest.raises(BackupRefused, match="already exists"):
             restore_backup(source=tmp_path / "b", db_path=db, artifacts_root=artifacts)
@@ -186,7 +208,7 @@ class TestARefusal:
     def test_the_refusal_says_what_is_already_there(self, machine, tmp_path):
         """A refusal that does not say what it is protecting is an obstruction."""
         db, artifacts = machine
-        create_backup(db_path=db, artifacts_root=artifacts, destination=tmp_path / "b")
+        _backup(db, artifacts, tmp_path / "b")
 
         with pytest.raises(BackupRefused) as raised:
             restore_backup(source=tmp_path / "b", db_path=db, artifacts_root=artifacts)
@@ -198,7 +220,7 @@ class TestARefusal:
 
     def test_the_overwrite_proceeds(self, machine, tmp_path):
         db, artifacts = machine
-        create_backup(db_path=db, artifacts_root=artifacts, destination=tmp_path / "b")
+        _backup(db, artifacts, tmp_path / "b")
 
         manifest = restore_backup(
             source=tmp_path / "b",
@@ -210,11 +232,81 @@ class TestARefusal:
         assert manifest.tables["entries"] == 1
 
 
+class TestABackupWillNotLandOnTheDiskItProtects:
+    """The failure the nightly schedule creates, rather than one the mechanism
+    had.
+
+    The destination is a mount point on a machine where the share might not be
+    mounted, and an unmounted mount point is an ordinary empty directory on the
+    local disk. Every backup then succeeds, the staleness check reports them
+    fresh, and all of them sit on the one device whose failure this capability
+    exists for.
+    """
+
+    def test_the_same_disk_is_refused(self, machine, tmp_path):
+        db, artifacts = machine
+
+        with pytest.raises(BackupRefused, match="same device"):
+            create_backup(
+                db_path=db, artifacts_root=artifacts, destination=tmp_path / "b"
+            )
+
+    def test_the_refusal_names_the_way_out(self, machine, tmp_path):
+        """A rehearsal is a real use, and an obstruction that does not say how
+        to proceed is one somebody routes around."""
+        db, artifacts = machine
+
+        with pytest.raises(BackupRefused) as raised:
+            create_backup(
+                db_path=db, artifacts_root=artifacts, destination=tmp_path / "b"
+            )
+
+        assert "--same-device-ok" in str(raised.value)
+        assert "not mounted" in str(raised.value)
+
+    def test_a_deliberate_rehearsal_proceeds(self, machine, tmp_path):
+        db, artifacts = machine
+
+        manifest = create_backup(
+            db_path=db,
+            artifacts_root=artifacts,
+            destination=tmp_path / "b",
+            same_device_ok=True,
+        )
+
+        assert manifest.tables["entries"] == 1
+
+    def test_another_device_needs_no_flag(self, machine, other_device):
+        """What the nightly unit does, against a real second filesystem."""
+        db, artifacts = machine
+
+        manifest = create_backup(
+            db_path=db, artifacts_root=artifacts, destination=other_device / "b"
+        )
+
+        assert manifest.tables["entries"] == 1
+
+    def test_a_destination_that_does_not_exist_yet_is_judged_by_its_parent(
+        self, machine, other_device
+    ):
+        """A backup's destination is a directory that does not exist yet, so the
+        device that matters is the one it will be created on."""
+        db, artifacts = machine
+
+        manifest = create_backup(
+            db_path=db,
+            artifacts_root=artifacts,
+            destination=other_device / "nested" / "deeper" / "b",
+        )
+
+        assert manifest.tables["entries"] == 1
+
+
 class TestVerifying:
     @pytest.fixture
     def backup(self, machine, tmp_path):
         db, artifacts = machine
-        create_backup(db_path=db, artifacts_root=artifacts, destination=tmp_path / "b")
+        _backup(db, artifacts, tmp_path / "b")
         return tmp_path / "b"
 
     def test_an_intact_backup_has_no_problems(self, backup):
@@ -285,7 +377,7 @@ class TestRestoring:
         """Dumped and compared, not counted. Counts agreeing is what the
         manifest already checks; this is whether the bytes came back."""
         db, artifacts = machine
-        create_backup(db_path=db, artifacts_root=artifacts, destination=tmp_path / "b")
+        _backup(db, artifacts, tmp_path / "b")
 
         restore_backup(
             source=tmp_path / "b",
@@ -303,7 +395,7 @@ class TestRestoring:
 
     def test_the_artifacts_come_back(self, machine, tmp_path):
         db, artifacts = machine
-        create_backup(db_path=db, artifacts_root=artifacts, destination=tmp_path / "b")
+        _backup(db, artifacts, tmp_path / "b")
 
         restore_backup(
             source=tmp_path / "b",
@@ -318,7 +410,7 @@ class TestRestoring:
         """A `-wal` beside a database it does not belong to is read as that
         database's committed tail, which is how a restore silently un-restores."""
         db, artifacts = machine
-        create_backup(db_path=db, artifacts_root=artifacts, destination=tmp_path / "b")
+        _backup(db, artifacts, tmp_path / "b")
 
         target = tmp_path / "restored" / "second-shift.db"
         target.parent.mkdir()
@@ -335,16 +427,16 @@ class TestRestoring:
 
 class TestDoctor:
     @pytest.fixture
-    def well(self, machine, tmp_path):
+    def well(self, machine, other_device):
+        """A machine with nothing wrong with it, which includes its backups
+        being somewhere other than the disk they protect."""
         db, artifacts = machine
-        create_backup(
-            db_path=db, artifacts_root=artifacts, destination=tmp_path / "backups" / "one"
-        )
+        _backup(db, artifacts, other_device / "backups" / "one")
         return {
             config.ENV_DB: str(db),
             config.ENV_ARTIFACTS: str(artifacts),
             config.ENV_PROFILE: "cloud",
-        }, tmp_path / "backups"
+        }, other_device / "backups"
 
     def test_a_well_machine_passes_every_check(self, well):
         env, backups = well
@@ -432,6 +524,32 @@ class TestDoctor:
 
         failed = [c for c in run_checks(env=env, backups=tmp_path / "nowhere") if not c.ok]
         assert len(failed) >= 3
+
+    def test_backups_on_the_same_disk_are_reported(self, machine, tmp_path):
+        """A machine already in the state `create_backup` refuses to create.
+
+        Weeks of successful local backups is something to be told about rather
+        than to discover on the day the disk goes.
+        """
+        db, artifacts = machine
+        _backup(db, artifacts, tmp_path / "backups" / "one")
+        env = {config.ENV_DB: str(db), config.ENV_PROFILE: "cloud"}
+
+        detail = next(
+            c
+            for c in run_checks(env=env, backups=tmp_path / "backups")
+            if c.name == "backup location"
+        )
+        assert not detail.ok
+        assert "not mounted" in detail.detail
+
+    def test_backups_on_another_disk_pass(self, well):
+        env, backups = well
+
+        detail = next(
+            c for c in run_checks(env=env, backups=backups) if c.name == "backup location"
+        )
+        assert detail.ok
 
     def test_a_named_path_is_not_second_guessed(self, well):
         """The ownership check exists for the default, which follows whoever

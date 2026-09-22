@@ -46,7 +46,8 @@ somebody else's job rather than inferring from silence that it was included.
 
 ## Taking a backup
 
-**Status: exercised.** Also runs on every deploy, before anything is replaced.
+**Status: exercised.** Runs nightly after the night, and on every deploy before
+anything is replaced.
 
 ```bash
 python -m secondshift.ops backup --to <directory>
@@ -55,6 +56,20 @@ python -m secondshift.ops backup --to <directory>
 There is no default destination and there will not be one. A copy of every
 captured idea and every recorded model payload should not be able to land
 somewhere nobody chose.
+
+**The schedule is the NAS, nightly, ordered after the night run.**
+`deploy/spark/second-shift-backup.user.service` has no timer of its own: the
+night's unit pulls it in with `Wants=` and it orders itself with `After=`, so it
+runs when the night finishes rather than at a clock time somebody guessed the
+night would be done by. It runs after a night that *failed*, too — that is the
+night most worth holding a copy of. Nights stopping means backups stopping, and
+`doctor` is what makes that silence visible.
+
+**A backup refuses to land on the disk it exists to survive.** If the share is
+not mounted, its mount point is an ordinary empty directory on the local disk;
+every backup into it would succeed, look fresh, and sit on the one device whose
+failure this document is about. For a deliberate local rehearsal — including the
+one measured below — pass `--same-device-ok`.
 
 **It may not leave the boundary that holds the brain.** Principle 2 names an
 export path that includes `model_call_payloads` as a violation, and
@@ -136,10 +151,12 @@ objective.
 python -m secondshift.ops doctor --backups <directory>
 ```
 
-Six checks, all of them reported rather than stopping at the first failure:
+Seven checks, all of them reported rather than stopping at the first failure:
 configuration resolves; the database opens in WAL with a current schema; the
 data path is not the root account's default; the local reasoner answers on the
-configured port serving the expected name; and the newest backup is not stale.
+configured port serving the expected name; the newest backup is not stale — three
+nights, since they are nightly — and the backups are on a device other than the
+database's.
 Exits non-zero if any fail. `deploy.sh` runs it at the end of every deploy.
 
 `python -m secondshift.config show` has still never been run on that machine —
@@ -203,4 +220,9 @@ in the document that assumes it is a dropped one.
   by hand and publishes on every interface; the unit binds loopback. A reasoner
   reachable from anything that reaches the machine is a privacy question, not an
   uptime one.
-- **A backup schedule**, once its destination is decided.
+- **The backup unit installed**, and `%h/.config/second-shift/backup.env`
+  written with the NAS path. The unit is `EnvironmentFile=` without a leading
+  `-`, so it fails loudly on a machine where that file is missing.
+- **One scheduled backup observed landing on the NAS**, which is also the first
+  real test of the same-device guard: if the share is not mounted, the unit
+  fails rather than quietly filling the local disk.

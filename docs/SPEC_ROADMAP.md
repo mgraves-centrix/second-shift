@@ -55,7 +55,7 @@ list rather than six. The detail stays where it is; this is the index.
 | A restore of the **real** data onto a scratch path, diffed and timed | `operations` | The mechanism is rehearsed against a generated night; that disk and that data are not. |
 | `ops doctor` run there, which subsumes `config show` | `operations` | Its `data ownership` check exists because a service running as the wrong account has corrupted the write-ahead log on that machine. |
 | The reasoner container reconciled with its unit | `operations` | The container was started by hand and publishes on every interface; the unit binds loopback. A privacy question, not an uptime one. |
-| A backup schedule, once its destination is decided | `operations` | Blocked on a clarification marker, not on code. |
+| The backup unit installed, and one backup observed landing on the NAS | `operations` | **Decided 22 Sep: the NAS, nightly after the night run.** `second-shift-backup.user.service` plus a `backup.env` holding the path. Also the first real test of the same-device guard — an unmounted share fails the unit instead of quietly filling the local disk. |
 | The judge container built, stood up, and read by a stranger | `judge-mode` | Three gaps, below. The NAS runs containers. |
 | One real night, to exercise the night's events against a live reasoner | `night-pipeline` | Also closes `2026-09-17-the-night-revises-what-it-believes` at 7/7. |
 | Live dispatch and telemetry collection against Nebius | `nebius-executor` | The credentials exist — on that machine, at `~/.config/second-shift/secrets.env`. Not a missing credential; a missing route to where it is. |

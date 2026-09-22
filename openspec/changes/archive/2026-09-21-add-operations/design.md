@@ -95,6 +95,12 @@ and no cloud destination is available for it at any price.
 
 What is genuinely open is which on-premises target, and how often.
 
+**Resolved 22 Sep: the NAS, nightly after the night run.** Implemented by
+`2026-09-22-schedule-the-backup`, which also adds the guard that schedule turns
+out to need — a backup refuses a destination on the same device as the database,
+because an unmounted share is an ordinary directory on the local disk and every
+backup into it would succeed while being worthless.
+
 > `[NEEDS CLARIFICATION: Which on-premises target holds the database backup, and
 > on what schedule? Recommendation — the same NAS the brain already mirrors to,
 > written nightly after the night run finishes rather than on a wall-clock

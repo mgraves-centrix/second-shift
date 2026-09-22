@@ -131,6 +131,7 @@ def create_backup(
     db_path: Path,
     artifacts_root: Path,
     destination: Path,
+    same_device_ok: bool = False,
 ) -> Manifest:
     """Write a consistent copy of the database and the artifacts to `destination`.
 
@@ -140,6 +141,8 @@ def create_backup(
     """
     if not db_path.exists():
         raise BackupRefused(f"no database at {db_path}")
+    if not same_device_ok:
+        _refuse_the_same_disk(db_path, destination)
     if (destination / MANIFEST).exists():
         raise BackupRefused(
             f"{destination} already holds a backup taken at "
@@ -182,6 +185,43 @@ def create_backup(
     )
     (destination / MANIFEST).write_text(manifest.to_json())
     return manifest
+
+
+def same_device(one: Path, other: Path) -> bool:
+    """Whether two paths are on the same storage device.
+
+    Walks up to the nearest existing ancestor, because a backup's destination is
+    usually a directory that does not exist yet — and the device of the parent
+    is the device it will be created on.
+    """
+    return _device_of(one) == _device_of(other)
+
+
+def _device_of(path: Path) -> int:
+    resolved = path.resolve()
+    while not resolved.exists() and resolved != resolved.parent:
+        resolved = resolved.parent
+    return resolved.stat().st_dev
+
+
+def _refuse_the_same_disk(db_path: Path, destination: Path) -> None:
+    """A copy on the disk it protects is not a copy.
+
+    This is the failure the nightly schedule creates rather than one the
+    mechanism had. The destination is a mount point on a machine where the
+    network share might not be mounted, and an unmounted mount point is an
+    ordinary empty directory on the local disk. Every backup then succeeds,
+    `doctor` reports them fresh, and all of them sit on the one device whose
+    failure this capability is about.
+    """
+    if not same_device(db_path, destination):
+        return
+    raise BackupRefused(
+        f"{destination} is on the same device as {db_path}, so a copy there "
+        "would be lost with the original. If the destination is a network "
+        "share, it is not mounted. For a deliberate local rehearsal, pass "
+        "--same-device-ok."
+    )
 
 
 def _copy_artifacts(root: Path, destination: Path) -> tuple[int, int]:
