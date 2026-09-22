@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ import pytest
 from secondshift import config
 from secondshift.db.connection import connect, now_ms
 from secondshift.ops import create_backup, restore_backup, run_checks, verify_backup
+from secondshift.ops.doctor import night_in_flight
 from secondshift.ops.backup import (
     DATABASE,
     MANIFEST,
@@ -425,6 +427,103 @@ class TestRestoring:
         assert not Path(f"{target}-wal").exists()
 
 
+class TestWhetherANightIsInFlight:
+    """The precondition for restarting anything on that machine.
+
+    `docker rm -f` on the reasoner during a night costs that night its morning,
+    and the night is the product. The lock is held by a real second process in
+    every test here: the thing under test is a `flock`, and a simulated one
+    would test the simulation.
+    """
+
+    @contextmanager
+    def _a_night_holding_the_lock(self, db_path: Path):
+        import subprocess
+        import sys
+
+        held = subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                "import fcntl, sys, time\n"
+                f"h = open({str(db_path) + '.night.lock'!r}, 'a')\n"
+                "fcntl.flock(h, fcntl.LOCK_EX)\n"
+                "print('held', flush=True)\n"
+                "time.sleep(60)\n",
+            ],
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        assert held.stdout.readline().strip() == "held"
+        try:
+            yield held
+        finally:
+            held.kill()
+            held.wait()
+            held.stdout.close()
+
+    def test_a_running_night_is_seen(self, machine):
+        db, _ = machine
+
+        with self._a_night_holding_the_lock(db):
+            assert night_in_flight(db) is True
+
+    def test_an_idle_machine_is_seen(self, machine):
+        db, _ = machine
+        Path(f"{db}.night.lock").touch()
+
+        assert night_in_flight(db) is False
+
+    def test_a_machine_that_has_never_run_a_night_is_idle(self, machine):
+        """Not broken. The judge container is exactly this."""
+        db, _ = machine
+
+        assert not Path(f"{db}.night.lock").exists()
+        assert night_in_flight(db) is False
+
+    def test_a_night_that_died_holding_the_lock_does_not_hold_it(self, machine):
+        """The reason this reads a lock and not an open `runs` row.
+
+        A killed night leaves a run open — that is what `recover_interrupted`
+        exists for — and a restart gated on that evidence would refuse forever.
+        The kernel releases the lock when the process exits however it exits.
+        """
+        db, _ = machine
+
+        with self._a_night_holding_the_lock(db) as held:
+            held.kill()
+            held.wait()
+
+        assert night_in_flight(db) is False
+
+    def test_the_command_exits_three_so_it_can_gate_a_restart(self, machine):
+        from secondshift.ops.__main__ import NIGHT_IN_FLIGHT, main
+
+        db, _ = machine
+        with self._a_night_holding_the_lock(db):
+            assert main(["--db", str(db), "night-status"]) == NIGHT_IN_FLIGHT
+
+    def test_the_exit_code_is_the_night_s_own(self):
+        """Two commands must not answer the same state with different codes.
+
+        Asserted rather than imported: `night.__main__` drags in FastAPI, and
+        `ops` runs on a bare python3 before the venv exists. The first draft did
+        import it, and the stdlib-only test caught it — which is a deploy that
+        did not break rather than a test that did.
+        """
+        from secondshift.night.__main__ import EXIT_ALREADY_RUNNING
+        from secondshift.ops.__main__ import NIGHT_IN_FLIGHT
+
+        assert NIGHT_IN_FLIGHT == EXIT_ALREADY_RUNNING
+
+    def test_the_command_exits_zero_when_idle(self, machine):
+        from secondshift.ops.__main__ import main
+
+        db, _ = machine
+
+        assert main(["--db", str(db), "night-status"]) == 0
+
+
 class TestDoctor:
     @pytest.fixture
     def well(self, machine, other_device):
@@ -550,6 +649,26 @@ class TestDoctor:
             c for c in run_checks(env=env, backups=backups) if c.name == "backup location"
         )
         assert detail.ok
+
+    def test_a_night_in_flight_is_reported_and_is_not_a_fault(self, well, machine):
+        """A night running is the machine working. It is here because it bears
+        on a deploy, a restart and a reboot alike."""
+        env, backups = well
+        db, _ = machine
+        with TestWhetherANightIsInFlight()._a_night_holding_the_lock(db):
+            detail = next(
+                c for c in run_checks(env=env, backups=backups) if c.name == "night"
+            )
+
+        assert detail.ok
+        assert "do not restart" in detail.detail
+
+    def test_an_idle_machine_says_so(self, well):
+        env, backups = well
+
+        detail = next(c for c in run_checks(env=env, backups=backups) if c.name == "night")
+        assert detail.ok
+        assert "none in flight" in detail.detail
 
     def test_a_named_path_is_not_second_guessed(self, well):
         """The ownership check exists for the default, which follows whoever

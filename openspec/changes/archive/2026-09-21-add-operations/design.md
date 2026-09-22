@@ -150,6 +150,15 @@ technical. What it costs is a restart and about three minutes of model load from
 a warm cache, and `OPERATIONS.md` says to weigh that against what is mid-flight
 — which nothing in this repository knows.
 
+**Resolved 22 Sep: now.** Implemented by `2026-09-22-supervise-the-reasoner`,
+which also found what the switch would have done: the unit's `ExecStartPre`
+removes `second-shift-reasoner` and the container actually running is
+`nemotron-lightning`, so the unit would have failed every fifteen seconds while
+the reasoner looked perfectly healthy — the old container still serving on the
+port the probe checks. `docs/operations/SUPERVISING_THE_REASONER.md` is the
+procedure, and `ops night-status` is the precondition, because `docker rm -f`
+during a night kills that night.
+
 > `[NEEDS CLARIFICATION: Switch the reasoner to the systemd unit now, or after
 > the next machine session? Recommendation — now, and specifically before any
 > work that depends on local inference. The container currently publishes on

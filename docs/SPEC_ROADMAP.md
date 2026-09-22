@@ -54,7 +54,7 @@ list rather than six. The detail stays where it is; this is the index.
 | A reboot, with the API, brain sync and reasoner serving afterward | `operations` | `docs/operations/RECOVERY.md` |
 | A restore of the **real** data onto a scratch path, diffed and timed | `operations` | The mechanism is rehearsed against a generated night; that disk and that data are not. |
 | `ops doctor` run there, which subsumes `config show` | `operations` | Its `data ownership` check exists because a service running as the wrong account has corrupted the write-ahead log on that machine. |
-| The reasoner container reconciled with its unit | `operations` | The container was started by hand and publishes on every interface; the unit binds loopback. A privacy question, not an uptime one. |
+| The reasoner switched to its unit | `operations` | **Decided 22 Sep: now.** `docs/operations/SUPERVISING_THE_REASONER.md`, gated on `ops night-status`. **Read step 2 before starting**: the unit removes `second-shift-reasoner` and the running container is `nemotron-lightning`, so a naive switch fails every fifteen seconds while the reasoner looks healthy — the old container is still serving on the port the probe checks. |
 | The backup unit installed, and one backup observed landing on the NAS | `operations` | **Decided 22 Sep: the NAS, nightly after the night run.** `second-shift-backup.user.service` plus a `backup.env` holding the path. Also the first real test of the same-device guard — an unmounted share fails the unit instead of quietly filling the local disk. |
 | The judge container built, stood up, and read by a stranger | `judge-mode` | Three gaps, below. The NAS runs containers. |
 | One real night, to exercise the night's events against a live reasoner | `night-pipeline` | Also closes `2026-09-17-the-night-revises-what-it-believes` at 7/7. |
@@ -1399,13 +1399,15 @@ that data. Marking the whole document "unverified" was rejected: it would have
 covered both the untried steps and the ones the gate runs on every commit, and
 flattening those into one word is how a document stops being read.
 
-**One question is recorded and unanswered**, and one was answered on 22 Sep. **Answered: the NAS, nightly after the night run**, which is
+**Both questions were answered on 22 Sep**, and both are implemented as far as
+a session with no route to the machine can take them. **Answered: the NAS, nightly after the night run**, which is
 what the marker recommended and what `2026-09-22-schedule-the-backup`
 implements. ADR 0014 had already settled that a backup may never leave the
 boundary holding the brain, so the question was only ever which on-premises
-target. **Still open:** whether the reasoner container becomes its supervised
-unit now, which needs to know what is mid-flight on a machine this session
-cannot reach.
+target. **Also answered: switch the reasoner to its unit now** — the
+container publishes on every interface while the unit binds loopback, which is
+the airlock half of that reconciliation. Preparing it found that the switch
+would have failed silently, and the procedure names that first.
 
 **What the next capability inherits.** `python -m secondshift.ops doctor` is a
 one-command answer to "is this machine well", and it runs in the judge container

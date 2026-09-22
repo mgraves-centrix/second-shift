@@ -20,8 +20,17 @@ from pathlib import Path
 
 from .. import config
 from .backup import CONTAINS, BackupRefused, Manifest, create_backup
-from .doctor import run_checks
+from .doctor import night_in_flight, run_checks
 from .restore import restore_backup, verify_backup
+
+#: The night's own `EXIT_ALREADY_RUNNING`, stated here rather than imported.
+#: `night.__main__` pulls in the whole pipeline and with it FastAPI, numpy and
+#: pydantic — and `deploy.sh` runs `ops backup` with the target's system python3
+#: before the venv exists, which is why this package imports nothing outside the
+#: standard library. `test_the_exit_code_is_the_night_s_own` holds the two
+#: together; the import would have broken a deploy rather than a test, and it
+#: did break the test that exists to stop that.
+NIGHT_IN_FLIGHT = 3
 
 
 def _paths(args) -> tuple[Path, Path]:
@@ -103,6 +112,22 @@ def _doctor(args) -> int:
     return 0
 
 
+def _night_status(args) -> int:
+    """Exit 0 idle, exit 3 busy, so this can gate another command with `&&`.
+
+    Three is the night's own `EXIT_ALREADY_RUNNING`. Reusing it rather than
+    choosing a code keeps two commands from answering the same state
+    differently, which is the kind of disagreement nobody notices until it
+    matters.
+    """
+    db, _ = _paths(args)
+    if night_in_flight(db):
+        print(f"a night is in flight against {db}", file=sys.stderr)
+        return NIGHT_IN_FLIGHT
+    print(f"no night in flight against {db}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m secondshift.ops")
     parser.add_argument("--db", help="override the configured database path")
@@ -137,6 +162,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="replace an existing database. Without this, an occupied path refuses.",
     )
     put.set_defaults(fn=_restore)
+
+    idle = sub.add_parser(
+        "night-status", help="is a night running (exit 3 if so, to gate a restart)"
+    )
+    idle.set_defaults(fn=_night_status)
 
     well = sub.add_parser("doctor", help="is this machine well")
     well.add_argument("--backups", help="the directory backups are written to")

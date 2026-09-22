@@ -56,6 +56,7 @@ def run_checks(
     checks.append(_reasoner(by_name, environment))
     checks.append(_backups(backups, now_ms))
     checks.append(_backups_elsewhere(backups, db_path))
+    checks.append(_night_in_flight(db_path))
     return checks
 
 
@@ -176,6 +177,46 @@ def _reasoner(by_name, environment: dict[str, str]) -> Check:
             f"{host}:{port} serves {', '.join(served) or 'nothing'}, expected {expected}",
         )
     return Check("local reasoner", True, f"{host}:{port} serving {expected}")
+
+
+def night_in_flight(db_path: Path) -> bool:
+    """Whether a night is running against this database right now.
+
+    From the lock the night holds, not from an open `runs` row. An open run is
+    also what a night killed last week left behind — the case
+    `recover_interrupted` exists for — so a restart gated on that evidence would
+    refuse forever.
+
+    The lock is an advisory `flock` that the kernel releases when the process
+    exits however it exits, which is exactly the property that makes it a
+    statement about *now*. Taking it and dropping it is the only way to ask:
+    there is no way to read a lock without attempting it.
+    """
+    import fcntl
+
+    lock = Path(f"{db_path}.night.lock")
+    if not lock.exists():
+        # A machine that has never run a night is idle, not broken. The judge
+        # container is exactly that.
+        return False
+    with lock.open("a") as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        fcntl.flock(handle, fcntl.LOCK_UN)
+    return False
+
+
+def _night_in_flight(db_path: Path) -> Check:
+    """Reported, never failed. A night running is the machine working.
+
+    It is here because it bears on a deploy, a restart and a reboot alike:
+    `docker rm -f` on the reasoner during a night costs that night its morning.
+    """
+    if night_in_flight(db_path):
+        return Check("night", True, "a night is in flight — do not restart anything")
+    return Check("night", True, "none in flight")
 
 
 def _backups_elsewhere(backups: Path | None, db_path: Path) -> Check:

@@ -216,10 +216,9 @@ in the document that assumes it is a dropped one.
 - **`doctor` on that machine**, whose `data ownership` check exists because a
   service running as the wrong account has corrupted the write-ahead log there
   before.
-- **The reasoner container reconciled with its unit.** The container was started
-  by hand and publishes on every interface; the unit binds loopback. A reasoner
-  reachable from anything that reaches the machine is a privacy question, not an
-  uptime one.
+- **The reasoner switched to its unit**, following
+  `SUPERVISING_THE_REASONER.md` beside this file. Decided 22 Sep; the procedure
+  exists, and nobody has run it.
 - **The backup unit installed**, and `%h/.config/second-shift/backup.env`
   written with the NAS path. The unit is `EnvironmentFile=` without a leading
   `-`, so it fails loudly on a machine where that file is missing.
