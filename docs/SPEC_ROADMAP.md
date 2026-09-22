@@ -1399,12 +1399,13 @@ that data. Marking the whole document "unverified" was rejected: it would have
 covered both the untried steps and the ones the gate runs on every commit, and
 flattening those into one word is how a document stops being read.
 
-**Two questions are recorded and unanswered**, both the user's. Where backups
-are kept and on what schedule — ADR 0014 settles that a backup may never leave
-the boundary that holds the brain, so the question is which on-premises target,
-never whether. And whether the reasoner container becomes its supervised unit
-now, which needs to know what is mid-flight on a machine this session cannot
-reach.
+**One question is recorded and unanswered**, and one was answered on 22 Sep. **Answered: the NAS, nightly after the night run**, which is
+what the marker recommended and what `2026-09-22-schedule-the-backup`
+implements. ADR 0014 had already settled that a backup may never leave the
+boundary holding the brain, so the question was only ever which on-premises
+target. **Still open:** whether the reasoner container becomes its supervised
+unit now, which needs to know what is mid-flight on a machine this session
+cannot reach.
 
 **What the next capability inherits.** `python -m secondshift.ops doctor` is a
 one-command answer to "is this machine well", and it runs in the judge container
