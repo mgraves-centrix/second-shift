@@ -31,6 +31,38 @@ suite is 29. The browser test adds 2 and the mutations 8. Everything runs on eve
 push; there is no fast path, because at this size one would save less than a
 minute and cost a second definition of "passing."
 
+## On every push, literally
+
+```bash
+git config core.hooksPath .githooks
+```
+
+One line per clone, and `.githooks/pre-push` refuses a push whose tree does not
+pass. Tracked here rather than left in `.git/hooks`, so it is reviewable and
+arrives with a clone; opt-in, because a hook that installs itself surprises
+somebody.
+
+**It exists because the sentence above was not true of the push.** Two red
+commits landed in three days, both from an exit status that never reached the
+shell:
+
+```bash
+python3 scripts/gate.py | tail -2 && git push    # reports tail's status
+python3 scripts/gate.py > log 2>&1; git push     # discards it entirely
+```
+
+Both read as careful, and the second happened after the first had been written
+up — which is what makes it a mechanism problem rather than a memory one.
+
+Removing a branch is not gated: `git push --delete` has no tree to check, and a
+two-minute wait to delete one is the friction that gets a hook uninstalled. A
+deletion pushed *alongside* real commits is gated, because one ref with a tree
+is enough.
+
+To push past a failure on purpose, `git push --no-verify`. The refusal says so
+itself — an override nobody can find is one they route around by unsetting
+`core.hooksPath`.
+
 ## Bootstrap from a clean clone
 
 Needs Python 3.12 or later, Node 24, and Google Chrome.

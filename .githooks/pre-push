@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Refuse a push whose tree does not pass the gate.
+#
+# `docs/development/GATES.md` says "everything runs on every push". That was
+# true of CI and not of the push, and the gap cost two red commits in three
+# days — both times because the gate's exit status never reached the shell:
+#
+#   python3 scripts/gate.py | tail -2 && git push   # the pipeline's status is tail's
+#   python3 scripts/gate.py > log 2>&1; git push    # the semicolon discards it
+#
+# Both read as careful. This is here because the second happened after the
+# first had been written up, which is what makes it a mechanism problem rather
+# than a memory one.
+#
+# Enable per clone, because a hook that installs itself is one that surprises
+# somebody:
+#
+#   git config core.hooksPath .githooks
+set -uo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+
+# A deletion has no tree to check. `git push --delete` sends an all-zero local
+# hash, and making it wait two minutes is the friction that gets a hook
+# uninstalled.
+only_deletions=true
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+    [ -z "${local_sha:-}" ] && continue
+    case "${local_sha}" in
+        *[!0]*) only_deletions=false ;;
+    esac
+done
+if [ "${only_deletions}" = true ]; then
+    exit 0
+fi
+
+echo "pre-push: running the gate. About two minutes." >&2
+if "${GATE_PYTHON_BIN:-python3}" "${ROOT}/scripts/gate.py"; then
+    exit 0
+fi
+
+cat >&2 <<'WHY'
+
+pre-push: refusing. The gate above says which one failed and with what.
+
+This exists because the exit status is easy to lose:
+  scripts/gate.py | tail -2 && git push     reports tail's status
+  scripts/gate.py > log 2>&1; git push      discards it entirely
+
+To push anyway, on purpose:
+  git push --no-verify
+WHY
+exit 1

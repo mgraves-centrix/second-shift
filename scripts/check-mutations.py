@@ -146,6 +146,16 @@ MUTATIONS = [
         "if planned and not exists:",
         PYTEST + [str(ROOT / "apps/api/tests/test_drift.py")],
     ),
+    Mutation(
+        "push-gate-skips-on-any-deletion",
+        "23 Sep: the cheap reading of a pre-push payload — any all-zero hash "
+        "means there is nothing to check — lets a red commit through behind a "
+        "branch deletion in the same push.",
+        ".githooks/pre-push",
+        "        *[!0]*) only_deletions=false ;;",
+        "        *[!0]*) : ;;",
+        PYTEST + [str(ROOT / "apps/api/tests/test_push_gate.py")],
+    ),
 ]
 
 
