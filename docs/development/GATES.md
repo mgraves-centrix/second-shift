@@ -63,6 +63,13 @@ To push past a failure on purpose, `git push --no-verify`. The refusal says so
 itself — an override nobody can find is one they route around by unsetting
 `core.hooksPath`.
 
+**The hook inherits the environment of `git push`.** Its first real use refused
+a push whose tree was green, because the browser gate could not find Chrome:
+`GATE_CHROME` had been set on the command that ran the gate by hand, and not on
+the one that pushed. Where either override is needed, it belongs in the shell's
+profile rather than in a per-command prefix, or the hook and the hand-run gate
+disagree about the same tree.
+
 ## Bootstrap from a clean clone
 
 Needs Python 3.12 or later, Node 24, and Google Chrome.
