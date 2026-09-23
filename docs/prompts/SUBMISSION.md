@@ -40,7 +40,9 @@ Everything this session produces is read by a judge who will not read the code.
   and its `week_of` says so on purpose. **Do not present it as day 3.** The
   honesty is worth more than the tidiness, and the run pins the brain it actually
   measured.
-- Fourteen numbered ADRs as of 21 Sep, each recording a decision and what it cost. Count them (`ls docs/decisions/*.md | wc -l`) rather than quoting this line; it said eight until today.
+- 14 numbered ADRs <!-- derived: count docs/decisions/*.md -->, each recording a
+  decision and what it cost. The marker is how that number stays true: it said
+  eight until 21 Sep, and `scripts/check-drift.py` now fails when it drifts again.
 - `config/pricing.toml` with rates read from the Token Factory console, so every
   cost figure is reproducible rather than estimated.
 - `cost_per_accepted_artifact` and `night_totals` are views, not stored numbers.
@@ -116,7 +118,7 @@ git status --short && openspec list && openspec list --specs
 python3 scripts/gate.py
 ```
 
-**One command, and it is the one CI runs.** Ten gates in order — airlock, the
+**One command, and it is the one CI runs.** 11 gates <!-- derived: matches scripts/gate.py ^    \(" --> in order — airlock, the
 two repository guards, specs, the orchestrator suite, web unit/types/build, a
 browser test, and a mutation check — stopping at the first failure with that
 gate's exit code. About 85 seconds. `docs/development/GATES.md` has the table.

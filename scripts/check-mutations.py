@@ -125,6 +125,27 @@ MUTATIONS = [
         "if _may_leave(p.policy, policy)",
         PYTEST + [str(ROOT / "apps/api/tests/test_retrieval.py")],
     ),
+    Mutation(
+        "drift-guesses-at-prose",
+        "23 Sep: the drift checker's value is that it never guesses. A version "
+        "that read bare numbers would fire on five rubric dimensions and six "
+        "night stages, and a check with false positives is one people suppress.",
+        "scripts/check-drift.py",
+        'for claimed, kind, target, pattern in _DERIVED.findall(line):',
+        'for claimed, kind, target, pattern in (_DERIVED.findall(line) or '
+        '[(n, "lines", "README.md", "") for n in re.findall(r"\\b(\\d+)\\b", line)]):',
+        PYTEST + [str(ROOT / "apps/api/tests/test_drift.py")],
+    ),
+    Mutation(
+        "drift-ignores-planned",
+        "23 Sep: a tree that calls shipped work planned tells a reader that work "
+        "remains which does not. The 16 Sep pass fixed the other direction and "
+        "left this one, in the same document.",
+        "scripts/check-drift.py",
+        "if planned and exists:",
+        "if planned and not exists:",
+        PYTEST + [str(ROOT / "apps/api/tests/test_drift.py")],
+    ),
 ]
 
 

@@ -117,7 +117,7 @@ a fabrication, and the tables above are meant to be checkable.
 A judge with a clone and no credentials can run all of this:
 
 ```bash
-python3 scripts/gate.py                        # ten gates, about 100 seconds
+python3 scripts/gate.py                        # every gate, about two minutes
 apps/api/.venv/bin/python -m secondshift_seed --seed 42 --db /tmp/night.db
 ```
 

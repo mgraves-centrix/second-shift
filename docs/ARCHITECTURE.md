@@ -104,8 +104,8 @@ second-shift/
 │   │   │   ├── retrieval/       embedding index + assembly
 │   │   │   ├── brain/           markdown read/write + git operations
 │   │   │   ├── api/             app, context, mappers, routes/ (one per capability)
-│   │   │   ├── night/           checkpointed stage machine  (planned)
-│   │   │   └── morning/         briefing + interview        (planned)
+│   │   │   ├── night/           checkpointed stage machine
+│   │   │   └── morning/         briefing + interview
 │   │   └── tests/
 │   └── web/                     Next.js PWA + dashboard
 │       ├── app/

@@ -17,6 +17,7 @@ the script; it never restates the gates.
 | airlock | Profile and policy refusals, redaction, and the research egress path. First because they are the fastest and the most important. |
 | no environment details | No private address, tailnet name or home path in a tracked or new file. The repository is public. |
 | American English | No British spellings in anything authored here. |
+| drift | The claims about this repository a machine can check: the documented tree against the filesystem in both directions, every number whose prose says what it derives from, and the bookkeeping that decides what `openspec list` reports. **It does not check semantics** — whether two documents agree, or whether one agrees with itself — and says so on every passing run, because a narrow check read as a broad one replaces the pass that would have found the rest. |
 | specs | `openspec validate --all --strict`. |
 | api | The full orchestrator suite. Warnings are errors. |
 | web unit | Pure-function tests under `node --test`. |

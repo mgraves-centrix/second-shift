@@ -42,6 +42,10 @@ GATES: list[tuple[str, list[str]]] = [
                           str(API / "tests/test_research.py")]),
     ("no environment details", ["bash", str(ROOT / "scripts/check-no-environment.sh")]),
     ("American English", ["bash", str(ROOT / "scripts/check-american-english.sh")]),
+    # Beside the other two repository guards, and nearly as cheap. It checks the
+    # claims a machine can check; the ones it cannot are named in its own output
+    # so a green row is not read as "the documents agree".
+    ("drift", [sys.executable, str(ROOT / "scripts/check-drift.py")]),
     ("specs", ["openspec", "validate", "--all", "--strict", "--no-interactive"]),
     ("api", PYTEST + [str(API / "tests")]),
     ("web unit", ["npm", "--prefix", str(WEB), "test"]),

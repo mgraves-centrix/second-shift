@@ -70,7 +70,7 @@ both be in `apps/web/app/` or in `secondshift/night/`.
 
 The third was `api/app.py`, a single file five sessions needed to add routes to:
 368 lines when this was written, 473 on 19 Sep, 539 on 21 Sep. `api-layer`
-shipped that day and it is 79 lines with no route in it; a route now lives in
+shipped that day and it is 80 lines <!-- derived: lines apps/api/secondshift/api/app.py --> with no route in it; a route now lives in
 `api/routes/<capability>.py` and adding one touches one file, measured rather
 than asserted. Three of the five sessions ran in sequence before the split and
 paid the cost, so the scheduling argument was largely spent by the time it

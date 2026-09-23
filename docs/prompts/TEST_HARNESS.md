@@ -9,7 +9,7 @@ alongside any other session.**
 > **Shipped 17 Sep — `2026-09-17-add-test-harness`. This is a record of what was
 > asked, not a session to run.**
 >
-> `python3 scripts/gate.py` runs ten gates in order and stops at the first
+> `python3 scripts/gate.py` runs 11 gates <!-- derived: matches scripts/gate.py ^    \(" --> in order and stops at the first
 > failure with that gate's exit code; `.github/workflows/gate.yml` calls the
 > same file and never restates the gates. The suite it describes below as "302
 > Python tests, 25 web tests" is 666 and 56 now.
