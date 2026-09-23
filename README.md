@@ -17,9 +17,18 @@ Built for the Nebius x NVIDIA Global AI Hackathon, Personal AI track.
 
 ## Status
 
-Week one, as of 2 Sep 2026. Capture works end to end and is taking real ideas
-daily; everything downstream of it is still ahead. The rest of this README
-describes the target — this table describes the present.
+**The submission write-up is [`docs/SUBMISSION.md`](docs/SUBMISSION.md)** — what
+this is, what has been measured, and what has not. Read that first.
+
+The table below is **the week-one record, as of 2 Sep 2026**, kept because it is
+where this started. Several of its rows have since been overtaken; those are
+marked. For what is true now, derive it:
+
+```bash
+npx openspec list --specs        # the capabilities
+cat docs/SPEC_ROADMAP.md         # what is built, what is owed, and to whom
+python3 scripts/gate.py          # whether it passes
+```
 
 | Milestone | State |
 |---|---|
@@ -36,19 +45,22 @@ describes the target — this table describes the present.
 | Retrieval — local embedding and policy-filtered assembly | done — measured on the machine: 40ms rebuild, 48 KiB index |
 | Agents — six roles, versioned prompts pinned by content | done — prompts are drafts awaiting judgment |
 | Configuration — resolved view with provenance | done — `python -m secondshift.config show`; not yet run on the always-on machine |
-| Night orchestrator | done — checkpointed six-stage walk, quarantine over downgrade; **never run against the real reasoner** |
+| Night orchestrator | done — checkpointed six-stage walk, quarantine over downgrade. ~~never run against the real reasoner~~ **Overtaken: two real nights ran on the Spark on 16 Sep, and a six-of-six night with research on 17 Sep** |
 | Artifacts — files on disk, variant groups, outcomes | done — hashed from what landed; `cost_per_accepted_artifact` returns a number once a `keep` is recorded |
 | Research — redaction before egress | done — queries are constructed, never filtered from raw text; `local-only` makes zero calls. **Never run against the live Tavily API**: no credential here |
-| Morning interview | **server half only** — briefing, questions with rationale, answering, policy upgrade. **No screen yet**; `frontend` has now landed, so it is unblocked |
+| Morning interview | done — briefing, questions with rationale, answering, policy upgrade. ~~no screen yet~~ **Overtaken: `app/morning/` shipped 3 Sep** |
 | Frontend shell and token system | done — one token file, navigation between every surface, demo label from the served profile |
 | Night scrubber UI | done — reads a recorded night, scrubs by pointer or keyboard |
-| Judge demo instance | not started |
+| Judge demo instance | ~~not started~~ **Overtaken: `judge-mode` shipped 20 Sep. The container has never been built — that needs a machine with a container runtime** |
 
-Eighteen capabilities have shipped across seventeen OpenSpec changes. Their
+22 capabilities <!-- derived: count openspec/specs/*/ --> have shipped across
+30 <!-- derived: count openspec/changes/archive/*/ --> OpenSpec changes. Their
 specifications are in `openspec/specs/`; the changes that built them, with their
 task lists, are in `openspec/changes/archive/`. Both directories are the
-authority on that count — this sentence has been wrong before, so count them
-rather than trusting it:
+authority on that count — **this sentence said "eighteen" for three weeks after
+it stopped being true**, which is why those two figures now derive from the
+directories and `scripts/check-drift.py` fails when they drift again. Count them
+yourself:
 
 ```bash
 npx openspec list --specs && ls openspec/changes/archive/
