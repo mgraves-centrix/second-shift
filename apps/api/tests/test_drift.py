@@ -198,6 +198,20 @@ class TestADerivedNumber:
 
         assert result.returncode == 0, result.stderr
 
+    def test_a_file_in_the_index_but_not_on_disk_is_skipped(self, repo):
+        """`git ls-files` lists what the index holds, which during a rename is
+        not what is on disk. The first run of this gate after an
+        `openspec archive` crashed with a traceback instead of reporting — and a
+        tree mid-move is exactly when somebody runs the gate."""
+        root = repo(extra={"docs/moved.md": "3 lines <!-- derived: lines docs/x.md -->\n"})
+        _checker_for(root)
+        (root / "docs" / "moved.md").unlink()
+
+        result = run(root)
+
+        assert result.returncode == 0, result.stderr
+        assert "Traceback" not in result.stderr
+
     def test_a_derivation_that_cannot_be_computed_is_reported(self, repo):
         """Not silently skipped. A marker pointing at a moved file is a claim
         nobody is checking any more, which is the state this exists to end."""

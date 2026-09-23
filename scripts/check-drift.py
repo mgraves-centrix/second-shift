@@ -116,6 +116,13 @@ def check_derived(files: list[Path]) -> list[str]:
     """
     problems = []
     for path in files:
+        if not path.is_file():
+            # `git ls-files` lists what the index holds, which during a rename
+            # or a delete is not what is on disk. The first run of this gate
+            # after an `openspec archive` crashed here rather than reporting,
+            # and a tree mid-move is exactly when somebody runs the gate. A file
+            # that is not there has no claims in it.
+            continue
         for line_no, line in enumerate(path.read_text().splitlines(), 1):
             for claimed, kind, target, pattern in _DERIVED.findall(line):
                 stated = int(claimed.replace(",", ""))
