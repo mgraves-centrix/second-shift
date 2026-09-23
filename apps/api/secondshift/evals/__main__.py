@@ -23,12 +23,13 @@ from ..config import synthetic_flag
 from ..db.connection import connect
 from ..db.migrate import migrate
 from ..db.repository import Repository
-from .content import Rubric, load_prompts, load_rubric
-from .runner import EvalRunner, NotComparable
+from .content import Rubric, load_prompts, load_rubric, load_threshold
+from .runner import NO_IMPROVEMENT_SHOWN, EvalRunner, NotComparable
 
 DEFAULT_DB = os.path.expanduser("~/second-shift-data/second-shift.db")
 DEFAULT_CANDIDATES = "config/evals/candidates.md"
 DEFAULT_RUBRIC = "config/evals/rubric.md"
+DEFAULT_THRESHOLD = "config/evals/threshold.md"
 
 
 def _status(runner: EvalRunner, rubric: Rubric) -> int:
@@ -129,12 +130,12 @@ def _dispatch(args, runner: EvalRunner, rubric: Rubric) -> int:
         return 0
 
     if args.command == "curve":
-        return _curve(runner, args.args)
+        return _curve(runner, args.args, load_threshold(args.threshold))
 
     return 2
 
 
-def _curve(runner: EvalRunner, ids: list[str]) -> int:
+def _curve(runner: EvalRunner, ids: list[str], threshold) -> int:
     """The comparison the submission rests on, or the reason there isn't one.
 
     With no arguments it takes the oldest and newest scored runs, because
@@ -156,7 +157,7 @@ def _curve(runner: EvalRunner, ids: list[str]) -> int:
         earlier_id, later_id = scored[0].eval_run_id, scored[-1].eval_run_id
 
     try:
-        curve = runner.curve(earlier_id, later_id)
+        curve = runner.curve(earlier_id, later_id, threshold=threshold)
     except (NotComparable, ValueError) as exc:
         print(f"not comparable: {exc}", file=sys.stderr)
         return 1
@@ -179,6 +180,25 @@ def _curve(runner: EvalRunner, ids: list[str]) -> int:
         print("  larger than the sampling spread")
     else:
         print("  inside the sampling spread: not shown to have moved")
+
+    # Paired, which is what the bar is applied to. The line above is the pooled
+    # view and stays because it is the one a reader checks by eye.
+    print()
+    for delta in curve.prompts:
+        print(f"  {delta.slug:34s} {delta.earlier:5.2f} -> {delta.later:5.2f}"
+              f"  {delta.difference:+5.2f}")
+    print(f"\n  per prompt {curve.paired_difference:+.2f}"
+          f"  standard error {curve.standard_error:.2f}"
+          f"  {curve.agreeing_prompts} of {len(curve.prompts)} agreeing")
+    # The hash travels with the verdict, so a threshold edited after the result
+    # is visible in the one place somebody reads the result.
+    print(f"  bar: {threshold.standard_errors:g} standard errors and "
+          f"{threshold.agreeing_share:.0%} agreeing, fixed {threshold.fixed_on} "
+          f"({threshold.sha[:12]})")
+    print(f"\n  VERDICT: {curve.verdict}")
+    if curve.verdict == NO_IMPROVEMENT_SHOWN:
+        print("  — which is not the same as the brain having learned nothing;")
+        print("    six prompts cannot resolve a small effect from none.")
     return 0
 
 
@@ -193,6 +213,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--brain", default=None)
     parser.add_argument("--candidates", default=DEFAULT_CANDIDATES)
     parser.add_argument("--rubric", default=DEFAULT_RUBRIC)
+    parser.add_argument("--threshold", default=DEFAULT_THRESHOLD)
     parser.add_argument("--week-of", default="")
     parser.add_argument("--samples", type=int, default=3)
     args = parser.parse_args(argv)

@@ -59,7 +59,7 @@ list rather than six. The detail stays where it is; this is the index.
 | The judge container built, stood up, and read by a stranger | `judge-mode` | Three gaps, below. The NAS runs containers. |
 | One real night, to exercise the night's events against a live reasoner | `night-pipeline` | Also closes `2026-09-17-the-night-revises-what-it-believes` at 7/7. |
 | Live dispatch and telemetry collection against Nebius | `nebius-executor` | The credentials exist — on that machine, at `~/.config/second-shift/secrets.env`. Not a missing credential; a missing route to where it is. |
-| The week-8 eval run, and the falsification threshold set **before** it is scored | `eval-scoring` | The curve command exists; scoring needs Token Factory. A threshold chosen after seeing the number is not a measurement, so its deadline is earlier than the submission's. |
+| The week-8 eval run | `eval-scoring` | The curve command exists and **the falsification threshold is fixed** — `config/evals/threshold.md`, 23 Sep, while nothing had been scored. What is left needs Token Factory. |
 | Spike F, and `Transcriber` | `asr` | The model runs on the Spark and nowhere else. |
 
 **None of these closes from a cloud development session**, and that is tested
@@ -502,7 +502,7 @@ A deferred obligation with no home is a dropped one, so they have a home now.
 | ~~`api-layer`~~ | **Shipped 21 Sep** — `2026-09-21-add-api-layer`. Nine routes in five modules under `api/routes/`; `app.py` is 79 lines and declares none of them. Adding a route now touches one file, measured rather than asserted. Detail below. | — |
 | ~~`test-harness`~~ | **Shipped 17 Sep** — `2026-09-17-add-test-harness`. `python3 scripts/gate.py` runs every gate; CI runs that file. A browser test of the night view, and a mutation check over shipped defects. See `docs/development/GATES.md`. | nothing |
 | ~~`operations`~~ | **Shipped 21 Sep** — `2026-09-21-add-operations`. `python -m secondshift.ops` backs up, verifies, restores and checks. `deploy.sh` installs then swaps, taking a backup before anything is destroyed. The procedure says per step whether anybody has run it. Detail below. | — |
-| `eval-scoring` | The week-8 run. **The curve shipped 21 Sep** (`2026-09-21-add-eval-curve`) — `python -m secondshift.evals curve` compares two runs and refuses five ways when the comparison would mean something other than it looks like. What is left is scoring, which needs the bound judge and therefore Token Factory. `SUBMISSION.md` declares a dependency on it that reads as satisfied and is not. | `submission` |
+| `eval-scoring` | The week-8 run. **The curve shipped 21 Sep and its bar was fixed 23 Sep** (`2026-09-21-add-eval-curve`) — `python -m secondshift.evals curve` compares two runs and refuses five ways when the comparison would mean something other than it looks like. What is left is scoring, which needs the bound judge and therefore Token Factory. `SUBMISSION.md` declares a dependency on it that reads as satisfied and is not. | `submission` |
 
 **Six capabilities shipped on 2 Sep and the sections below are not in ship
 order.** Each states the canonical count as of its own ship, so the numbers read

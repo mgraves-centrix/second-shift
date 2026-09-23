@@ -10,7 +10,7 @@ import pytest
 
 from secondshift.brain.repo import BrainRepo, BrainUnavailable
 from secondshift.evals.__main__ import main
-from secondshift.evals.content import Rubric, load_prompts, load_rubric
+from secondshift.evals.content import Rubric, load_prompts, load_rubric, load_threshold
 from secondshift.evals.judge import (
     DIMENSIONS,
     Judgement,
@@ -19,6 +19,9 @@ from secondshift.evals.judge import (
 )
 from secondshift.evals.runner import (
     AWAITING,
+    IMPROVED,
+    NO_IMPROVEMENT_SHOWN,
+    REGRESSED,
     EvalRunner,
     NoJudgeConfigured,
     NotComparable,
@@ -892,3 +895,192 @@ class TestTheCurveCommand:
 
         assert code == 2
         assert "two eval run ids" in capsys.readouterr().err
+
+
+REPO_THRESHOLD = REPO_ROOT / "config" / "evals" / "threshold.md"
+
+
+class TestTheBarWasSetBeforeTheNumber:
+    """`EVAL_SCORING.md`: a threshold chosen after the fact is not a
+    measurement, and a judge who has run an experiment will know."""
+
+    def test_the_shipped_threshold_says_when_it_was_fixed(self):
+        """A date in the text, not a modification time — that is a property of
+        a checkout and this has to survive being cloned."""
+        threshold = load_threshold(REPO_THRESHOLD)
+
+        assert threshold.fixed_on == "2026-09-23"
+
+    def test_a_threshold_that_does_not_say_when_is_refused(self, tmp_path):
+        path = tmp_path / "t.md"
+        path.write_text("# A bar\n\nTwo standard errors.\n")
+
+        with pytest.raises(ValueError, match="does not say when it was fixed"):
+            load_threshold(path).fixed_on
+
+    def test_the_hash_follows_the_text(self, tmp_path):
+        """An edit after the result changes the hash, and the hash is printed
+        beside the verdict."""
+        path = tmp_path / "t.md"
+        path.write_text("**Fixed 2026-09-23** two errors\n")
+        first = load_threshold(path).sha
+        path.write_text("**Fixed 2026-09-23** one error\n")
+
+        assert load_threshold(path).sha != first
+
+    def test_the_rule_matches_the_file(self):
+        """The numbers live in code and the argument lives in the file, so this
+        is the seam where they could disagree."""
+        threshold = load_threshold(REPO_THRESHOLD)
+
+        assert threshold.standard_errors == 2.0
+        assert "twice its standard error" in threshold.text
+        assert "two thirds" in threshold.text
+        assert abs(threshold.agreeing_share - 2 / 3) < 1e-9
+
+    def test_the_file_records_the_correction_it_makes(self):
+        """It supersedes what 2026-09-21-add-eval-curve recommended, and says
+        so rather than quietly shipping the better rule."""
+        text = load_threshold(REPO_THRESHOLD).text
+
+        assert "standard deviation describes the spread of samples" in text
+        assert "no p-value is computed" in text
+
+
+class TestTheVerdict:
+    """Constructed so the rule decides each case rather than the fixture being
+    obviously one-sided."""
+
+    def _curve(self, prompts, threshold=None):
+        from secondshift.evals.runner import Curve, PromptDelta, RunSummary
+
+        empty = RunSummary(
+            eval_run_id="x", brain_sha="a", rubric_sha="r", judge_model="j", complete=True
+        )
+        return Curve(
+            earlier=empty,
+            later=empty,
+            dimensions=[],
+            prompts=[PromptDelta(slug=s, earlier=e, later=l) for s, e, l in prompts],
+            threshold=threshold or load_threshold(REPO_THRESHOLD),
+        )
+
+    def test_a_consistent_gain_clears_the_bar(self):
+        curve = self._curve([(f"p{i}", 15.0, 17.0 + i * 0.1) for i in range(6)])
+
+        assert curve.verdict == IMPROVED
+        assert curve.agreeing_prompts == 6
+
+    def test_one_prompt_carrying_the_mean_does_not(self):
+        """The case pairing exists for. The pooled mean moves by a point, and
+        one prompt is the entire reason."""
+        deltas = [("p0", 15.0, 15.1), ("p1", 15.0, 15.1), ("p2", 15.0, 15.1),
+                  ("p3", 15.0, 15.1), ("p4", 15.0, 15.1), ("p5", 15.0, 21.0)]
+        curve = self._curve(deltas)
+
+        assert curve.paired_difference > 1.0, "the mean did move"
+        assert curve.verdict == NO_IMPROVEMENT_SHOWN, "and it is one prompt's doing"
+
+    def test_a_consistent_loss_is_reported_as_one(self):
+        """With the same prominence. A thesis that cannot fail is not a
+        measurement."""
+        curve = self._curve([(f"p{i}", 17.0 + i * 0.1, 15.0) for i in range(6)])
+
+        assert curve.verdict == REGRESSED
+
+    def test_a_split_decision_does_not_clear_the_consistency_bar(self):
+        """Three up, three barely down — and the magnitude bar is cleared.
+
+        The first version of this test used three large gains against three
+        small losses, which fails on magnitude alone: a split inflates the
+        spread of the differences and the standard error with it. So dropping
+        the consistency condition entirely left every test green, which is what
+        the mutation pass is for. These numbers clear the first condition (mean
+        0.50 against a standard error of 0.23) and fail only the second, which
+        is the isolation this test is supposed to provide.
+        """
+        deltas = [("p0", 15.0, 16.0), ("p1", 15.0, 16.0), ("p2", 15.0, 16.0),
+                  ("p3", 15.0, 14.99), ("p4", 15.0, 14.99), ("p5", 15.0, 14.99)]
+        curve = self._curve(deltas)
+        threshold = load_threshold(REPO_THRESHOLD)
+
+        assert abs(curve.paired_difference) > threshold.standard_errors * curve.standard_error, (
+            "this case no longer clears the magnitude bar, so it no longer "
+            "isolates the consistency one"
+        )
+        assert curve.agreeing_prompts == 3
+        assert curve.verdict == NO_IMPROVEMENT_SHOWN
+
+    def test_no_threshold_means_no_verdict_claimed(self):
+        from secondshift.evals.runner import Curve, PromptDelta, RunSummary
+
+        empty = RunSummary(
+            eval_run_id="x", brain_sha="a", rubric_sha="r", judge_model="j", complete=True
+        )
+        curve = Curve(
+            earlier=empty,
+            later=empty,
+            dimensions=[],
+            prompts=[PromptDelta(slug="p", earlier=1.0, later=9.0)],
+            threshold=None,
+        )
+
+        assert curve.verdict == NO_IMPROVEMENT_SHOWN
+
+    def test_the_standard_error_is_not_the_standard_deviation(self):
+        """The specific error this threshold corrects. With six prompts they
+        differ by a factor of the square root of six."""
+        import statistics
+
+        deltas = [("p0", 0.0, 1.0), ("p1", 0.0, 2.0), ("p2", 0.0, 3.0),
+                  ("p3", 0.0, 4.0), ("p4", 0.0, 5.0), ("p5", 0.0, 6.0)]
+        curve = self._curve(deltas)
+        spread = statistics.stdev(d.difference for d in curve.prompts)
+
+        assert abs(curve.standard_error - spread / 6**0.5) < 1e-9
+        assert curve.standard_error < spread / 2, "these are not the same number"
+
+
+class TestTheCurveRefusesADifferentPromptSet:
+    def test_two_runs_over_different_prompts(self, runner, rubric, brain, repo):
+        """Two runs covering different prompts are two measurements of
+        different things — what the rubric pin prevents, on another axis.
+
+        Constructed by reassigning one run's results rather than by calling
+        `activate` twice, and that is worth knowing: `activate` only ever sets
+        `active = 1`, and `summarize` measures completeness against the active
+        set *now*. So changing the set retroactively marks every older run
+        incomplete, and the incompleteness refusal fires before this one ever
+        could. Both runs here stay complete, so this refusal is the one under
+        test.
+        """
+        _seed_and_activate(runner, rubric, slugs=("a", "b"))
+        first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+        runner.score(first, judge=_FixedJudge(GOOD), generate=_generate, rubric=rubric)
+
+        (Path(brain.path) / "profile.md").write_text("# Profile\n\nLater.\n")
+        for args in (["add", "-A"], ["commit", "-q", "-m", "later"]):
+            subprocess.run(["git", "-C", str(brain.path), *args], check=True, capture_output=True)
+
+        second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
+        runner.score(second, judge=_FixedJudge(GOOD), generate=_generate, rubric=rubric)
+
+        from secondshift.evals.content import PromptCandidate
+
+        runner.load_candidates(
+            [PromptCandidate(slug="c", label="c", prompt="prompt c")], rubric
+        )
+        moved_to = repo.connection.execute(
+            "SELECT id FROM eval_prompts WHERE slug = 'c'"
+        ).fetchone()["id"]
+        was = repo.connection.execute(
+            "SELECT id FROM eval_prompts WHERE slug = 'b'"
+        ).fetchone()["id"]
+        repo.connection.execute(
+            "UPDATE eval_results SET eval_prompt_id = ? WHERE eval_run_id = ? "
+            "AND eval_prompt_id = ?",
+            (moved_to, second, was),
+        )
+
+        with pytest.raises(NotComparable, match="different prompts"):
+            runner.curve(first, second)

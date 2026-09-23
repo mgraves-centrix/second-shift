@@ -78,3 +78,57 @@ def load_prompts(path: str | Path) -> list[PromptCandidate]:
 def load_rubric(path: str | Path) -> Rubric:
     resolved = Path(path)
     return Rubric(path=resolved, text=resolved.read_text())
+
+
+@dataclass(frozen=True, slots=True)
+class Threshold:
+    """What would falsify the claim, fixed before the result existed.
+
+    Hashed like the rubric, and for the same reason: a bar edited after the
+    number is a bar that was never a bar. `curve` prints this hash beside its
+    verdict, so the edit is visible where the result is read.
+
+    The numbers are held here rather than in the file because code that parsed
+    its own policy out of prose would be a second place for the policy to live.
+    The file is the argument; these two are what the argument concluded, and
+    `test_the_rule_matches_the_file` holds them together.
+    """
+
+    path: Path
+    text: str
+
+    #: Twice the standard error of the mean per-prompt change. One is about 68%
+    #: and would call noise a result; three is a bar six prompts cannot clear
+    #: even if the brain genuinely helps, which makes the claim unfalsifiable
+    #: the other way. Two is the conventional rule of thumb, and it is a rule of
+    #: thumb: no p-value is computed and none should be quoted.
+    standard_errors: float = 2.0
+
+    #: And at least this share of the prompts moving the same way, because the
+    #: claim is about the brain rather than about one kind of question.
+    agreeing_share: float = 2 / 3
+
+    @property
+    def sha(self) -> str:
+        """Content hash. Follows the file, not the commit that touched it."""
+        return hashlib.sha256(self.text.encode()).hexdigest()
+
+    @property
+    def fixed_on(self) -> str:
+        """The date in the file's own first line, not a mtime.
+
+        A modification time is a property of a checkout. This has to survive
+        being cloned by somebody checking whether the bar predated the number.
+        """
+        found = re.search(r"\*\*Fixed (\d{4}-\d{2}-\d{2})", self.text)
+        if found is None:
+            raise ValueError(
+                f"{self.path} does not say when it was fixed, which is the one "
+                "thing a falsification threshold has to say"
+            )
+        return found.group(1)
+
+
+def load_threshold(path: str | Path) -> Threshold:
+    resolved = Path(path)
+    return Threshold(path=resolved, text=resolved.read_text())

@@ -14,6 +14,7 @@ baseline pinned rather than the one on disk.
 from __future__ import annotations
 
 import json
+import math
 import statistics
 from dataclasses import dataclass, field
 
@@ -22,8 +23,15 @@ from ..db.connection import now_ms
 from ..db.ids import new_ulid
 from ..db.repository import Repository
 from ..telemetry.failures import BadOutput
-from .content import PromptCandidate, Rubric
+from .content import PromptCandidate, Rubric, Threshold
 from .judge import DIMENSIONS, Judge, Judgement, UnreadableJudgement
+
+#: The three answers `Curve.verdict` gives. "No improvement shown" is the third
+#: rather than a failure: it is a statement about what this design can resolve,
+#: not about what the brain did.
+IMPROVED = "improved"
+REGRESSED = "regressed"
+NO_IMPROVEMENT_SHOWN = "no improvement shown"
 
 #: A run with no judge recorded has inputs but no scores. Stored in the judge
 #: column rather than a status column: the absence *is* the state, and a
@@ -94,12 +102,34 @@ class DimensionDelta:
 
 
 @dataclass(frozen=True, slots=True)
+class PromptDelta:
+    """One prompt, in both runs. The unit of comparison.
+
+    Not one sample: the prompts differ from one another systematically, which is
+    what makes them a set rather than six draws, so an estimate pooled over
+    every sample mixes the variation *between* prompts into one meant to
+    describe the variation *within* them. Pairing removes it — the same prompt,
+    twice, and the difference is the quantity.
+    """
+
+    slug: str
+    earlier: float
+    later: float
+
+    @property
+    def difference(self) -> float:
+        return self.later - self.earlier
+
+
+@dataclass(frozen=True, slots=True)
 class Curve:
     """Two runs, and whether the difference between them survives the noise."""
 
     earlier: RunSummary
     later: RunSummary
     dimensions: list[DimensionDelta]
+    prompts: list[PromptDelta] = field(default_factory=list)
+    threshold: Threshold | None = None
 
     @property
     def difference(self) -> float:
@@ -119,6 +149,58 @@ class Curve:
         check by eye, and it does not imply a p-value nobody computed.
         """
         return abs(self.difference) > self.spread
+
+    @property
+    def paired_difference(self) -> float:
+        """The mean of the per-prompt changes. What the bar is applied to."""
+        return statistics.fmean(d.difference for d in self.prompts) if self.prompts else 0.0
+
+    @property
+    def standard_error(self) -> float:
+        """Of the mean per-prompt change, across the prompts.
+
+        Not a standard deviation. A standard deviation describes the spread of
+        what was observed; this describes how well the mean of it is known, and
+        with a handful of prompts they differ by a factor of roughly the square
+        root of that handful. `2026-09-21-add-eval-curve` recommended the former
+        and `config/evals/threshold.md` records the correction.
+        """
+        if len(self.prompts) < 2:
+            return 0.0
+        return statistics.stdev(d.difference for d in self.prompts) / math.sqrt(len(self.prompts))
+
+    @property
+    def agreeing_prompts(self) -> int:
+        """How many prompts moved the way the paired mean did.
+
+        Nearly implied by the standard error — one prompt carrying a result
+        inflates the spread of the differences and so the error with it — but
+        stated separately because the claim is about the brain rather than about
+        one kind of question, and a reader should not have to derive that.
+        """
+        if self.paired_difference == 0:
+            return 0
+        sign = 1 if self.paired_difference > 0 else -1
+        return sum(1 for d in self.prompts if d.difference * sign > 0)
+
+    @property
+    def verdict(self) -> str:
+        """Improved, regressed, or no improvement shown.
+
+        The bar is `config/evals/threshold.md`, fixed on a date before any
+        week-8 output existed. "No improvement shown" is deliberately not "the
+        brain learned nothing": six prompts and three samples cannot distinguish
+        a small real effect from none, and the negative claim is as unsupported
+        as the positive one would be.
+        """
+        if self.threshold is None or not self.prompts:
+            return NO_IMPROVEMENT_SHOWN
+        difference = self.paired_difference
+        clears = abs(difference) > self.threshold.standard_errors * self.standard_error
+        agreeing = self.agreeing_prompts >= self.threshold.agreeing_share * len(self.prompts)
+        if not (clears and agreeing):
+            return NO_IMPROVEMENT_SHOWN
+        return IMPROVED if difference > 0 else REGRESSED
 
     @property
     def agreeing_dimensions(self) -> int:
@@ -404,7 +486,9 @@ class EvalRunner:
 
     # -- reading -----------------------------------------------------------
 
-    def curve(self, earlier_id: str, later_id: str) -> Curve:
+    def curve(
+        self, earlier_id: str, later_id: str, *, threshold: Threshold | None = None
+    ) -> Curve:
         """Compare two runs, or refuse to.
 
         Every refusal below is a way the reported number would measure something
@@ -455,6 +539,15 @@ class EvalRunner:
                 "Two judges are two instruments, and a curve across instruments is "
                 "not a curve."
             )
+        earlier_slugs = {p.slug for p in earlier.prompts}
+        later_slugs = {p.slug for p in later.prompts}
+        if earlier_slugs != later_slugs:
+            only = sorted(earlier_slugs ^ later_slugs)
+            raise NotComparable(
+                f"the two runs were scored over different prompts ({', '.join(only)} "
+                "in one and not the other). There is no pairing across two sets, and "
+                "the alternative is comparing two different questions."
+            )
         if earlier.brain_sha and earlier.brain_sha == later.brain_sha:
             raise NotComparable(
                 f"both runs pin brain {earlier.brain_sha[:12]}. The brain did not "
@@ -462,8 +555,16 @@ class EvalRunner:
                 "reporting it as a result would be reporting the noise."
             )
 
+        by_slug = {p.slug: p for p in later.prompts}
         return Curve(
-            earlier=earlier, later=later, dimensions=self._dimensions(earlier_id, later_id)
+            earlier=earlier,
+            later=later,
+            dimensions=self._dimensions(earlier_id, later_id),
+            prompts=[
+                PromptDelta(slug=p.slug, earlier=p.mean, later=by_slug[p.slug].mean)
+                for p in earlier.prompts
+            ],
+            threshold=threshold,
         )
 
     def _dimensions(self, earlier_id: str, later_id: str) -> list[DimensionDelta]:

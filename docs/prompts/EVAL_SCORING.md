@@ -74,6 +74,13 @@ exists: **what result would falsify the claim.** Write down the difference you
 would accept as "no improvement," given the spread. A threshold chosen after
 seeing the number is not a measurement.
 
+> **Settled 23 Sep**, while the only run in the system still read
+> `awaiting-scoring`. `config/evals/threshold.md` is the bar and
+> `2026-09-23-fix-the-falsification-threshold` applies it; the curve prints the
+> verdict, the file's hash and the date it was fixed. Do not re-derive it, and
+> do not adjust it after the run — the hash is printed beside the result for
+> exactly that reason.
+
 ## What good looks like
 
 - The week-1 baseline is scored against **the brain commit it pinned**, not

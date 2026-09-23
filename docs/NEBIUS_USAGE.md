@@ -94,7 +94,7 @@ rows can never reach a measurement.
 | Nights run locally, end to end | **Recorded 16–17 Sep** | Two real nights on the Spark against the live reasoner; the second completed five stages in 192 seconds, and a later one completed six of six with research on |
 | **A build stage fanned out to real parallel Jobs** | **Not yet run** | `SELECT count(*), sum(total_tokens), sum(estimated_cost_usd) FROM model_calls WHERE provider = 'nebius-job' AND is_synthetic = 0` — returns nothing today. **The `is_synthetic = 0` is not decoration**: the seeded night writes ten `nebius-job` rows, and the first draft of this table omitted the filter and would have shown a reader a fan-out that never happened |
 | **A cloud night's cost, side by side with a local one** | **Not yet run** | `SELECT * FROM night_totals` — the demo's two-ideas comparison reads exactly this |
-| **The week-1 to week-8 eval curve** | **Baseline recorded, not scored** | `python -m secondshift.evals curve` — says "nothing to compare yet" today, and will refuse five ways if the comparison would mean something other than it looks like |
+| **The week-1 to week-8 eval curve** | **Baseline recorded, not scored. The bar is fixed.** | `python -m secondshift.evals curve` — says "nothing to compare yet" today, refuses six ways if the comparison would mean something other than it looks like, and prints its verdict against `config/evals/threshold.md`, fixed 23 Sep while no week-8 output existed |
 
 **The three unrun rows are one blocker, not three.** The Nebius credentials
 exist and were verified; they live on the always-on machine, outside any
@@ -126,6 +126,29 @@ submission regenerates from the same command. It is also marked: every row it
 writes carries `is_synthetic = 1`, every view excludes those rows, and
 `scripts/check-judge-package.py` refuses to package a database that carries
 unmarked ones or any `model_call_payloads` at all.
+
+## The bar was set before the number
+
+`config/evals/threshold.md`, fixed **23 Sep 2026**, when the only eval run in
+the system had `judge_model = 'awaiting-scoring'` and there was nothing to be
+influenced by.
+
+An improvement is **both**: the mean per-prompt change exceeding twice its
+standard error across the active prompts, and at least two thirds of them moving
+that way. Anything else is *no improvement shown* — which the file is careful to
+distinguish from *the brain learned nothing*, because six prompts cannot support
+the negative claim either.
+
+Two things make that checkable rather than assertable. The file's addition is in
+the history — `git log --diff-filter=A -- config/evals/threshold.md` against the
+commit that records the run — and its content hash is printed beside the verdict
+every time the curve runs, so an edit after the fact is visible in the one place
+somebody reads the result.
+
+**The bar is applied by the same command that reports the result**, so a
+favorable number and an unfavorable one go through identical arithmetic. If it
+comes out the other way, the submission says the brain got worse, with the same
+prominence.
 
 ## The failure record is part of the argument
 
