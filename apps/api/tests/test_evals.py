@@ -27,6 +27,7 @@ from secondshift.evals.runner import (
     NotComparable,
     RubricMismatch,
 )
+from secondshift.providers.base import Completion
 
 GOOD = {d: 4 for d in DIMENSIONS}
 
@@ -74,8 +75,50 @@ def _seed_and_activate(runner, rubric, slugs=("a", "b")):
     runner.activate(list(slugs))
 
 
-def _generate(prompt: str, brain, sample: int) -> str:
-    return f"{prompt} answered from: {brain.profile.strip()[:20]} #{sample}"
+#: The two generators that matter, as the pricing fixture knows them: the local
+#: reasoner and the cloud one. The policy is part of the tuple because the
+#: `model_calls` CHECK refuses a `local-only` row naming a remote provider, so a
+#: pair that disagrees is rejected by the database rather than by a test.
+LOCAL = ("local-vllm", "nemotron-3.5-lightning-30b", "local-only")
+CLOUD = ("token-factory", "nemotron-3-super", "cloud-assisted")
+
+
+def _generator(recorder, source=LOCAL):
+    """A `generate` callable that records its call, the way a provider does.
+
+    It returns the recorded completion rather than text because that is the
+    contract: the result row names the call that produced it, and the foreign
+    key means a fabricated id would be rejected. So the call is real here, which
+    also makes the generator refusal a test against the same join the curve
+    reads.
+    """
+    provider, model, policy = source
+
+    def generate(*, prompt, brain, sample):
+        return Completion(
+            text=f"{prompt} answered from: {brain.profile.strip()[:20]} #{sample}",
+            model_call_id=recorder.record_model_call(
+                provider=provider,
+                model=model,
+                policy=policy,
+                prompt_tokens=8,
+                completion_tokens=16,
+            ),
+            prompt_tokens=8,
+            completion_tokens=16,
+        )
+
+    return generate
+
+
+@pytest.fixture
+def generate(recorder):
+    return _generator(recorder)
+
+
+@pytest.fixture
+def generate_in_the_cloud(recorder):
+    return _generator(recorder, CLOUD)
 
 
 class TestContent:
@@ -186,7 +229,7 @@ class TestBaselineAndPinning:
 
     def test_scoring_does_not_overwrite_the_recorded_commit(
         self, runner, rubric, repo, brain
-    ):
+, generate):
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
         baseline_sha = brain.head()
@@ -194,7 +237,7 @@ class TestBaselineAndPinning:
         subprocess.run(["git", "-C", str(brain.path), "commit", "-qam", "later"],
                        check=True, capture_output=True)
 
-        runner.score(run_id, judge=StubJudge(), generate=_generate, rubric=rubric)
+        runner.score(run_id, judge=StubJudge(), generate=generate, rubric=rubric)
         row = repo.connection.execute(
             "SELECT brain_sha FROM eval_runs WHERE id = ?", (run_id,)
         ).fetchone()
@@ -218,10 +261,10 @@ class TestBaselineAndPinning:
 
 
 class TestSampling:
-    def test_three_samples_per_prompt(self, runner, rubric, repo):
+    def test_three_samples_per_prompt(self, runner, rubric, repo, generate):
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
-        runner.score(run_id, judge=StubJudge(), generate=_generate, rubric=rubric)
+        runner.score(run_id, judge=StubJudge(), generate=generate, rubric=rubric)
         rows = repo.connection.execute(
             "SELECT eval_prompt_id, sample_index FROM eval_results WHERE eval_run_id = ?",
             (run_id,),
@@ -229,10 +272,10 @@ class TestSampling:
         assert len(rows) == 6
         assert sorted({r["sample_index"] for r in rows}) == [0, 1, 2]
 
-    def test_summary_reports_a_center_and_a_spread(self, runner, rubric):
+    def test_summary_reports_a_center_and_a_spread(self, runner, rubric, generate):
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
-        summary = runner.score(run_id, judge=StubJudge(), generate=_generate, rubric=rubric)
+        summary = runner.score(run_id, judge=StubJudge(), generate=generate, rubric=rubric)
         assert len(summary.prompts) == 2
         for prompt in summary.prompts:
             assert len(prompt.samples) == 3
@@ -240,11 +283,11 @@ class TestSampling:
             assert prompt.spread >= 0
         assert summary.complete is True
 
-    def test_pinning_is_recorded_on_the_run(self, runner, rubric, repo):
+    def test_pinning_is_recorded_on_the_run(self, runner, rubric, repo, generate):
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
         judge = StubJudge()
-        runner.score(run_id, judge=judge, generate=_generate, rubric=rubric)
+        runner.score(run_id, judge=judge, generate=generate, rubric=rubric)
         row = repo.connection.execute(
             "SELECT judge_model, judge_model_version, rubric_sha FROM eval_runs WHERE id = ?",
             (run_id,),
@@ -253,10 +296,10 @@ class TestSampling:
         assert row["judge_model_version"] == judge.version
         assert row["rubric_sha"] == rubric.sha
 
-    def test_subscores_are_recorded_per_dimension(self, runner, rubric, repo):
+    def test_subscores_are_recorded_per_dimension(self, runner, rubric, repo, generate):
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
-        runner.score(run_id, judge=StubJudge(), generate=_generate, rubric=rubric)
+        runner.score(run_id, judge=StubJudge(), generate=generate, rubric=rubric)
         row = repo.connection.execute(
             "SELECT subscores_json FROM eval_results WHERE eval_run_id = ? LIMIT 1",
             (run_id,),
@@ -265,22 +308,22 @@ class TestSampling:
 
 
 class TestFailureHandling:
-    def test_no_judge_configured_refuses(self, runner, rubric):
+    def test_no_judge_configured_refuses(self, runner, rubric, generate):
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
         with pytest.raises(NoJudgeConfigured, match="refusing"):
-            runner.score(run_id, judge=None, generate=_generate, rubric=rubric)
+            runner.score(run_id, judge=None, generate=generate, rubric=rubric)
 
     def test_an_unreadable_judgement_records_a_failure_not_a_zero(
         self, runner, rubric, repo
-    ):
+, generate):
         class Broken(StubJudge):
             def score(self, *, output, rubric, prompt):
                 raise UnreadableJudgement("returned prose")
 
         _seed_and_activate(runner, rubric, slugs=("a",))
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
-        summary = runner.score(run_id, judge=Broken(), generate=_generate, rubric=rubric)
+        summary = runner.score(run_id, judge=Broken(), generate=generate, rubric=rubric)
 
         assert summary.prompts == []
         assert summary.complete is False
@@ -290,7 +333,7 @@ class TestFailureHandling:
         assert len(failures) == 3
         assert all(f["type"] == "bad_output" for f in failures)
 
-    def test_a_partial_run_records_its_successes(self, runner, rubric):
+    def test_a_partial_run_records_its_successes(self, runner, rubric, generate):
         calls = {"n": 0}
 
         class Flaky(StubJudge):
@@ -302,7 +345,7 @@ class TestFailureHandling:
 
         _seed_and_activate(runner, rubric, slugs=("a",))
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
-        summary = runner.score(run_id, judge=Flaky(), generate=_generate, rubric=rubric)
+        summary = runner.score(run_id, judge=Flaky(), generate=generate, rubric=rubric)
 
         assert summary.prompts[0].samples == [20, 20]
         assert summary.complete is False
@@ -355,13 +398,13 @@ class TestRubricPinningIsBinding:
         path.write_text("# Rubric v1\n\nFive dimensions, one to five. Plus a sixth.\n")
         return load_rubric(path)
 
-    def test_scoring_under_a_different_rubric_is_refused(self, runner, rubric, tmp_path):
+    def test_scoring_under_a_different_rubric_is_refused(self, runner, rubric, tmp_path, generate):
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
         drifted = self._drifted(tmp_path)
 
         with pytest.raises(RubricMismatch) as raised:
-            runner.score(run_id, judge=StubJudge(), generate=_generate, rubric=drifted)
+            runner.score(run_id, judge=StubJudge(), generate=generate, rubric=drifted)
 
         # Both hashes named: a refusal that does not say which two values
         # disagree leaves the operator running the same SQL by hand.
@@ -369,13 +412,13 @@ class TestRubricPinningIsBinding:
         assert rubric.sha[:12] in message
         assert drifted.sha[:12] in message
 
-    def test_a_refused_score_records_nothing(self, runner, rubric, repo, tmp_path):
+    def test_a_refused_score_records_nothing(self, runner, rubric, repo, tmp_path, generate):
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
 
         with pytest.raises(RubricMismatch):
             runner.score(
-                run_id, judge=StubJudge(), generate=_generate,
+                run_id, judge=StubJudge(), generate=generate,
                 rubric=self._drifted(tmp_path),
             )
 
@@ -386,7 +429,7 @@ class TestRubricPinningIsBinding:
 
     def test_a_refusal_is_not_recorded_as_failed_samples(
         self, runner, rubric, repo, tmp_path
-    ):
+, generate):
         """A wrong rubric is wrong for every sample, so it is not a partial run."""
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
@@ -394,7 +437,7 @@ class TestRubricPinningIsBinding:
 
         with pytest.raises(RubricMismatch):
             runner.score(
-                run_id, judge=StubJudge(), generate=_generate,
+                run_id, judge=StubJudge(), generate=generate,
                 rubric=self._drifted(tmp_path),
             )
 
@@ -420,10 +463,10 @@ class TestRubricPinningIsBinding:
             )
         assert calls == []
 
-    def test_scoring_under_the_pinned_rubric_proceeds(self, runner, rubric, repo):
+    def test_scoring_under_the_pinned_rubric_proceeds(self, runner, rubric, repo, generate):
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
-        summary = runner.score(run_id, judge=StubJudge(), generate=_generate, rubric=rubric)
+        summary = runner.score(run_id, judge=StubJudge(), generate=generate, rubric=rubric)
         assert summary.complete
         assert repo.connection.execute(
             "SELECT COUNT(*) n FROM eval_results WHERE eval_run_id = ?", (run_id,)
@@ -431,7 +474,7 @@ class TestRubricPinningIsBinding:
 
     def test_an_identical_rubric_at_another_path_is_the_same_rubric(
         self, runner, rubric, tmp_path
-    ):
+, generate):
         """The hash follows content, not location. A copy is not drift."""
         elsewhere = tmp_path / "copied" / "rubric.md"
         elsewhere.parent.mkdir()
@@ -440,7 +483,7 @@ class TestRubricPinningIsBinding:
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
         summary = runner.score(
-            run_id, judge=StubJudge(), generate=_generate, rubric=load_rubric(elsewhere)
+            run_id, judge=StubJudge(), generate=generate, rubric=load_rubric(elsewhere)
         )
         assert summary.complete
 
@@ -513,10 +556,10 @@ class TestStatusReportsThePinning:
 
     def test_a_scored_run_names_its_judge_rather_than_awaiting(
         self, runner, rubric, tmp_path, capsys
-    ):
+, generate):
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-24", rubric=rubric)
-        runner.score(run_id, judge=StubJudge(), generate=_generate, rubric=rubric)
+        runner.score(run_id, judge=StubJudge(), generate=generate, rubric=rubric)
 
         code, out = self._run(tmp_path, rubric.path, capsys)
         assert code == 0
@@ -632,19 +675,19 @@ class TestTheCurveRefusesMoreThanItReports:
     something other than what it appears to."""
 
     @pytest.fixture
-    def two_runs(self, runner, rubric, brain):
+    def two_runs(self, runner, rubric, brain, generate):
         """Two scored runs over two brain states, which is the only shape that
         is actually comparable."""
         _seed_and_activate(runner, rubric)
         first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
-        runner.score(first, judge=_FixedJudge(GOOD), generate=_generate, rubric=rubric)
+        runner.score(first, judge=_FixedJudge(GOOD), generate=generate, rubric=rubric)
 
         (Path(brain.path) / "profile.md").write_text("# Profile\n\nWeek eight belief.\n")
         for args in (["add", "-A"], ["commit", "-q", "-m", "week eight"]):
             subprocess.run(["git", "-C", str(brain.path), *args], check=True, capture_output=True)
 
         second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
-        runner.score(second, judge=_FixedJudge({d: 5 for d in DIMENSIONS}), generate=_generate, rubric=rubric)
+        runner.score(second, judge=_FixedJudge({d: 5 for d in DIMENSIONS}), generate=generate, rubric=rubric)
         return first, second
 
     def test_two_comparable_runs_produce_a_curve(self, runner, two_runs):
@@ -664,7 +707,7 @@ class TestTheCurveRefusesMoreThanItReports:
         assert curve.spread == 0.0, "the stub judge is deterministic, so there is no spread"
         assert curve.moved is True
 
-    def test_a_difference_inside_the_noise_is_not_a_change(self, runner, rubric, brain):
+    def test_a_difference_inside_the_noise_is_not_a_change(self, runner, rubric, brain, generate):
         """A real difference, and still not a change.
 
         The first draft of this test used two judges whose means were exactly
@@ -674,13 +717,13 @@ class TestTheCurveRefusesMoreThanItReports:
         """
         _seed_and_activate(runner, rubric)
         first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
-        runner.score(first, judge=_VaryingJudge([1, 5, 3]), generate=_generate, rubric=rubric)
+        runner.score(first, judge=_VaryingJudge([1, 5, 3]), generate=generate, rubric=rubric)
 
         (Path(brain.path) / "profile.md").write_text("# Profile\n\nLater.\n")
         for args in (["add", "-A"], ["commit", "-q", "-m", "later"]):
             subprocess.run(["git", "-C", str(brain.path), *args], check=True, capture_output=True)
         second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
-        runner.score(second, judge=_VaryingJudge([3, 4, 3]), generate=_generate, rubric=rubric)
+        runner.score(second, judge=_VaryingJudge([3, 4, 3]), generate=generate, rubric=rubric)
 
         curve = runner.curve(first, second)
 
@@ -688,14 +731,14 @@ class TestTheCurveRefusesMoreThanItReports:
         assert abs(curve.difference) < curve.spread
         assert curve.moved is False
 
-    def test_the_same_brain_is_refused(self, runner, rubric):
+    def test_the_same_brain_is_refused(self, runner, rubric, generate):
         """The one most likely to happen by accident: run the week-8 eval
         without the brain having moved, and the curve reports sampling noise."""
         _seed_and_activate(runner, rubric)
         first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
-        runner.score(first, judge=_FixedJudge(GOOD), generate=_generate, rubric=rubric)
+        runner.score(first, judge=_FixedJudge(GOOD), generate=generate, rubric=rubric)
         second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
-        runner.score(second, judge=_FixedJudge(GOOD), generate=_generate, rubric=rubric)
+        runner.score(second, judge=_FixedJudge(GOOD), generate=generate, rubric=rubric)
 
         with pytest.raises(NotComparable, match="brain did not change"):
             runner.curve(first, second)
@@ -743,7 +786,7 @@ class TestTheCurveRefusesMoreThanItReports:
         with pytest.raises(NotComparable, match="never scored"):
             runner.curve(first, unscored)
 
-    def test_a_regression_hidden_by_the_mean_is_visible(self, runner, rubric, brain):
+    def test_a_regression_hidden_by_the_mean_is_visible(self, runner, rubric, brain, generate):
         """The case the per-dimension breakdown exists for, and the one that will
         not occur by accident in a fixture: the overall mean improves while one
         dimension goes backwards."""
@@ -752,7 +795,7 @@ class TestTheCurveRefusesMoreThanItReports:
         runner.score(
             first,
             judge=_FixedJudge({**{d: 3 for d in DIMENSIONS}, "voice": 5}),
-            generate=_generate,
+            generate=generate,
             rubric=rubric,
         )
 
@@ -763,7 +806,7 @@ class TestTheCurveRefusesMoreThanItReports:
         runner.score(
             second,
             judge=_FixedJudge({**{d: 5 for d in DIMENSIONS}, "voice": 1}),
-            generate=_generate,
+            generate=generate,
             rubric=rubric,
         )
 
@@ -831,10 +874,10 @@ class TestTheCurveCommand:
         assert code == 1
         assert "nothing to compare yet" in capsys.readouterr().err
 
-    def test_one_scored_run_is_still_not_a_curve(self, runner, rubric, tmp_path, capsys):
+    def test_one_scored_run_is_still_not_a_curve(self, runner, rubric, tmp_path, capsys, generate):
         _seed_and_activate(runner, rubric)
         run_id = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
-        runner.score(run_id, judge=StubJudge(), generate=_generate, rubric=rubric)
+        runner.score(run_id, judge=StubJudge(), generate=generate, rubric=rubric)
 
         code = self._run(tmp_path, rubric.path)
 
@@ -843,12 +886,12 @@ class TestTheCurveCommand:
 
     def test_a_refusal_is_reported_on_stderr_and_exits_non_zero(
         self, runner, rubric, tmp_path, capsys
-    ):
+, generate):
         _seed_and_activate(runner, rubric)
         first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
-        runner.score(first, judge=StubJudge(), generate=_generate, rubric=rubric)
+        runner.score(first, judge=StubJudge(), generate=generate, rubric=rubric)
         second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
-        runner.score(second, judge=StubJudge(), generate=_generate, rubric=rubric)
+        runner.score(second, judge=StubJudge(), generate=generate, rubric=rubric)
 
         code = self._run(tmp_path, rubric.path)
 
@@ -857,18 +900,18 @@ class TestTheCurveCommand:
 
     def test_a_comparison_prints_the_spread_beside_the_difference(
         self, runner, rubric, brain, tmp_path, capsys
-    ):
+, generate):
         """There is no output shape that shows a difference without its spread."""
         _seed_and_activate(runner, rubric)
         first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
         runner.score(first, judge=_FixedJudge({d: 3 for d in DIMENSIONS}),
-                     generate=_generate, rubric=rubric)
+                     generate=generate, rubric=rubric)
         (Path(brain.path) / "profile.md").write_text("# Profile\n\nLater.\n")
         for args in (["add", "-A"], ["commit", "-q", "-m", "later"]):
             subprocess.run(["git", "-C", str(brain.path), *args], check=True, capture_output=True)
         second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
         runner.score(second, judge=_FixedJudge({d: 5 for d in DIMENSIONS}),
-                     generate=_generate, rubric=rubric)
+                     generate=generate, rubric=rubric)
 
         code = self._run(tmp_path, rubric.path)
         out = capsys.readouterr().out
@@ -879,11 +922,11 @@ class TestTheCurveCommand:
         for dimension in DIMENSIONS:
             assert dimension in out
 
-    def test_two_identifiers_are_taken_in_order(self, runner, rubric, tmp_path, capsys):
+    def test_two_identifiers_are_taken_in_order(self, runner, rubric, tmp_path, capsys, generate):
         """A wrong pair compared by hand is the failure the no-argument form avoids."""
         _seed_and_activate(runner, rubric)
         first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
-        runner.score(first, judge=StubJudge(), generate=_generate, rubric=rubric)
+        runner.score(first, judge=StubJudge(), generate=generate, rubric=rubric)
 
         code = self._run(tmp_path, rubric.path, first, first)
 
@@ -1042,7 +1085,7 @@ class TestTheVerdict:
 
 
 class TestTheCurveRefusesADifferentPromptSet:
-    def test_two_runs_over_different_prompts(self, runner, rubric, brain, repo):
+    def test_two_runs_over_different_prompts(self, runner, rubric, brain, repo, generate):
         """Two runs covering different prompts are two measurements of
         different things — what the rubric pin prevents, on another axis.
 
@@ -1056,14 +1099,14 @@ class TestTheCurveRefusesADifferentPromptSet:
         """
         _seed_and_activate(runner, rubric, slugs=("a", "b"))
         first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
-        runner.score(first, judge=_FixedJudge(GOOD), generate=_generate, rubric=rubric)
+        runner.score(first, judge=_FixedJudge(GOOD), generate=generate, rubric=rubric)
 
         (Path(brain.path) / "profile.md").write_text("# Profile\n\nLater.\n")
         for args in (["add", "-A"], ["commit", "-q", "-m", "later"]):
             subprocess.run(["git", "-C", str(brain.path), *args], check=True, capture_output=True)
 
         second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
-        runner.score(second, judge=_FixedJudge(GOOD), generate=_generate, rubric=rubric)
+        runner.score(second, judge=_FixedJudge(GOOD), generate=generate, rubric=rubric)
 
         from secondshift.evals.content import PromptCandidate
 
@@ -1083,4 +1126,133 @@ class TestTheCurveRefusesADifferentPromptSet:
         )
 
         with pytest.raises(NotComparable, match="different prompts"):
+            runner.curve(first, second)
+
+
+class TestAScoreKnowsWhichModelProducedIt:
+    """`eval_results.model_call_id` existed from the first migration and the
+    `INSERT` never named it. What that cost is one row below: a week 1 generated
+    locally and a week 8 generated in the cloud, reported as the brain learning."""
+
+    def test_the_call_is_recorded_beside_the_score(self, runner, rubric, repo, generate):
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+
+        runner.score(run_id, judge=_FixedJudge(GOOD), generate=generate, rubric=rubric)
+
+        rows = repo.connection.execute(
+            "SELECT r.model_call_id AS call, c.model AS model FROM eval_results r "
+            "JOIN model_calls c ON c.id = r.model_call_id WHERE r.eval_run_id = ?",
+            (run_id,),
+        ).fetchall()
+        assert len(rows) == 6, "two prompts, three samples, every one joined to its call"
+        assert {r["model"] for r in rows} == {"nemotron-3.5-lightning-30b"}
+
+    def test_a_generator_that_returns_only_text_is_refused(self, runner, rubric):
+        """Refused by name, and not caught as a failed sample.
+
+        `score` swallows `RuntimeError` to record a bad output and continue, so a
+        contract error raised as one would read as the model having produced
+        nothing — six failures and an incomplete run, pointing at the model
+        rather than at the caller.
+        """
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+
+        with pytest.raises(TypeError, match="generate returned str"):
+            runner.score(
+                run_id,
+                judge=_FixedJudge(GOOD),
+                generate=lambda **kw: "an answer, with no call behind it",
+                rubric=rubric,
+            )
+
+    def test_a_run_reports_what_produced_it(self, runner, rubric, generate):
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+        runner.score(run_id, judge=_FixedJudge(GOOD), generate=generate, rubric=rubric)
+
+        summary = runner.summarize(run_id)
+
+        assert summary.generators == ("local-vllm/nemotron-3.5-lightning-30b",)
+        assert summary.generator_unrecorded is False
+
+    def test_the_model_changing_between_runs_is_refused(
+        self, runner, rubric, brain, generate, generate_in_the_cloud
+    ):
+        """The shortest path to a week-8 number, and the one that breaks it.
+
+        Everything else about these two runs is comparable: same rubric, same
+        judge, same prompts, two brain states, both complete. Only the generator
+        differs, so this refusal is the one under test rather than one of the six
+        that came before it.
+        """
+        _seed_and_activate(runner, rubric)
+        first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+        runner.score(first, judge=_FixedJudge(GOOD), generate=generate, rubric=rubric)
+
+        (Path(brain.path) / "profile.md").write_text("# Profile\n\nWeek eight belief.\n")
+        for args in (["add", "-A"], ["commit", "-q", "-m", "week eight"]):
+            subprocess.run(["git", "-C", str(brain.path), *args], check=True, capture_output=True)
+
+        second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
+        runner.score(
+            second, judge=_FixedJudge(GOOD), generate=generate_in_the_cloud, rubric=rubric
+        )
+
+        with pytest.raises(NotComparable, match="different models produced the outputs"):
+            runner.curve(first, second)
+
+    def test_the_same_model_on_both_sides_compares(self, runner, rubric, brain, generate):
+        """The other half, and the half that catches a refusal firing for the
+        wrong reason. Two mutations survived on 23 Sep because the setup for a
+        refusal satisfied a second condition at the same time."""
+        _seed_and_activate(runner, rubric)
+        first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+        runner.score(first, judge=_FixedJudge(GOOD), generate=generate, rubric=rubric)
+
+        (Path(brain.path) / "profile.md").write_text("# Profile\n\nWeek eight belief.\n")
+        for args in (["add", "-A"], ["commit", "-q", "-m", "week eight"]):
+            subprocess.run(["git", "-C", str(brain.path), *args], check=True, capture_output=True)
+
+        second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
+        runner.score(
+            second,
+            judge=_FixedJudge({d: 5 for d in DIMENSIONS}),
+            generate=generate,
+            rubric=rubric,
+        )
+
+        curve = runner.curve(first, second)
+
+        assert curve.difference > 0, "the same generator on both sides is comparable"
+
+    def test_an_unrecorded_generator_is_refused(
+        self, runner, rubric, brain, repo, generate
+    ):
+        """A row written before the column was filled, which is every row the
+        system would have had if this had been found after 15 Oct.
+
+        Refused separately from the mismatch, and before it: "I cannot see what
+        produced one side" is a different statement from "the two sides differ",
+        and reporting the second here would name two models when one of them is
+        not known.
+        """
+        _seed_and_activate(runner, rubric)
+        first = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+        runner.score(first, judge=_FixedJudge(GOOD), generate=generate, rubric=rubric)
+
+        (Path(brain.path) / "profile.md").write_text("# Profile\n\nWeek eight belief.\n")
+        for args in (["add", "-A"], ["commit", "-q", "-m", "week eight"]):
+            subprocess.run(["git", "-C", str(brain.path), *args], check=True, capture_output=True)
+
+        second = runner.record_baseline(week_of="2026-10-19", rubric=rubric)
+        runner.score(second, judge=_FixedJudge(GOOD), generate=generate, rubric=rubric)
+        repo.connection.execute(
+            "UPDATE eval_results SET model_call_id = NULL WHERE eval_run_id = ?",
+            (first,),
+        )
+
+        assert runner.summarize(first).generator_unrecorded is True
+        with pytest.raises(NotComparable, match="name no model call"):
             runner.curve(first, second)

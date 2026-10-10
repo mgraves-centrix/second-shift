@@ -215,6 +215,33 @@ class Curve:
         return sum(1 for d in self.dimensions if d.difference * sign > 0)
 
 
+def _completion_of(value):
+    """The recorded completion `generate` returned, or a refusal.
+
+    Raises `TypeError` rather than anything `score` catches: a callable with the
+    wrong contract is a programming error, and the failure path there records a
+    bad *output* and moves to the next sample. A contract error swallowed as a
+    failed sample would read as the model having produced nothing.
+
+    Text is refused rather than wrapped. Wrapping it would need a placeholder
+    call id, and a placeholder is how `prompt_sha` was `deadbeef` for a week:
+    the column reads as populated and the guard that reads it reads as holding.
+    """
+    if isinstance(value, str):
+        raise TypeError(
+            "generate returned str; it must return the recorded completion, so "
+            "the result row can name the model call that produced it"
+        )
+    missing = [f for f in ("text", "model_call_id") if not getattr(value, f, None)]
+    if missing:
+        raise TypeError(
+            f"generate returned {type(value).__name__} without "
+            f"{' and '.join(missing)}; a result whose generator is unknown is a "
+            "score whose subject is unknown"
+        )
+    return value
+
+
 def _spread_of(summary: RunSummary) -> float:
     values = [s for p in summary.prompts for s in p.samples]
     return statistics.stdev(values) if len(values) > 1 else 0.0
@@ -235,6 +262,12 @@ class RecordedRun:
         return self.judge_model == AWAITING
 
 
+#: How a run with results that name no model call reports its generator. Not a
+#: string, because a model could be called anything and a sentinel that collides
+#: with a real name is worse than no sentinel at all.
+UNRECORDED = None
+
+
 @dataclass(frozen=True, slots=True)
 class RunSummary:
     eval_run_id: str
@@ -243,11 +276,28 @@ class RunSummary:
     judge_model: str
     complete: bool
     prompts: list[PromptSummary] = field(default_factory=list)
+    #: What produced this run's outputs, as `provider/model`, distinct and
+    #: sorted — with `UNRECORDED` present if any result names no call. Sorted so
+    #: two runs' generators compare and print the same way every time.
+    #:
+    #: `provider/model` rather than the model alone: the same name served from
+    #: two places is two instruments, and the pair is what the table can see.
+    #: Quantization is not in it, so this catches a provider or model change and
+    #: not a re-quantized reserve of the same weights.
+    generators: tuple[str | None, ...] = ()
 
     @property
     def mean(self) -> float:
         values = [s for p in self.prompts for s in p.samples]
         return statistics.fmean(values) if values else 0.0
+
+    @property
+    def generator_unrecorded(self) -> bool:
+        return UNRECORDED in self.generators
+
+    def generators_text(self) -> str:
+        return ", ".join(g if g is not None else "unrecorded" for g in self.generators) \
+            or "nothing recorded"
 
 
 class EvalRunner:
@@ -417,10 +467,16 @@ class EvalRunner:
     ) -> RunSummary:
         """Generate an output per sample and grade it.
 
-        `generate` takes the prompt and the brain as it was, and returns text.
-        Kept as a parameter rather than a dependency so the runner is exercisable
-        without a model, and so the caller decides which provider produces the
-        output.
+        `generate` takes the prompt and the brain as it was, and returns the
+        recorded `Completion` — not its text. Kept as a parameter rather than a
+        dependency so the runner is exercisable without a model, and so the
+        caller decides which provider produces the output.
+
+        It returns the completion rather than text because the result row has to
+        name the call that produced it. Two runs over the same prompts, rubric
+        and brain state differ only in what generated their text, so a score
+        with no reference to its call is a number whose subject is unknown — and
+        the curve cannot refuse a comparison across two models it cannot see.
         """
         if judge is None:
             raise NoJudgeConfigured(
@@ -448,8 +504,12 @@ class EvalRunner:
         for prompt_id, slug, prompt in self.active_prompts():
             for index in range(self._samples):
                 try:
-                    output = generate(prompt=prompt, brain=brain, sample=index)
-                    judgement = judge.score(output=output, rubric=rubric.text, prompt=prompt)
+                    completion = _completion_of(
+                        generate(prompt=prompt, brain=brain, sample=index)
+                    )
+                    judgement = judge.score(
+                        output=completion.text, rubric=rubric.text, prompt=prompt
+                    )
                 except (UnreadableJudgement, BadOutput, RuntimeError) as exc:
                     # A failed sample is recorded as a failure and omitted from
                     # the scores. A zero would be indistinguishable from a
@@ -461,7 +521,9 @@ class EvalRunner:
                         message=str(exc) or type(exc).__name__,
                     )
                     continue
-                self._record_result(eval_run_id, prompt_id, index, judgement)
+                self._record_result(
+                    eval_run_id, prompt_id, index, judgement, completion.model_call_id
+                )
 
         self._repo.connection.execute(
             "UPDATE eval_runs SET judge_model = ?, judge_model_version = ?, "
@@ -472,15 +534,21 @@ class EvalRunner:
         return self.summarize(eval_run_id)
 
     def _record_result(
-        self, eval_run_id: str, prompt_id: str, sample: int, judgement: Judgement
+        self,
+        eval_run_id: str,
+        prompt_id: str,
+        sample: int,
+        judgement: Judgement,
+        model_call_id: str,
     ) -> None:
         import json
 
         self._repo.connection.execute(
             "INSERT INTO eval_results (id, eval_run_id, eval_prompt_id, sample_index, "
-            "score, subscores_json, is_synthetic) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "score, subscores_json, model_call_id, is_synthetic) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (new_ulid(now_ms()), eval_run_id, prompt_id, sample,
-             float(judgement.total), json.dumps(judgement.scores),
+             float(judgement.total), json.dumps(judgement.scores), model_call_id,
              int(self._is_synthetic)),
         )
 
@@ -538,6 +606,25 @@ class EvalRunner:
                 f"different judges — {earlier.judge_model} and {later.judge_model}. "
                 "Two judges are two instruments, and a curve across instruments is "
                 "not a curve."
+            )
+
+        # Unrecorded before different, and not folded into one check. "I cannot
+        # see what produced one side" and "the two sides differ" are different
+        # statements, and reporting the second when the first holds would be a
+        # guess dressed as a finding.
+        blind = [s.eval_run_id for s in (earlier, later) if s.generator_unrecorded]
+        if blind:
+            raise NotComparable(
+                f"{', '.join(blind)} has results that name no model call, so what "
+                "produced them is unknown. The comparison cannot be shown to be "
+                "between two states of one system rather than two systems."
+            )
+        if earlier.generators != later.generators:
+            raise NotComparable(
+                f"different models produced the outputs — "
+                f"{earlier.generators_text()} and {later.generators_text()}. The "
+                "difference this would report is the model and not the brain, and "
+                "the brain is what the measurement is about."
             )
         earlier_slugs = {p.slug for p in earlier.prompts}
         later_slugs = {p.slug for p in later.prompts}
@@ -632,4 +719,25 @@ class EvalRunner:
             judge_model=run["judge_model"],
             complete=run["judge_model"] != AWAITING and recorded == expected,
             prompts=[PromptSummary(slug=s, samples=v) for s, v in sorted(by_slug.items())],
+            generators=self._generators(eval_run_id),
         )
+
+    def _generators(self, eval_run_id: str) -> tuple[str | None, ...]:
+        """What produced a run's outputs, read through the result rows.
+
+        A LEFT JOIN, so a result naming no call contributes `UNRECORDED` rather
+        than dropping out of the set. An inner join would make a run with no
+        recorded generators look like a run with one, which is the mistake the
+        curve's generator refusal exists to catch.
+        """
+        rows = self._repo.connection.execute(
+            "SELECT DISTINCT c.provider AS provider, c.model AS model "
+            "FROM eval_results r LEFT JOIN model_calls c ON c.id = r.model_call_id "
+            "WHERE r.eval_run_id = ?",
+            (eval_run_id,),
+        ).fetchall()
+        named = sorted(
+            f"{r['provider']}/{r['model']}" for r in rows if r["model"] is not None
+        )
+        unknown = (UNRECORDED,) if any(r["model"] is None for r in rows) else ()
+        return tuple(named) + unknown
