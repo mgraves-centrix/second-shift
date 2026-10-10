@@ -496,3 +496,38 @@ If capture-from-phone → logged entry is not working end to end by end of day
 Wed 2 Sep, **stop every spike and fix only that.** Local model serving, Nebius
 integration, and the scrubber are all recoverable in week two. A memory history
 that starts late is not recoverable at all.
+
+---
+
+## The week-one record — as of Wed 2 Sep 2026
+
+What week one produced, written on the last day of it. **This is a snapshot and
+is not maintained**; several rows were overtaken within a fortnight. For current
+state read `README.md`, `docs/SUBMISSION.md` and `docs/SPEC_ROADMAP.md`, each of
+which derives its figures rather than asserting them.
+
+It is kept because the failure condition above names one deliverable, and this
+is the evidence for whether week one met it: capture was in daily use on day 7.
+
+| Milestone | State |
+|---|---|
+| Repo scaffold | done |
+| Persistence, telemetry, compute profiles, Privacy Airlock | done |
+| Capture path (PWA → logged entry, text) | done — in daily use |
+| Capture path (voice → ASR) | not started; text-first, so it gates nothing |
+| The brain — plaintext memory under git | done — receiving every entry |
+| Eval harness — pinned rubric, pinned brain state, repeated sampling | done — baseline recorded 2 Sep, six prompts; scoring waits on a judge |
+| Synthetic night generator | done — 1,200+ events, every row `is_synthetic = 1` |
+| Local reasoning on the Spark | done — behind the `Reasoner` interface; a real completion was made through an agent on 2 Sep |
+| Nebius Token Factory | credentials live and verified against the real API; the cloud `Reasoner` is not implemented |
+| Nebius Serverless Jobs | not started |
+| Retrieval — local embedding and policy-filtered assembly | done — measured on the machine: 40ms rebuild, 48 KiB index |
+| Agents — six roles, versioned prompts pinned by content | done — prompts are drafts awaiting judgment |
+| Configuration — resolved view with provenance | done — `python -m secondshift.config show`; not yet run on the always-on machine |
+| Night orchestrator | done — checkpointed six-stage walk, quarantine over downgrade. Never run against the real reasoner |
+| Artifacts — files on disk, variant groups, outcomes | done — hashed from what landed; `cost_per_accepted_artifact` returns a number once a `keep` is recorded |
+| Research — redaction before egress | done — queries are constructed, never filtered from raw text; `local-only` makes zero calls. **Never run against the live Tavily API**: no credential here |
+| Morning interview | done — briefing, questions with rationale, answering, policy upgrade. No screen yet |
+| Frontend shell and token system | done — one token file, navigation between every surface, demo label from the served profile |
+| Night scrubber UI | done — reads a recorded night, scrubs by pointer or keyboard |
+| Judge demo instance | not started |

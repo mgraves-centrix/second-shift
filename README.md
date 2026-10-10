@@ -17,54 +17,47 @@ Built for the Nebius x NVIDIA Global AI Hackathon, Personal AI track.
 
 ## Status
 
-**The submission write-up is [`docs/SUBMISSION.md`](docs/SUBMISSION.md)** — what
-this is, what has been measured, and what has not. Read that first.
+**Start with [`docs/SUBMISSION.md`](docs/SUBMISSION.md)** — what this is, what
+has been measured, and what has not.
 
-The table below is **the week-one record, as of 2 Sep 2026**, kept because it is
-where this started. Several of its rows have since been overtaken; those are
-marked. For what is true now, derive it:
+**What exists.** 22 capabilities <!-- derived: count openspec/specs/*/ --> are
+specified and shipped across 30 <!-- derived: count openspec/changes/archive/*/ -->
+OpenSpec changes: capture, the brain, the night orchestrator, the morning
+interview, retrieval, research, agents, the eval harness, configuration, the PWA
+with its night scrubber, the judge instance, backup and restore. Those two
+directories are the authority on the count — **this sentence said "eighteen" for
+three weeks after it stopped being true**, which is why both figures now derive
+from the directories and `scripts/check-drift.py` fails the build when they
+drift again.
 
-```bash
-npx openspec list --specs        # the capabilities
-cat docs/SPEC_ROADMAP.md         # what is built, what is owed, and to whom
-python3 scripts/gate.py          # whether it passes
-```
+**What is unproven, and why it is one thing and not four.** Four claims have not
+been measured: a build stage fanned out to real parallel Nebius Jobs, a cloud
+night's cost beside a local one, the week-8 eval score, and the judge container
+standing up. Each of them needs a session on the always-on machine, which is
+where the credentials and the real data are. `docs/SPEC_ROADMAP.md`'s *Owed
+verification* table is the full list, and **nothing is stubbed to fill those
+rows**: a stub executor returning plausible job results would write telemetry
+indistinguishable from a real fan-out, and that fan-out is the whole evidence
+for the Nebius claim.
 
-| Milestone | State |
-|---|---|
-| Repo scaffold | done |
-| Persistence, telemetry, compute profiles, Privacy Airlock | done |
-| Capture path (PWA → logged entry, text) | done — in daily use |
-| Capture path (voice → ASR) | not started; text-first, so it gates nothing |
-| The brain — plaintext memory under git | done — receiving every entry |
-| Eval harness — pinned rubric, pinned brain state, repeated sampling | done — baseline recorded 2 Sep, six prompts; scoring waits on a judge |
-| Synthetic night generator | done — 1,200+ events, every row `is_synthetic = 1` |
-| Local reasoning on the Spark | done — behind the `Reasoner` interface; a real completion was made through an agent on 2 Sep |
-| Nebius Token Factory | credentials live and verified against the real API; the cloud `Reasoner` is not implemented |
-| Nebius Serverless Jobs | not started |
-| Retrieval — local embedding and policy-filtered assembly | done — measured on the machine: 40ms rebuild, 48 KiB index |
-| Agents — six roles, versioned prompts pinned by content | done — prompts are drafts awaiting judgment |
-| Configuration — resolved view with provenance | done — `python -m secondshift.config show`; not yet run on the always-on machine |
-| Night orchestrator | done — checkpointed six-stage walk, quarantine over downgrade. ~~never run against the real reasoner~~ **Overtaken: two real nights ran on the Spark on 16 Sep, and a six-of-six night with research on 17 Sep** |
-| Artifacts — files on disk, variant groups, outcomes | done — hashed from what landed; `cost_per_accepted_artifact` returns a number once a `keep` is recorded |
-| Research — redaction before egress | done — queries are constructed, never filtered from raw text; `local-only` makes zero calls. **Never run against the live Tavily API**: no credential here |
-| Morning interview | done — briefing, questions with rationale, answering, policy upgrade. ~~no screen yet~~ **Overtaken: `app/morning/` shipped 3 Sep** |
-| Frontend shell and token system | done — one token file, navigation between every surface, demo label from the served profile |
-| Night scrubber UI | done — reads a recorded night, scrubs by pointer or keyboard |
-| Judge demo instance | ~~not started~~ **Overtaken: `judge-mode` shipped 20 Sep. The container has never been built — that needs a machine with a container runtime** |
+**What is live.** Capture went live on 28 Aug and has been taking real ideas
+since. Two real nights ran against the live reasoner on 16 Sep and a six-of-six
+night with research on 17 Sep. The entry count is in the database on that
+machine, not in this repository, so this file does not quote one.
 
-22 capabilities <!-- derived: count openspec/specs/*/ --> have shipped across
-30 <!-- derived: count openspec/changes/archive/*/ --> OpenSpec changes. Their
-specifications are in `openspec/specs/`; the changes that built them, with their
-task lists, are in `openspec/changes/archive/`. Both directories are the
-authority on that count — **this sentence said "eighteen" for three weeks after
-it stopped being true**, which is why those two figures now derive from the
-directories and `scripts/check-drift.py` fails when they drift again. Count them
-yourself:
+Nothing here asks to be taken on trust:
 
 ```bash
-npx openspec list --specs && ls openspec/changes/archive/
+npx openspec list --specs     # the capabilities, from the specs themselves
+cat docs/SPEC_ROADMAP.md      # what is built, what is owed, and to whom
+python3 scripts/gate.py       # 11 gates <!-- derived: matches scripts/gate.py ^    \(" -->, the ones CI runs
 ```
+
+This section was a 22-row table of hand-written milestone states until 10 Oct,
+and three of its rows were wrong by then — one still read "never run against the
+real reasoner" three weeks after two nights had. It is the week-one record it
+always was, and it now sits at the end of
+[`docs/WEEK_ONE.md`](docs/WEEK_ONE.md) beside the plan it reports on.
 
 ---
 
