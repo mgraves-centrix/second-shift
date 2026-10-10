@@ -189,6 +189,30 @@ MUTATIONS = [
         "if False:",
         PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
     ),
+    Mutation(
+        "curve-compares-across-prompts",
+        "10 Oct: generating eval answers through the product's agent path put "
+        "the generator hole back one layer up. A role prompt is versioned and "
+        "eval_runs pins no prompt, so a prompt replaced between week 1 and "
+        "week 8 moves the scores for a reason that is not memory. distiller was "
+        "already at v2 when this was written.",
+        "apps/api/secondshift/evals/runner.py",
+        "if earlier.prompt_versions != later.prompt_versions:",
+        "if False:",
+        PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
+    ),
+    Mutation(
+        "a-deployment-scores-the-other-kind-of-run",
+        "10 Oct: the is_synthetic flag marks results and the exclusion filters "
+        "runs — two tables. So a judge deployment scoring a run recorded as real "
+        "writes synthetic results under a real run, and summarize reads them as "
+        "that run's scores because it filters results by nothing. The 19 Sep "
+        "exclusion protects whole runs and never sees this.",
+        "apps/api/secondshift/evals/runner.py",
+        "if bool(recorded[\"is_synthetic\"]) != self._is_synthetic:",
+        "if False:",
+        PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
+    ),
 ]
 
 

@@ -139,11 +139,18 @@ console on 2026-08-27, region `eu-north1`. Rates are USD per 1M tokens.
 |---|---|---|---|
 | Routine turns | `Nemotron-3.5-Lightning` | $0.06 | $0.24 |
 | Deep reasoning | `Nvidia-Nemotron-3-Super-120B-A12B` | $0.30 | $0.90 |
-| Frontier turns, eval judge | `Nemotron-3-Ultra-550B-a55B` | $1.00 | $3.00 |
+| Frontier turns | `Nemotron-3-Ultra-550B-a55B` | $1.00 | $3.00 |
 
-Every model also has a `-Batch` variant at **exactly half** both rates. The
-eval judge is version-pinned in `eval_runs.judge_model_version` and never
-floats.
+Every model also has a `-Batch` variant at **exactly half** both rates.
+
+**The eval judge is not in this table any more.** ADR 0006 bound it to
+`Nemotron-3-Ultra-550B-a55B`, and ADR 0010 made that impermissible six days
+later by giving brain topic files `local-only` — an eval answer is generated
+from them, so it inherits that policy and cannot reach a remote provider.
+`docs/decisions/0015` retires the clause and the judge is the local reasoner.
+It is still version-pinned in `eval_runs.judge_model_version` and still never
+floats; the pin now comes from `evals.judge_version` in `config/models.toml`
+rather than from a cloud model id.
 
 ### Batch for the night, standard for the morning
 

@@ -40,7 +40,7 @@ Everything this session produces is read by a judge who will not read the code.
   and its `week_of` says so on purpose. **Do not present it as day 3.** The
   honesty is worth more than the tidiness, and the run pins the brain it actually
   measured.
-- 14 numbered ADRs <!-- derived: count docs/decisions/*.md -->, each recording a
+- 15 numbered ADRs <!-- derived: count docs/decisions/*.md -->, each recording a
   decision and what it cost. The marker is how that number stays true: it said
   eight until 21 Sep, and `scripts/check-drift.py` now fails when it drifts again.
 - `config/pricing.toml` with rates read from the Token Factory console, so every

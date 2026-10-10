@@ -5,11 +5,19 @@
     python -m secondshift.evals baseline          # fix inputs; no judge needed
     python -m secondshift.evals status            # what is pinned, against the file
     python -m secondshift.evals summarize <id>
+    python -m secondshift.evals score <id>       # generate and grade
 
-Scoring is deliberately absent from this entry point until a judge is chosen and
-a generating provider is configured. Recording a baseline needs neither, which is
-the whole reason the two are separable — the inputs can be fixed today and
-scored when a model exists.
+Scoring was absent from this entry point until 10 Oct, while no judge existed
+and `EvalRunner.score` was reachable only from the test suite. Recording a
+baseline needs neither a judge nor a generating provider, which is the whole
+reason the two are separable — the inputs can be fixed on day 3 and scored when
+a model exists.
+
+`score` refuses rather than substituting, at every point where it could
+substitute: no judge configured, no local reasoner bound, no pinned version. A
+stub judge that reached the real curve would be the one defect here that cannot
+be withdrawn, because the claim is a week-1 to week-8 comparison and there is no
+way to tell afterwards which rows came from where.
 """
 
 from __future__ import annotations
@@ -17,14 +25,34 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from dataclasses import dataclass
 
+from ..agents.invoke import invoke
+from ..agents.roster import discover, register
 from ..brain.repo import BrainRepo, BrainUnavailable
-from ..config import synthetic_flag
+from ..config import Profile, eval_settings, resolve_profile, synthetic_flag
 from ..db.connection import connect
 from ..db.migrate import migrate
 from ..db.repository import Repository
+from ..providers.registry import LocalReasonerNotConfigured, Registry
+from ..telemetry.pricing import PricingTable
+from ..telemetry.recorder import Recorder
 from .content import Rubric, load_prompts, load_rubric, load_threshold
-from .runner import NO_IMPROVEMENT_SHOWN, EvalRunner, NotComparable
+from .judge import ModelJudge
+from .runner import (
+    NO_IMPROVEMENT_SHOWN,
+    DeploymentMismatch,
+    EvalRunner,
+    NotComparable,
+)
+
+#: The policy every call in a scoring run carries. Not configurable, and not an
+#: argument. ADR 0010 makes brain topic files `local-only`, and an eval answer is
+#: generated from them: treating the output as less restricted than its most
+#: restricted input would launder the policy. ADR 0015 records why the judge is
+#: local, and moving it means superseding 0010 with an argument rather than
+#: setting a value here.
+POLICY = "local-only"
 
 DEFAULT_DB = os.path.expanduser("~/second-shift-data/second-shift.db")
 DEFAULT_CANDIDATES = "config/evals/candidates.md"
@@ -82,7 +110,7 @@ def _status(runner: EvalRunner, rubric: Rubric) -> int:
     return 1
 
 
-def _dispatch(args, runner: EvalRunner, rubric: Rubric) -> int:
+def _dispatch(args, runner: EvalRunner, rubric: Rubric, repo: Repository) -> int:
     if args.command == "seed":
         added = runner.load_candidates(load_prompts(args.candidates), rubric)
         print(f"loaded {added} new candidate prompts, all inactive")
@@ -132,6 +160,12 @@ def _dispatch(args, runner: EvalRunner, rubric: Rubric) -> int:
         if summary.prompts:
             print(f"  overall mean {summary.mean:.2f}")
         return 0
+
+    if args.command == "score":
+        if not args.args:
+            print("name an eval run id", file=sys.stderr)
+            return 2
+        return _score(runner, repo, args.args[0], rubric)
 
     if args.command == "curve":
         return _curve(runner, args.args, load_threshold(args.threshold))
@@ -206,11 +240,149 @@ def _curve(runner: EvalRunner, ids: list[str], threshold) -> int:
     return 0
 
 
+def _score(
+    runner: EvalRunner, repo: Repository, eval_run_id: str, rubric: Rubric
+) -> int:
+    """Generate a run's answers and grade them, or refuse and say why.
+
+    Every refusal here is a substitution not made. The registry binds an echo
+    reasoner on the `cloud` profile, `StubJudge` exists for exercising the
+    runner, and either of them reaching a real run writes scores that look like
+    every other score in the table. Unlike a bad artifact, a scored eval run
+    cannot be withdrawn: the claim is a week-1 to week-8 comparison, and nothing
+    afterwards can tell which rows came from where.
+    """
+    settings = eval_settings()
+    missing = [
+        name
+        for name, value in (
+            ("evals.judge_version", settings.judge_version),
+            ("evals.generating_role", settings.role),
+        )
+        if not value
+    ]
+    if missing:
+        print(
+            f"not scoring: {' and '.join(missing)} is not set in config/models.toml. "
+            "Refusing to score under a pin nobody chose — a run recorded against "
+            "the wrong version is in the curve.",
+            file=sys.stderr,
+        )
+        return 2
+
+    resolved = resolve_profile()
+    if resolved.profile is Profile.CLOUD:
+        # The same refusal the night makes, for a sharper reason. A night run
+        # against the echo produced artifacts somebody would eventually read and
+        # disbelieve. Scoring against it produces numbers that are the evidence.
+        reason = resolved.degradation_reason or "the profile resolved to cloud"
+        print(
+            f"not scoring: no local reasoner can do the work ({reason}). The "
+            "judge runs local-only by ADR 0015, and the registry binds an echo "
+            "here — scoring against it would put fabricated numbers in the curve.",
+            file=sys.stderr,
+        )
+        return 2
+
+    recorder = Recorder(
+        repo, pricing=PricingTable.load(), compute_profile=str(resolved.profile)
+    )
+    try:
+        reasoner = Registry(recorder).bind(str(resolved.profile)).reasoner
+    except LocalReasonerNotConfigured as exc:
+        print(f"not scoring: {exc}", file=sys.stderr)
+        return 2
+
+    agents = register(repo)
+    prompts = discover()
+    if settings.role not in agents or settings.role not in prompts:
+        print(
+            f"not scoring: no prompt registered for role {settings.role!r}",
+            file=sys.stderr,
+        )
+        return 2
+
+    def generate(*, prompt: str, brain, sample: int):
+        """One answer, produced the way the product produces work.
+
+        Through the agent path rather than a composition written for evaluation:
+        an improvement measured in a harness is an improvement in the harness.
+        The brain arrives as the topic files at the run's pinned commit, which is
+        what `EvalRunner.score` reads and what makes the number a week-1 number.
+        """
+        turn = invoke(
+            recorder,
+            reasoner,
+            role=settings.role,
+            agent_id=agents[settings.role],
+            prompt_path=prompts[settings.role].path,
+            task=prompt,
+            policy=POLICY,
+            context=_brain_context(brain),
+        )
+        return _Generated(text=turn.text, model_call_id=turn.model_call_id)
+
+    judge = ModelJudge(reasoner, policy=POLICY, version=settings.judge_version)
+    try:
+        summary = runner.score(
+            eval_run_id, judge=judge, generate=generate, rubric=rubric
+        )
+    except DeploymentMismatch as exc:
+        print(f"not scoring: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"run {summary.eval_run_id} judge={summary.judge_model} "
+          f"complete={summary.complete}")
+    print(f"  generated by {summary.generators_text()}")
+    print(f"  prompt       {summary.prompt_versions_text()}")
+    for prompt_summary in summary.prompts:
+        print(f"  {prompt_summary.slug:34s} mean {prompt_summary.mean:5.2f}"
+              f"  sd {prompt_summary.spread:4.2f}  n={len(prompt_summary.samples)}")
+    if summary.prompts:
+        print(f"  overall mean {summary.mean:.2f}")
+    if not summary.complete:
+        # Non-zero, because an incomplete run is not a scored run: the curve
+        # refuses it, and an operator who saw zero would not know that yet.
+        print("  incomplete — some samples failed; see the failure ledger",
+              file=sys.stderr)
+        return 1
+    return 0
+
+
+@dataclass(frozen=True, slots=True)
+class _Generated:
+    """What `generate` owes the runner: the text, and the call behind it."""
+
+    text: str
+    model_call_id: str | None
+
+
+def _brain_context(brain) -> str:
+    """The brain's topic files as one block of context.
+
+    Labeled by file rather than concatenated, because the rubric scores *voice*
+    and *fit* — a model that cannot tell the style guide from the profile cannot
+    be expected to apply one and not the other.
+    """
+    parts = [
+        f"--- {name} ---\n{text.strip()}"
+        for name, text in (
+            ("profile.md", brain.profile),
+            ("style-guide.md", brain.style_guide),
+            *((f"skills/{n}", s) for n, s in sorted(brain.skills.items())),
+        )
+        if text.strip()
+    ]
+    return "\n\n".join(parts)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="secondshift.evals")
     parser.add_argument(
         "command",
-        choices=["seed", "activate", "baseline", "summarize", "status", "curve"],
+        choices=[
+            "seed", "activate", "baseline", "summarize", "status", "score", "curve"
+        ],
     )
     parser.add_argument("args", nargs="*")
     parser.add_argument("--db", default=os.environ.get("SECOND_SHIFT_DB", DEFAULT_DB))
@@ -228,8 +400,9 @@ def main(argv: list[str] | None = None) -> int:
     conn = connect(args.db)
     try:
         migrate(conn)
+        repo = Repository(conn)
         runner = EvalRunner(
-            Repository(conn),
+            repo,
             brain=BrainRepo(args.brain),
             samples=args.samples,
             # Server-derived, never a flag on this command. A judge deployment
@@ -238,7 +411,7 @@ def main(argv: list[str] | None = None) -> int:
             # way to tell afterwards which rows came from where.
             is_synthetic=synthetic_flag(),
         )
-        return _dispatch(args, runner, load_rubric(args.rubric))
+        return _dispatch(args, runner, load_rubric(args.rubric), repo)
     finally:
         conn.close()
 

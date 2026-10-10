@@ -59,3 +59,25 @@ embedder_host = "127.0.0.1"
 embedder_port = 8201
 embedder_dimensions = 2048
 embedder_timeout_s = 30
+
+# How the week-1 to week-8 comparison is produced, and what it is pinned to.
+#
+# `judge_version` is recorded in `eval_runs.judge_model_version` and never
+# floats. It is not read from the inference server: vLLM reports whatever
+# `--served-model-name` was set to at launch, so a version taken from the
+# endpoint changes when the endpoint is restarted against another checkpoint,
+# and a past run's claim about itself would then depend on the present.
+#
+# `generating_role` is which agent produces the answers being graded. Eval
+# answers go through the product's own agent path rather than through a
+# composition written for evaluation, because an improvement in a harness is not
+# an improvement in the product. `architect` because the prompt set is
+# idea-interrogation shaped and *interrogation* is the rubric's first dimension.
+#
+# A prompt replaced between the two runs is refused by the curve rather than
+# reported: the scores would move for a reason that is not memory. See
+# `docs/decisions/0015`.
+
+[evals]
+judge_version = "nemotron-3.5-lightning-nvfp4-2026-08"
+generating_role = "architect"

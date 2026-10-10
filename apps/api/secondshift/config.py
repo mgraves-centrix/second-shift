@@ -260,6 +260,36 @@ def _embedder_config() -> dict:
 
 
 @dataclass(frozen=True, slots=True)
+class EvalSettings:
+    """What grades an eval run, and what generates its answers.
+
+    Both are deployment decisions rather than code. `judge_version` is pinned
+    here and not read from the endpoint because the local server reports
+    whatever `--served-model-name` was set to at launch: a version read from it
+    changes the moment the server is restarted against another checkpoint, which
+    would make a past run's claim about itself depend on the present.
+    """
+
+    judge_version: str
+    role: str
+
+
+def eval_settings() -> EvalSettings:
+    """The judge's pinned version and the role that generates eval answers.
+
+    Empty rather than defaulted on a malformed file, so the caller refuses and
+    names what is missing instead of scoring under values nobody chose. Scoring
+    is the one operation in this system whose output cannot be withdrawn — a
+    week-1 number recorded against the wrong pin is in the curve.
+    """
+    block = _read_toml(_MODELS_CONFIG)[0].get("evals", {})
+    return EvalSettings(
+        judge_version=str(block.get("judge_version", "")),
+        role=str(block.get("generating_role", "")),
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class LocalEmbedderSettings:
     """Everything needed to talk to the local embedding server.
 

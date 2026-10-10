@@ -75,6 +75,32 @@ is superseded by a new record, never edited.
   provider means superseding it with an argument, not setting a flag — 0010 says
   so itself, because "a switch that could be flipped is a switch that will be".
 
+## How an answer is generated, decided 10 Oct
+
+**Through `agents.invoke`, the way the product produces work** — the `architect`
+role, `task` set to the eval prompt, `context` set to the brain's topic files at
+the pinned commit.
+
+`EvalRunner.score` hands `generate` the brain and leaves composition to the call
+site, and nothing in the codebase composes topic files into a turn:
+`retrieval/index.py` indexes them as documents, and no path turns them into a
+prompt. So the alternative was a composition existing only for evals, and a
+week-8 improvement in it would be an improvement in the harness rather than
+demonstrably in the product. `architect` because the candidate set is
+idea-interrogation shaped and *interrogation* is the rubric's first dimension.
+
+**This reintroduces the hole `a-score-knows-which-model-produced-it` closed, one
+layer up**, and so closes it the same way. A role prompt is versioned —
+`distiller` is already at v2 — and `eval_runs` pins `brain_sha`, `rubric_sha`,
+`code_sha` and the judge, but no prompt. A prompt edited between week 1 and
+week 8 would read as the brain having learned, which is exactly the defect the
+generator refusal exists to prevent.
+
+It needs no migration. `eval_results.model_call_id` →
+`model_calls.agent_invocation_id` → `agent_invocations.agent_id` →
+`agents.prompt_sha`, which also carries `role` and `version`. The join is
+already there; only the read and the refusal are new.
+
 ## What changes
 
 1. **A `score` command** in `evals/__main__.py`, resolving the judge and the
@@ -106,10 +132,25 @@ is superseded by a new record, never edited.
    tabulates ADR 0006, so its "frontier turns, eval judge" row is where a reader
    would next pick up the dead binding.
 
+6. **`AgentTurn` carries the model call it recorded.** It carries `role`,
+   `text`, `raw_text` and `invocation_id` and not the call id, so a caller that
+   needs the row — which is now every eval result — cannot name it. One field,
+   read from the completion the turn already holds.
+
+7. **A tenth refusal in the curve**: the two runs' outputs were produced by
+   different agent prompts. Absent on both sides compares equal, unlike the
+   generator, because generating without an agent is a legitimate shape; what is
+   refused is a *change* between the runs.
+
 ## Impact
 
 - `apps/api/secondshift/evals/__main__.py` — the `score` command.
-- `config/models.toml` — the judge binding and its pinned version.
+- `apps/api/secondshift/agents/invoke.py` — `AgentTurn` carries its
+  `model_call_id`. **Outside `evals`**, and the only file in this change that is.
+- `apps/api/secondshift/evals/runner.py` — the prompt versions behind a run, and
+  the refusal that reads them.
+- `config/models.toml` — the judge binding, its pinned version, and the eval
+  generating role.
 - `docs/decisions/` — the new ADR.
 - `docs/MODELS.md` — the row that tabulates the retired clause.
 - `docs/SPEC_ROADMAP.md` — its `eval-scoring` row says what is left needs Token

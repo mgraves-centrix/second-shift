@@ -51,6 +51,11 @@ class AgentTurn:
     #: caller has only the agent id — which is a different table, and the
     #: foreign key catches the confusion rather than storing it.
     invocation_id: str | None = None
+    #: The `model_calls` row behind the text. Carried for the same reason as the
+    #: invocation and one layer down: a caller that has to attribute this text
+    #: to what produced it would otherwise choose between an unattributed
+    #: record and a second lookup that guesses which recent call was this one.
+    model_call_id: str | None = None
 
     @property
     def showed_its_reasoning(self) -> bool:
@@ -117,4 +122,5 @@ def invoke(
         text=strip_reasoning(completion.text),
         raw_text=completion.text,
         invocation_id=invocation_id,
+        model_call_id=completion.model_call_id,
     )

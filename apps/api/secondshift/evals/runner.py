@@ -43,6 +43,20 @@ class NoJudgeConfigured(RuntimeError):
     """Scoring was attempted with nothing to score with."""
 
 
+class DeploymentMismatch(RuntimeError):
+    """A deployment tried to score a run recorded by the other kind.
+
+    The flag marks results, and the curve excludes runs — two different tables.
+    So a judge deployment scoring a run recorded as real writes results flagged
+    synthetic *under a run that is not*, and `summarize` reads them as that
+    run's scores because it filters results by nothing. The exclusion that was
+    added on 19 Sep protects whole runs and does not reach this case.
+
+    Raised in the runner rather than in the command, so every caller is covered
+    by it rather than the one that happened to find it.
+    """
+
+
 class NotComparable(RuntimeError):
     """Two runs that cannot be compared without the answer meaning something else.
 
@@ -285,6 +299,17 @@ class RunSummary:
     #: Quantization is not in it, so this catches a provider or model change and
     #: not a re-quantized reserve of the same weights.
     generators: tuple[str | None, ...] = ()
+    #: The agent prompts behind this run's outputs, as `role.vN:sha`, distinct
+    #: and sorted, with `UNRECORDED` present for results produced without an
+    #: agent. A role prompt is versioned and content-hashed, and `eval_runs`
+    #: pins no prompt — so a prompt replaced between two runs would move the
+    #: scores for a reason that has nothing to do with memory.
+    #:
+    #: `UNRECORDED` is a member rather than an absence, so a run that mixed
+    #: agent and non-agent generation is distinguishable from one that did not.
+    #: Both runs carrying only `UNRECORDED` compare equal: generating without an
+    #: agent is a legitimate shape, and what is refused is a change.
+    prompt_versions: tuple[str | None, ...] = ()
 
     @property
     def mean(self) -> float:
@@ -296,8 +321,14 @@ class RunSummary:
         return UNRECORDED in self.generators
 
     def generators_text(self) -> str:
-        return ", ".join(g if g is not None else "unrecorded" for g in self.generators) \
-            or "nothing recorded"
+        return _listed(self.generators)
+
+    def prompt_versions_text(self) -> str:
+        return _listed(self.prompt_versions, absent="no agent")
+
+
+def _listed(values: tuple[str | None, ...], *, absent: str = "unrecorded") -> str:
+    return ", ".join(v if v is not None else absent for v in values) or "nothing recorded"
 
 
 class EvalRunner:
@@ -483,6 +514,21 @@ class EvalRunner:
                 "no judge configured; refusing to record unscored results as scored"
             )
 
+        recorded = self._repo.connection.execute(
+            "SELECT is_synthetic FROM eval_runs WHERE id = ?", (eval_run_id,)
+        ).fetchone()
+        if recorded is None:
+            raise ValueError(f"unknown eval run {eval_run_id!r}")
+        if bool(recorded["is_synthetic"]) != self._is_synthetic:
+            kind = "synthetic" if self._is_synthetic else "real"
+            was = "synthetic" if recorded["is_synthetic"] else "real"
+            raise DeploymentMismatch(
+                f"a {kind} deployment cannot score {eval_run_id}, which was "
+                f"recorded as {was}. The flag marks results and the exclusion "
+                "filters runs, so the rows would be readable as that run's "
+                "scores with nothing afterwards able to tell."
+            )
+
         # The rubric arrives from disk and the run recorded a hash. Nothing
         # compared them until now, so a rubric edited after a baseline was
         # recorded would have graded that baseline and stamped the result with a
@@ -626,6 +672,13 @@ class EvalRunner:
                 "difference this would report is the model and not the brain, and "
                 "the brain is what the measurement is about."
             )
+        if earlier.prompt_versions != later.prompt_versions:
+            raise NotComparable(
+                f"different agent prompts produced the outputs — "
+                f"{earlier.prompt_versions_text()} and "
+                f"{later.prompt_versions_text()}. A role prompt is versioned and "
+                "a replacement moves the scores for a reason that is not memory."
+            )
         earlier_slugs = {p.slug for p in earlier.prompts}
         later_slugs = {p.slug for p in later.prompts}
         if earlier_slugs != later_slugs:
@@ -720,7 +773,34 @@ class EvalRunner:
             complete=run["judge_model"] != AWAITING and recorded == expected,
             prompts=[PromptSummary(slug=s, samples=v) for s, v in sorted(by_slug.items())],
             generators=self._generators(eval_run_id),
+            prompt_versions=self._prompt_versions(eval_run_id),
         )
+
+    def _prompt_versions(self, eval_run_id: str) -> tuple[str | None, ...]:
+        """The agent prompts behind a run's outputs.
+
+        Four joins and no new column, because every link already exists: a
+        result names its model call, the call names its invocation, the
+        invocation names its agent, and the agent carries the prompt hash. A
+        column on `eval_runs` would have been a fifth place for the same fact to
+        be recorded, and the one that could disagree with the others.
+        """
+        rows = self._repo.connection.execute(
+            "SELECT DISTINCT a.role AS role, a.version AS version, "
+            "a.prompt_sha AS prompt_sha FROM eval_results r "
+            "LEFT JOIN model_calls c ON c.id = r.model_call_id "
+            "LEFT JOIN agent_invocations i ON i.id = c.agent_invocation_id "
+            "LEFT JOIN agents a ON a.id = i.agent_id "
+            "WHERE r.eval_run_id = ?",
+            (eval_run_id,),
+        ).fetchall()
+        named = sorted(
+            f"{r['role']}.v{r['version']}:{r['prompt_sha'][:12]}"
+            for r in rows
+            if r["role"] is not None
+        )
+        none = (UNRECORDED,) if any(r["role"] is None for r in rows) else ()
+        return tuple(named) + none
 
     def _generators(self, eval_run_id: str) -> tuple[str | None, ...]:
         """What produced a run's outputs, read through the result rows.

@@ -1,6 +1,9 @@
 # 0006 — Model bindings: the whole runtime path is Nemotron
 
 **Status:** accepted · **Date:** 2026-08-27
+**Superseded in part by [0015](0015-the-eval-judge-is-local.md)** — the eval
+judge is local, and had been impermissible as a cloud model since 0010. Every
+other binding below stands.
 
 ## Context
 

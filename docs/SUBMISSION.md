@@ -198,15 +198,17 @@ verdict every time:
 **The same arithmetic runs either way.** If it comes out the other direction,
 this document will say the brain got worse, with the same prominence.
 
-The comparison also refuses, rather than warns, in 9 <!-- derived: matches apps/api/secondshift/evals/runner.py raise NotComparable\( --> cases where the
+The comparison also refuses, rather than warns, in 10 <!-- derived: matches apps/api/secondshift/evals/runner.py raise NotComparable\( --> cases where the
 number would mean something other than it looks like: different rubrics,
 different judges, a run never scored, a run scored incompletely, a synthetic
 run, different prompt sets, both runs pinning the same brain state — the one
-that happens by accident — and the two added on 10 Oct, which are the ones the
+that happens by accident — and the three added on 10 Oct, which are the ones the
 shortest path to a week-8 number would have hit: **a run that does not record
-which model produced its outputs, and two runs whose outputs came from different
-models.** A week 1 generated on the Spark and a week 8 generated in the cloud is
-a difference in the model, and this document would have called it learning.
+which model produced its outputs, two runs whose outputs came from different
+models, and two runs whose outputs came from different agent prompts.** A week 1
+generated on the Spark and a week 8 generated in the cloud is a difference in
+the model; a role prompt edited in between is a difference in the prompt. This
+document would have called either one learning.
 
 That figure derives from the refusals in the code rather than being typed here.
 Three documents disagreed about it — five, six, and the truth — for the three
@@ -270,7 +272,7 @@ package a database carrying unmarked rows or any `model_call_payloads` at all.
 
 The record is in the repository: 22 capabilities
 <!-- derived: count openspec/specs/*/ --> with their specifications in
-`openspec/specs/`, 32 <!-- derived: count openspec/changes/archive/*/ --> archived
+`openspec/specs/`, 33 <!-- derived: count openspec/changes/archive/*/ --> archived
 changes with the task lists that built them, and 14
 <!-- derived: count docs/decisions/*.md --> numbered decision records, each saying
 what it cost.
