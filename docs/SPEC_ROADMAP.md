@@ -59,12 +59,25 @@ list rather than six. The detail stays where it is; this is the index.
 | The judge container built, stood up, and read by a stranger | `judge-mode` | Three gaps, below. The NAS runs containers. |
 | One real night, to exercise the night's events against a live reasoner | `night-pipeline` | Also closes `2026-09-17-the-night-revises-what-it-believes` at 7/7. |
 | Live dispatch and telemetry collection against Nebius | `nebius-executor` | The credentials exist — on that machine, at `~/.config/second-shift/secrets.env`. Not a missing credential; a missing route to where it is. |
-| The week-8 eval run | `eval-scoring` | The curve command exists and **the falsification threshold is fixed** — `config/evals/threshold.md`, 23 Sep, while nothing had been scored. What is left needs Token Factory. |
+| `ModelJudge` against the real local reasoner | `evals` | **Added 10 Oct and tested only against a stub.** A stub cannot predict what a real checkpoint writes around its JSON, and the extraction rule is the whole risk surface. One completion on the machine settles it. |
+| The week-8 eval run | `eval-scoring` | **Week 8 is 15–21 Oct.** The curve exists, the threshold is fixed (`config/evals/threshold.md`, 23 Sep, while nothing had been scored), and as of 10 Oct a judge exists that drives any reasoner. **Whether it needs Token Factory is now an open decision, not a fact** — `openspec/changes/2026-10-10-which-model-grades/` carries it, and a local judge would take the credential off the critical path. Both runs need the same judge on both sides; the curve refuses two judges as two instruments. |
 | Spike F, and `Transcriber` | `asr` | The model runs on the Spark and nowhere else. |
 
-**None of these closes from a cloud development session**, and that is tested
-rather than assumed — see the note under `judge-mode` for how, and for the trap
-that made an earlier test of it report the wrong answer.
+**Most of these do not close from a cloud development session**, and that is
+tested rather than assumed — see the note under `judge-mode` for how, and for
+the trap that made an earlier test of it report the wrong answer.
+
+**This said "none" until 10 Oct, and that was the wrong word for two reasons.**
+The first: it was read as "nothing here is worth starting from the cloud", and
+`ModelJudge` — the thing the week-8 run had no substitute for — turned out to be
+buildable and testable there against a socket the test suite already stands up.
+The second: the sentence was about a route to the machine, while what the Nebius
+rows actually need is a credential. The Token Factory and Serverless Jobs
+endpoints both answer from a cloud session; `api.studio.nebius.com/v1/models`
+returns 401, which is a missing key and not a missing route. Whether a key
+should live anywhere but that machine is a decision nobody has made, and it is
+not this document's to make — but it is a different question from the one this
+paragraph was answering.
 
 Nightly research is on as of 17 Sep: the night unit reads an optional file
 holding the Tavily key alone, never the machine's secrets file, which also holds

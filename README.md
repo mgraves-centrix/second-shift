@@ -21,7 +21,7 @@ Built for the Nebius x NVIDIA Global AI Hackathon, Personal AI track.
 has been measured, and what has not.
 
 **What exists.** 22 capabilities <!-- derived: count openspec/specs/*/ --> are
-specified and shipped across 31 <!-- derived: count openspec/changes/archive/*/ -->
+specified and shipped across 32 <!-- derived: count openspec/changes/archive/*/ -->
 OpenSpec changes: capture, the brain, the night orchestrator, the morning
 interview, retrieval, research, agents, the eval harness, configuration, the PWA
 with its night scrubber, the judge instance, backup and restore. Those two

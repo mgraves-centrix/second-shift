@@ -11,9 +11,11 @@ import pytest
 from secondshift.brain.repo import BrainRepo, BrainUnavailable
 from secondshift.evals.__main__ import main
 from secondshift.evals.content import Rubric, load_prompts, load_rubric, load_threshold
+from secondshift.config import LocalReasonerSettings
 from secondshift.evals.judge import (
     DIMENSIONS,
     Judgement,
+    ModelJudge,
     StubJudge,
     UnreadableJudgement,
 )
@@ -29,6 +31,7 @@ from secondshift.evals.runner import (
     UNRECORDED,
 )
 from secondshift.providers.base import Completion
+from secondshift.providers.vllm import VllmReasoner
 
 GOOD = {d: 4 for d in DIMENSIONS}
 
@@ -1277,3 +1280,169 @@ class TestAScoreKnowsWhichModelProducedIt:
         assert runner.summarize(first).generator_unrecorded is True
         with pytest.raises(NotComparable, match="name no model call"):
             runner.curve(first, second)
+
+
+class TestTheJudgeIsAModel:
+    """Until now nothing in this system had ever scored anything: `Judge` was a
+    protocol with one implementation that returned arithmetic on the length of
+    its input. The endpoint here is a real socket, so what is under test is the
+    reading of a completion rather than a mock of it."""
+
+    @pytest.fixture
+    def judge(self, recorder, vllm_stub) -> ModelJudge:
+        return ModelJudge(
+            VllmReasoner(
+                recorder,
+                settings=LocalReasonerSettings(
+                    host=vllm_stub.host,
+                    port=vllm_stub.port,
+                    model="stub-served-model",
+                    max_tokens=256,
+                    temperature=0.7,
+                    timeout_s=5.0,
+                ),
+            ),
+            policy="local-only",
+            version="pinned-1",
+        )
+
+    def _scores(self, **overrides) -> str:
+        scores = {d: 4 for d in DIMENSIONS}
+        scores.update(overrides)
+        return json.dumps({"scores": scores, "note": "fine"})
+
+    def test_the_judge_reports_the_model_that_graded(self, judge):
+        """Read from the provider at runtime, so it is the model that actually
+        graded rather than what somebody wrote down — and so no model identifier
+        lands outside the providers package."""
+        assert judge.name == "stub-served-model"
+        assert judge.version == "pinned-1"
+
+    def test_a_bare_object_is_read(self, judge, vllm_stub, rubric):
+        vllm_stub.answers(text=self._scores())
+
+        judgement = judge.score(output="an answer", rubric=rubric.text, prompt="q")
+
+        assert judgement.scores == {d: 4 for d in DIMENSIONS}
+        assert judgement.note == "fine"
+
+    def test_deliberation_before_the_object_is_ignored(self, judge, vllm_stub, rubric):
+        """The served checkpoint emits its reasoning inconsistently — sometimes
+        delimited, sometimes as bare prose, which `agents/invoke.py` records as
+        the finding it is. Demanding a bare object would refuse every real
+        completion."""
+        vllm_stub.answers(
+            text="Here's a thinking process: the answer interrogates well.\n"
+            + self._scores(interrogation=5)
+        )
+
+        judgement = judge.score(output="an answer", rubric=rubric.text, prompt="q")
+
+        assert judgement.scores["interrogation"] == 5
+
+    def test_a_fenced_block_is_read(self, judge, vllm_stub, rubric):
+        vllm_stub.answers(text=f"```json\n{self._scores(voice=2)}\n```")
+
+        assert judge.score(output="a", rubric=rubric.text, prompt="q").scores["voice"] == 2
+
+    def test_the_last_of_two_objects_is_the_judgement(self, judge, vllm_stub, rubric):
+        """A model that restates its answer puts the final form last."""
+        vllm_stub.answers(
+            text=f"First pass: {self._scores(fit=1)}\nOn reflection: {self._scores(fit=5)}"
+        )
+
+        assert judge.score(output="a", rubric=rubric.text, prompt="q").scores["fit"] == 5
+
+    def test_a_brace_inside_a_note_does_not_truncate_the_object(
+        self, judge, vllm_stub, rubric
+    ):
+        """The note is the one field a model writes freely."""
+        vllm_stub.answers(
+            text=json.dumps(
+                {"scores": {d: 3 for d in DIMENSIONS}, "note": "it wrote a } and a {"}
+            )
+        )
+
+        judgement = judge.score(output="a", rubric=rubric.text, prompt="q")
+
+        assert judgement.note == "it wrote a } and a {"
+        assert judgement.total == 15
+
+    def test_prose_with_no_object_is_refused(self, judge, vllm_stub, rubric):
+        """Reading 4/5 out of a sentence would make the measurement depend on
+        the model's formatting, which is what pinning the judge excludes."""
+        vllm_stub.answers(text="Interrogation: 4/5. Fit: strong. Voice: 3 out of 5.")
+
+        with pytest.raises(UnreadableJudgement, match="no JSON object"):
+            judge.score(output="a", rubric=rubric.text, prompt="q")
+
+    def test_a_truncated_completion_is_refused_before_it_is_parsed(
+        self, judge, vllm_stub, rubric
+    ):
+        """The silent one. JSON cut off at a token limit can parse as a smaller
+        valid object, so a judgement missing two dimensions would score on the
+        rest. The object served here is valid and complete — only the stop
+        reason says otherwise, which is the whole point: the refusal must not
+        depend on the text happening to be broken too."""
+        vllm_stub.answers(text=self._scores(), finish_reason="length")
+
+        with pytest.raises(UnreadableJudgement, match="the judge stopped: length"):
+            judge.score(output="a", rubric=rubric.text, prompt="q")
+
+    def test_a_missing_dimension_is_refused(self, judge, vllm_stub, rubric):
+        partial = {d: 4 for d in DIMENSIONS if d != "voice"}
+        vllm_stub.answers(text=json.dumps({"scores": partial}))
+
+        with pytest.raises(UnreadableJudgement, match="missing dimension 'voice'"):
+            judge.score(output="a", rubric=rubric.text, prompt="q")
+
+    def test_a_score_outside_the_range_is_refused(self, judge, vllm_stub, rubric):
+        vllm_stub.answers(text=self._scores(fit=7))
+
+        with pytest.raises(UnreadableJudgement, match="outside 1-5"):
+            judge.score(output="a", rubric=rubric.text, prompt="q")
+
+    def test_a_refused_judgement_still_recorded_its_call(
+        self, judge, vllm_stub, rubric, repo
+    ):
+        """The case that matters for principle 7: a judge that failed to produce
+        readable scores still cost tokens. The provider layer records before the
+        judge reads, so the row exists whatever the text turned out to be."""
+        vllm_stub.answers(text="no object at all")
+
+        with pytest.raises(UnreadableJudgement):
+            judge.score(output="a", rubric=rubric.text, prompt="q")
+
+        rows = [dict(r) for r in repo.connection.execute("SELECT * FROM model_calls")]
+        assert len(rows) == 1
+        assert rows[0]["model"] == "stub-served-model"
+        assert rows[0]["policy"] == "local-only"
+
+    def test_the_rubric_and_the_answer_both_reach_the_model(
+        self, judge, vllm_stub, rubric
+    ):
+        """A judge that did not send the rubric would grade against whatever it
+        remembered, and the hash pinned to the run would be decorative."""
+        vllm_stub.answers(text=self._scores())
+
+        judge.score(output="the answer text", rubric=rubric.text, prompt="the question")
+
+        sent = vllm_stub.requests[0]["messages"][0]["content"]
+        assert rubric.text in sent
+        assert "the answer text" in sent
+        assert "the question" in sent
+
+    def test_a_run_scored_by_the_model_records_it_as_the_judge(
+        self, runner, rubric, vllm_stub, judge, generate
+    ):
+        """End to end: the runner, the model judge and the curve's pinning all
+        agree about which instrument graded the run."""
+        vllm_stub.answers(text=self._scores())
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+
+        summary = runner.score(run_id, judge=judge, generate=generate, rubric=rubric)
+
+        assert summary.judge_model == "stub-served-model"
+        assert summary.complete is True
+        assert summary.mean == 20.0, "five dimensions at four each"

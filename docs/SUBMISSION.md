@@ -137,14 +137,22 @@ estimating it.**
 | The scrubber at 20× | **Measured.** 0.1ms per steady frame against a 16.7ms budget, and flat in night size |
 | **A build stage fanned out to real parallel Jobs** | **Not run** |
 | **A cloud night's cost beside a local one** | **Not run** |
-| **The week-8 eval score** | **Not run.** The week-1 baseline is recorded and awaiting a judge |
+| **The week-8 eval score** | **Not run.** Week 8 is 15–21 Oct. The week-1 baseline is recorded; a judge that drives any reasoner exists as of 10 Oct and has been tested against a stub endpoint, never against a real checkpoint |
 | **The judge container built and stood up** | **Not run** |
 
-**The unrun rows are one blocker, not four.** The Nebius credentials exist and
-were verified end to end on 2 Sep — a hand-built RS256 JWT exchanged for an
-access token, which then authorized a live `GET /ai/v1/jobs`. They live on the
-always-on machine, outside any git-tracked path, and what is missing is a session
-on that machine. `docs/SPEC_ROADMAP.md` tracks every one under *Owed
+**The unrun rows are one blocker, not four — and it is a credential, not a
+machine.** The Nebius credentials exist and were verified end to end on 2 Sep: a
+hand-built RS256 JWT exchanged for an access token, which then authorized a live
+`GET /ai/v1/jobs`. They live on the always-on machine, outside any git-tracked
+path.
+
+This document said until 10 Oct that what was missing was a session on that
+machine. That was imprecise in a way that mattered: the Token Factory and
+Serverless Jobs endpoints both answer from anywhere —
+`api.studio.nebius.com/v1/models` returns 401, which is a missing key rather
+than a missing route. What is missing is a key in the place the work is being
+done, and where a key should be allowed to live is a decision, not a fact about
+the network. `docs/SPEC_ROADMAP.md` tracks every unrun row under *Owed
 verification*.
 
 **Nothing is stubbed to fill those rows**, and that is deliberate. A stub
@@ -262,7 +270,7 @@ package a database carrying unmarked rows or any `model_call_payloads` at all.
 
 The record is in the repository: 22 capabilities
 <!-- derived: count openspec/specs/*/ --> with their specifications in
-`openspec/specs/`, 31 <!-- derived: count openspec/changes/archive/*/ --> archived
+`openspec/specs/`, 32 <!-- derived: count openspec/changes/archive/*/ --> archived
 changes with the task lists that built them, and 14
 <!-- derived: count docs/decisions/*.md --> numbered decision records, each saying
 what it cost.

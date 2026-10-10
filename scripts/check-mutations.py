@@ -178,6 +178,17 @@ MUTATIONS = [
         "if False:",
         PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
     ),
+    Mutation(
+        "judge-reads-a-truncated-judgement",
+        "10 Oct: JSON cut off at a token limit still parses as a smaller valid "
+        "object, so a judgement missing two dimensions scores on the rest — a "
+        "wrong number that reads like a right one. The first real night lost "
+        "three stages to the same shape of partial output read as whole.",
+        "apps/api/secondshift/evals/judge.py",
+        "if completion.finish_reason != STOPPED_CLEANLY:",
+        "if False:",
+        PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
+    ),
 ]
 
 
