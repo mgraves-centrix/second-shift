@@ -13,57 +13,67 @@ itself needs neither answer.
 `ModelJudge` takes a `Reasoner` and a policy. Something has to choose them, and
 the choice is not a coding decision.
 
-## The open decision
+## The decision, resolved 10 Oct
 
-**Which model grades, and under which policy.**
+**The local reasoner grades. Its calls run `local-only`, and the cloud judge
+ADR 0006 named is retired rather than deferred.**
 
-`docs/MODELS.md` binds the eval judge to `Nemotron-3-Ultra-550B-a55B` via Token
-Factory, and says it is version-pinned in `eval_runs.judge_model_version` and
-never floats. That is a decision of record and this change does not overturn it.
-But it was made on 27 Aug for judgment quality, and two things about it are now
-worth re-examining rather than inheriting:
+### What settles it
 
-**It makes the centerpiece depend on a credential.** The key exists on the
-always-on machine and nowhere else. A local judge needs no key, and the machine
-session that the week-8 run requires anyway — the local reasoner generates the
-outputs — would then close the whole thing.
+**ADR 0010 had already made a cloud judge impermissible, and nobody noticed for
+five weeks.** It says brain topic files carry `local-only`, and its rationale is
+explicit about why the restriction travels: "treating the output as less
+restricted than its most restricted input would launder the policy." Eval
+generation reads `topic_files_at(brain_sha)` — brain topic files — so an eval
+output is distilled from `local-only` material and inherits that policy by
+0010's own argument. The constitution then forbids a `local-only` idea reaching
+a remote provider, enforced as a `CHECK` on `model_calls`, and says proposals
+MUST NOT weaken, bypass or make that constraint conditional.
 
-**It sends brain-derived text to a remote provider.** An eval output is
-generated from the brain at a pinned commit. Principle 2 says the brain itself
-never leaves and only assembled, policy-filtered context is transmitted. An
-output is not the brain, and it is not retrieval context either; it is model
-text about the subject's own ideas. Nothing in `openspec/specs/privacy-airlock/`
-or `docs/decisions/` says which of those it counts as, and the judge's
-`model_calls` row has to carry a policy either way.
+So the judge was never a free choice between two instruments. ADR 0006 bound it
+to `Nemotron-3-Ultra-550B-a55B` on **27 Aug**; ADR 0010 contradicted that clause
+on **2 Sep**; both have been accepted and in force since. The disagreement
+survived because nothing in this system had ever scored anything — the only
+recorded eval run reads `judge_model = 'awaiting-scoring'`, so the dead clause
+was never executed and never failed.
 
-The argument the other way is judgment quality: a 550B grader is a better
-instrument than a 30B one. The counter is that the curve uses **differences**,
-not levels, and the judge is pinned across both runs — so a consistent judge
-matters and an excellent one is a bonus. A 30B model emitting five integers
-against a written rubric is not the hard end of its range.
+### What follows from it
 
-- [NEEDS CLARIFICATION: Does an eval output sent to a cloud judge require
-  redaction before egress, or is it `cloud-assisted` text the airlock already
-  permits? The judge's `model_calls` row records `policy` and
-  `redaction_applied`, so this decides what those two columns say — and whether
-  a `local-only` entry's eval output may be graded remotely at all.]
-- [NEEDS CLARIFICATION: Is the judge the cloud Ultra model as `docs/MODELS.md`
-  binds it, or the local reasoner? Recommendation: **the local reasoner for the
-  week-1 and week-8 runs**, because it removes the credential from the critical
-  path with eleven days to the window, needs no answer to the question above,
-  and the comparison is of differences under a pinned judge rather than of
-  absolute scores. Revisit for a later run if the grader looks like the limit.]
+- **The judge is the local reasoner**, driven through `ModelJudge` and the
+  `Reasoner` interface, with `policy="local-only"`. The `model_calls` CHECK then
+  holds by construction rather than by review.
+- **No redaction question arises**, because nothing leaves the machine. The
+  question of whether an eval output is redactable `cloud-assisted` text is not
+  answered here and does not need to be; it returns only if someone proposes a
+  cloud judge, and that proposal must supersede ADR 0010 first.
+- **The schedule argument is real but secondary.** A local judge does take the
+  credential off the critical path with the week-8 window opening 15 Oct, and
+  the curve compares differences under a pinned judge rather than absolute
+  scores, so a consistent 30B grader is sufficient. Those were the reasons
+  offered before the 0010 conflict was found. They are no longer the reasons:
+  the airlock is.
 
-**Neither marker blocks what this change builds.** `ModelJudge` takes a
-`Reasoner` and a policy; both answers are a constructor argument. What they
-block is the `score` command's default and the deployment note, so those are the
-tasks held back until `/openspec:clarify` resolves them.
+### What it costs
+
+A 550B grader is a better instrument than a 30B one, and this gives that up. The
+claim being measured is a difference across two pinned brain states under one
+pinned judge, so the loss is in the absolute level of the scores rather than in
+the comparison — but it is a real loss and it is not being pretended away.
+
+**This change writes the ADR that records all of it**, superseding ADR 0006's
+eval-judge clause alone. The rest of 0006's bindings stand; an accepted decision
+is superseded by a new record, never edited.
 
 ## What this change is not
 
 - **Not the judge.** `2026-10-10-the-judge-is-a-model` builds and tests that.
-- **Not a Nebius provider.** If the answer is the cloud judge, the Token Factory
-  `Reasoner` is `nebius-executor`'s to build, and this change consumes it.
+- **Not a Nebius provider.** The resolution retires the cloud judge, so no
+  Token Factory client is needed here or implied. If one is ever built it is
+  `nebius-executor`'s, and a judge running through it would need ADR 0010
+  superseded first.
+- **Not a reversal of ADR 0010.** It is reaffirmed. Moving the judge to a remote
+  provider means superseding it with an argument, not setting a flag — 0010 says
+  so itself, because "a switch that could be flipped is a switch that will be".
 
 ## What changes
 
@@ -73,30 +83,45 @@ tasks held back until `/openspec:clarify` resolves them.
    called from nowhere but `apps/api/tests/test_evals.py`, and that module's
    docstring says scoring is "deliberately absent from this entry point until a
    judge is chosen and a generating provider is configured" — the condition the
-   first answer ends.
+   resolution above ends. Both are the local reasoner: the judge by this
+   decision, the generator because the brain never leaves the machine.
 
 2. **The judge's pinned version** recorded in `eval_runs.judge_model_version`,
    from configuration rather than from whatever the endpoint reports, because
-   `docs/MODELS.md` says it never floats.
+   ADR 0006 says it never floats and that clause of it survives. The local
+   server reports whatever `--served-model-name` was set to at launch, so a
+   version read from the endpoint floats the moment it is restarted against
+   another checkpoint.
 
 3. **`is_synthetic` stays server-derived.** A judge deployment that scored
    itself into the real curve is unrecoverable, and the command takes no flag
    that could do it.
 
-4. **An ADR if the answer departs from `docs/MODELS.md`**, which binds the eval
-   judge to the cloud Ultra model. Superseding that binding is a new decision
-   record, never an edit to the old one.
+4. **An ADR superseding ADR 0006's eval-judge clause**, recording that ADR 0010
+   had already made a cloud judge impermissible and that the clause has been
+   dead since 2 Sep. The rest of 0006's bindings stand, and 0006 itself is not
+   edited — an accepted decision is superseded by a new record.
+
+5. **`docs/MODELS.md` stops stating the retired clause as current.** It
+   tabulates ADR 0006, so its "frontier turns, eval judge" row is where a reader
+   would next pick up the dead binding.
 
 ## Impact
 
 - `apps/api/secondshift/evals/__main__.py` — the `score` command.
-- `config/models.toml` — the judge binding, if it is configuration.
-- `docs/MODELS.md`, `docs/decisions/` — if the binding changes.
+- `config/models.toml` — the judge binding and its pinned version.
+- `docs/decisions/` — the new ADR.
+- `docs/MODELS.md` — the row that tabulates the retired clause.
+- `docs/SPEC_ROADMAP.md` — its `eval-scoring` row says what is left needs Token
+  Factory, which this resolution makes false.
 
 ## Constitution Compliance
 
-- **Principle 2 (Privacy Airlock).** The first marker *is* this principle. No
-  implementation proceeds until it is answered; that is the point of the split.
+- **Principle 2 (Privacy Airlock).** This principle is what decided the change.
+  The judge runs `local-only` against a local provider, so the `model_calls`
+  CHECK holds by construction and nothing derived from the brain leaves the
+  machine. ADR 0010 is reaffirmed rather than weakened, and the redaction
+  question it would have raised does not arise because there is no egress.
 - **Principle 5 (one codebase, two deployments).** The judge is configuration,
   so the judge deployment and the personal one differ by configuration and
   seeded data rather than by code.
@@ -108,6 +133,14 @@ tasks held back until `/openspec:clarify` resolves them.
 ## Risk
 
 **The window.** Week 8 is 15–21 Oct. Both runs must be generated and scored with
-the same judge on both sides, and the curve refuses two judges as two
-instruments. An answer after 15 Oct does not leave room to discover that the
-chosen judge needs its prompt reworked.
+the same judge on both sides — the curve refuses two judges as two instruments,
+and since 10 Oct it also refuses two generators. Resolved on 10 Oct, which
+leaves time to discover that the judge's prompt needs reworking; that discovery
+needs the machine, because `ModelJudge` has only ever run against a stub.
+
+**The grader is the weak link now, not the schedule.** A 30B model emitting five
+integers against a written rubric is not the hard end of its range, but nothing
+has confirmed it does so reliably. If it refuses often, the run comes back
+incomplete and the curve refuses it — which is the correct behavior and still a
+lost window. The first real completion on the machine is the thing to run early
+rather than last.

@@ -1,16 +1,13 @@
-## 0. Blocked
+## 0. Resolved 10 Oct
 
-Two questions in `proposal.md` are unanswered and both change what gets built
-rather than how. **Run `/openspec:clarify` before anything below.** They are not
-restated here: the rules keep clarification markers out of task lists, because a
-task nobody can start yet is not a task.
+Both questions are answered in `proposal.md` and this list is no longer blocked.
+**The local reasoner grades, `local-only`**, and the cloud judge ADR 0006 named
+is retired rather than deferred — ADR 0010 had already made it impermissible,
+and the clause has been dead since 2 Sep.
 
-The first decides what `policy` and `redaction_applied` say on the judge's
-`model_calls` row, and whether a `local-only` entry's eval output may be graded
-remotely at all. The second decides which reasoner the command resolves.
-
-`2026-10-10-the-judge-is-a-model` is deliberately separate and needs neither
-answer, so the judge is not waiting on this.
+Read the resolution before task 3.1. The ADR this change writes is a correction
+rather than a trade-off, and a record that argued the schedule instead would
+leave the next reader thinking a cloud judge is a configuration change away.
 
 ## 1. The command
 
@@ -37,13 +34,21 @@ answer, so the judge is not waiting on this.
 
 ## 3. The record
 
-- [ ] 3.1 If the answer departs from `docs/MODELS.md`'s binding of the eval
-      judge to the cloud Ultra model, write an ADR superseding it. An accepted
-      decision is superseded by a new record, never edited.
-- [ ] 3.2 `docs/SPEC_ROADMAP.md`'s `eval-scoring` row says what is left needs
-      Token Factory. If the answer is the local reasoner, that row is wrong and
-      is the sentence somebody reads when deciding whether a machine session
-      can close the week-8 run.
+- [ ] 3.1 An ADR superseding **ADR 0006's eval-judge clause alone**, recording
+      that ADR 0010 made a cloud judge impermissible on 2 Sep and that the
+      clause has been dead since. The rest of 0006's bindings stand and 0006 is
+      not edited. Reaffirm 0010 explicitly: moving the judge to a remote
+      provider needs 0010 superseded with an argument, not a flag.
+- [ ] 3.2 Record the five-week disagreement as the finding it is — two accepted
+      ADRs in force and contradicting each other, surviving because nothing had
+      ever been scored, so the dead clause was never executed and never failed.
+      It belongs in the ADR's own Context, where the next reader of 0006 will
+      follow the supersession link to it.
+- [ ] 3.3 `docs/MODELS.md`'s "frontier turns, eval judge" row tabulates the
+      retired clause. It is where a reader picks the dead binding back up.
+- [ ] 3.4 `docs/SPEC_ROADMAP.md`'s `eval-scoring` row says what is left needs
+      Token Factory. It is now false, and it is the sentence somebody reads when
+      deciding whether a machine session can close the week-8 run.
 
 ## 4. Gate
 
