@@ -198,10 +198,20 @@ appears to mean:
 
 - the two runs pin different rubrics;
 - the two runs pin the same brain state, so nothing under test has changed;
+- either run has no results at all, having been recorded but never scored;
 - either run is incomplete, because a partial run is not comparable to a whole one;
 - the two runs were graded by different judges;
 - either run is synthetic;
-- the two runs were scored over different sets of prompts.
+- the two runs were scored over different sets of prompts;
+- either run does not record which model produced its outputs, because a guard
+  that cannot see one side of the comparison is not a guard;
+- the two runs' outputs were produced by different models, because then the
+  difference is the model rather than the brain, and the brain is what the
+  measurement is about.
+
+Each condition SHALL be its own refusal with its own message. A reader of a
+refusal is deciding what to do next, and "recorded but never scored" and
+"scored but incomplete" call for different actions.
 
 Every difference it reports SHALL be accompanied by the spread of both runs. A
 difference smaller than the wider spread MUST NOT be presented as a change.
@@ -242,6 +252,14 @@ meant to describe the variation within them.
 - **WHEN** either run is synthetic
 - **THEN** the comparison is refused and says which, rather than returning an empty report
 
+#### Scenario: The model changed between the runs
+- **WHEN** the two runs' outputs were produced by different models
+- **THEN** the comparison is refused and names both models, because the difference it would report is the model and not the brain
+
+#### Scenario: One run's generator is unrecorded
+- **WHEN** either run has results that reference no model call
+- **THEN** the comparison is refused, because the comparison cannot be shown to be between two states of one system rather than two systems
+
 ### Requirement: What would falsify the claim is fixed before the result exists
 
 The difference that counts as an improvement SHALL be recorded before the second
@@ -273,3 +291,32 @@ same prominence as the favorable result.
 #### Scenario: The threshold is edited afterwards
 - **WHEN** the recorded text changes
 - **THEN** the hash printed beside the verdict changes with it
+
+### Requirement: A score records the model call that produced what was scored
+
+Every recorded result SHALL reference the model call whose output the judge
+graded. The generator is not inferable afterwards: two runs over the same
+prompts, the same rubric and the same brain state are distinguishable only by
+what produced their text, and a score with no reference to its call is a number
+whose subject is unknown.
+
+The callable that produces an output SHALL return the recorded call, not its
+text alone. A callable returning text alone MUST be refused, naming the
+parameter, rather than coerced — coercing it would restore the unrecorded case
+without saying so, which is the state this requirement exists to end.
+
+A run's distinct generating models SHALL be reportable from its summary, so the
+question "what produced this run" is answerable without writing SQL against a
+database on another machine.
+
+#### Scenario: The call is recorded beside the score
+- **WHEN** a sample is generated and graded
+- **THEN** the recorded result references the model call that produced the output
+
+#### Scenario: A generator that returns only text
+- **WHEN** the callable returns a string rather than a recorded completion
+- **THEN** scoring is refused, naming the parameter, rather than recording a result whose generator is unknown
+
+#### Scenario: A run's generators are reportable
+- **WHEN** a scored run is summarized
+- **THEN** the distinct models behind its results are part of the summary

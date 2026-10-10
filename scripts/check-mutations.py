@@ -156,6 +156,28 @@ MUTATIONS = [
         "        *[!0]*) : ;;",
         PYTEST + [str(ROOT / "apps/api/tests/test_push_gate.py")],
     ),
+    Mutation(
+        "score-forgets-its-generator",
+        "10 Oct: eval_results.model_call_id existed from the first migration and "
+        "the INSERT never named it, so the curve could not refuse a week 1 "
+        "generated locally against a week 8 generated in the cloud. Writing the "
+        "column as NULL is the silent version of the same defect: it reads as "
+        "populated and the guard that reads it reads as holding.",
+        "apps/api/secondshift/evals/runner.py",
+        "json.dumps(judgement.scores), model_call_id,",
+        "json.dumps(judgement.scores), None,",
+        PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
+    ),
+    Mutation(
+        "curve-compares-across-models",
+        "10 Oct: the curve refused six ways and none of them was the model "
+        "changing between the two runs — the one difference the shortest path to "
+        "a week-8 number actually introduces, reported as the brain learning.",
+        "apps/api/secondshift/evals/runner.py",
+        "if earlier.generators != later.generators:",
+        "if False:",
+        PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
+    ),
 ]
 
 

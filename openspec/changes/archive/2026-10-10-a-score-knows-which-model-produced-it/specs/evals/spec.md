@@ -44,6 +44,7 @@ appears to mean:
 
 - the two runs pin different rubrics;
 - the two runs pin the same brain state, so nothing under test has changed;
+- either run has no results at all, having been recorded but never scored;
 - either run is incomplete, because a partial run is not comparable to a whole one;
 - the two runs were graded by different judges;
 - either run is synthetic;
@@ -53,6 +54,10 @@ appears to mean:
 - the two runs' outputs were produced by different models, because then the
   difference is the model rather than the brain, and the brain is what the
   measurement is about.
+
+Each condition SHALL be its own refusal with its own message. A reader of a
+refusal is deciding what to do next, and "recorded but never scored" and
+"scored but incomplete" call for different actions.
 
 Every difference it reports SHALL be accompanied by the spread of both runs. A
 difference smaller than the wider spread MUST NOT be presented as a change.
@@ -100,24 +105,3 @@ meant to describe the variation within them.
 #### Scenario: One run's generator is unrecorded
 - **WHEN** either run has results that reference no model call
 - **THEN** the comparison is refused, because the comparison cannot be shown to be between two states of one system rather than two systems
-
-### Requirement: The judge is configured, not fixed in code
-
-The scoring model SHALL be a configured value. The runner MUST work against any
-judge satisfying the interface, and MUST be exercisable without a real model.
-
-Scoring SHALL be reachable as a command, not only as a library call. A scoring
-path that exists only where tests call it cannot produce the result the system is
-built to report, and its absence is invisible from the command list.
-
-#### Scenario: A stub judge exercises the runner
-- **WHEN** the runner executes with a stub judge
-- **THEN** results are produced and recorded exactly as with a real one
-
-#### Scenario: No judge configured
-- **WHEN** scoring is attempted with no judge configured
-- **THEN** it fails clearly, naming what is missing, rather than recording unscored results as scored
-
-#### Scenario: Scoring is reachable from the command line
-- **WHEN** the operator lists the eval commands
-- **THEN** scoring is among them, and running it with no judge configured exits non-zero naming what is missing

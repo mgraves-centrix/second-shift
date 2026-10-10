@@ -37,19 +37,26 @@ takes a callable returning `str`. The provider layer already returns
 specifically so "a caller receives the recorded call's id." The eval runner is
 the one caller that throws it away.
 
-**And the scoring path has no entry point.** `python -m secondshift.evals`
-offers `seed`, `activate`, `baseline`, `summarize`, `status` and `curve`.
-`EvalRunner.score` is called from nowhere but `apps/api/tests/test_evals.py`.
-The method that produces the submission's number is reachable only from the test
-suite — the orphan shape this project checks for, in the one place where it costs
-the most.
+**And the scoring path has no entry point** — deliberately, which is worth
+knowing before reaching for it. `python -m secondshift.evals` offers `seed`,
+`activate`, `baseline`, `summarize`, `status` and `curve`, and that module's
+docstring says scoring is "deliberately absent from this entry point until a
+judge is chosen and a generating provider is configured." That was right: the
+baseline needs neither, which is why the two are separable at all.
+
+It stops being right the moment a judge exists, and `EvalRunner.score` is
+meanwhile called from nowhere but `apps/api/tests/test_evals.py` — the method
+that produces the submission's number, reachable only from the test suite.
+**The command belongs with the judge, not here.** Added now it could only
+refuse, which is the same unreachable shape wearing a different costume; added
+with the judge, the entry point and the thing it calls arrive together. It is
+recorded here because this is the change that went looking.
 
 ## What this change is not
 
-- **Not a judge.** No implementation of the `Judge` protocol calls a model, and
-  this change does not add one. `score` will refuse when none is configured,
-  which is what it already does inside the runner; this makes that refusal
-  reachable from a shell instead of from a test.
+- **Not a judge, and not the `score` command.** No implementation of the `Judge`
+  protocol calls a model, and this change does not add one. The command that
+  would call it goes with it, for the reason given above.
 - **Not a migration.** `model_call_id` and `output_path` are already columns.
 - **Not a change to the threshold.** `config/evals/threshold.md` is fixed, and
   its hash is in the history. Nothing here touches what the bar is.
@@ -77,11 +84,7 @@ the most.
    - the two runs' outputs came from different models, because then the
      difference is the model and not the brain.
 
-5. **A `score` command**, so the path from a recorded baseline to a scored run
-   exists outside the test suite. It resolves the judge from configuration, and
-   exits non-zero naming what is missing when there is none.
-
-6. **Three documents stop disagreeing about the refusal count.**
+5. **Three documents stop disagreeing about the refusal count.**
    `docs/SPEC_ROADMAP.md` says the curve "refuses five ways",
    `docs/SUBMISSION.md` says six, and the code has six conditions across seven
    raise sites. After this change there are eight, and every figure that states
@@ -91,7 +94,8 @@ the most.
 
 - `apps/api/secondshift/evals/runner.py` — the `generate` contract,
   `_record_result`, `RunSummary`, two refusals in `curve`.
-- `apps/api/secondshift/evals/__main__.py` — the `score` command.
+- `apps/api/secondshift/evals/__main__.py` — `summarize` prints what produced a
+  run.
 - `apps/api/tests/test_evals.py` — every `score(...)` call site passes a
   callable returning `Completion`. **This is a contract change and those tests
   change with it**, which is the cost of the fix and is stated rather than
