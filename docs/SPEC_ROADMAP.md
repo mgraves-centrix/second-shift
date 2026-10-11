@@ -1293,6 +1293,28 @@ reserved ranges that must never route, so a port-80 connect test reports success
 against addresses that do not exist. Probe a port the shim does not intercept —
 22 or 2375 — or the answer is meaningless.
 
+**Re-tested 11 Oct, and the trap has grown: 443 is intercepted too.** This
+paragraph named only port 80, so a 443 probe looked like the safe one and cost
+the turn the paragraph exists to save. On 443, an address in the tailnet's
+shared range and two addresses from the reserved documentation and future-use
+blocks all report CONNECTED; on 22, 2375 and 8200 every one of them times out
+identically, tailnet range and reserved control alike. **Always probe with a
+reserved address as a control** — a connect that succeeds against an address
+that cannot exist is the shim answering, and that control is what turns a
+meaningless result into a conclusive one.
+
+Two further things differ from the 20 Sep container: there is **no `tailscale`
+binary at all** now, not merely a stopped daemon, and the proxy's `noProxy` list
+carries the tailnet's shared range — which means "do not relay this range", not
+"a route exists", and is a static default present whether or not a tailnet is.
+Use that entry as evidence of nothing.
+
+`pkgs.tailscale.com` and `login.tailscale.com` do answer, so the only missing
+piece is an auth key. That is a credential and a hard stop: a session does not
+obtain one. It is also not a small decision for somebody else to make quickly —
+joining a cloud sandbox to the tailnet gives it the home LAN, and ADR 0012 put
+the origin on the always-on machine deliberately.
+
 So the container build happens on a machine that runs containers, and the real
 night happens on the Spark, both driven from a session with a route to them.
 
