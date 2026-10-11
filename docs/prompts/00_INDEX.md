@@ -64,6 +64,12 @@ all three cases differs from the prompt in at least one decision.
 | 13 | `SUBMISSION.md` | the write-up. **`docs/NEBIUS_USAGE.md` was written 21 Sep**, with three claims marked not yet run and the query for each | 12 | — |
 | — | ~~`OPERATIONS.md`~~ | ✅ shipped 21 Sep — `python -m secondshift.ops`. The reboot and the on-machine restore are owed | — | — |
 | — | `ASR.md` | `providers/asr*`, spike F | — | everything |
+| — | `ENDGAME.md` | the order of what is left, and the machine session in full | — | nothing: it runs first |
+
+**`ENDGAME.md` is the one file here that is not one session.** It owns the
+ordering of the rest and the full prompt for the machine session, because that
+session unblocks everything else and the week-8 eval window — **Thu 15 to Wed
+21 Oct** — closes before the deadline does. Start there.
 
 **Two collision surfaces now, and the third is closed.** Two sessions must never
 both be in `apps/web/app/` or in `secondshift/night/`.
