@@ -213,6 +213,18 @@ MUTATIONS = [
         "if False:",
         PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
     ),
+    Mutation(
+        "judge-reads-the-first-object-not-the-last",
+        "11 Oct: the real checkpoint shows its work, so a judgement is preceded "
+        "by deliberation that can contain braces and can contain a drafted set "
+        "of scores the model then reconsiders. Taking the first object records "
+        "the number it talked itself out of, or parses `{interrogation}` out of "
+        "a sentence about the rubric.",
+        "apps/api/secondshift/evals/judge.py",
+        "                if depth == 0 and started is not None:",
+        "                if depth == 0 and started is not None and not found:",
+        PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
+    ),
 ]
 
 

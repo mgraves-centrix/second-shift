@@ -1434,6 +1434,74 @@ class TestTheJudgeIsAModel:
         assert "the answer text" in sent
         assert "the question" in sent
 
+    # -- the three wrapper shapes the real checkpoint has been observed to
+    # -- emit, on three different days. Invented shapes prove the extractor
+    # -- survives my imagination; these prove it survives the model.
+
+    def test_the_think_delimiter_shape(self, judge, vllm_stub, rubric):
+        """`docs/MODELS.md`: the reasoning is wrapped in `<think>...</think>`
+        inline in `content`, a structural delimiter rather than a prose marker,
+        because no reasoning parser is configured on the server.
+
+        The deliberation here carries braces, which is the part that matters: a
+        scan that counted them outside string state would close the object early
+        and parse a fragment.
+        """
+        vllm_stub.answers(
+            text="<think>The rubric says {interrogation} first. I will weigh it "
+            f"above voice.</think>\n{self._scores(interrogation=5)}"
+        )
+
+        judgement = judge.score(output="a", rubric=rubric.text, prompt="q")
+
+        assert judgement.scores["interrogation"] == 5
+
+    def test_the_bare_prose_shape(self, judge, vllm_stub, rubric):
+        """`docs/SPEC_ROADMAP.md`: one live call opened with the literal
+        `Here's a thinking process:` as prose, *not* inside the wrapper observed
+        hours earlier the same day. The wrapper is inconsistent between calls,
+        which is why the judge locates an object rather than stripping a
+        delimiter — a strip conditioned on `</think>` handles one of these two
+        and silently mangles the other.
+        """
+        vllm_stub.answers(
+            text="Here's a thinking process: the answer is specific and asks "
+            f"nothing back.\n\n{self._scores(interrogation=2)}"
+        )
+
+        judgement = judge.score(output="a", rubric=rubric.text, prompt="q")
+
+        assert judgement.scores["interrogation"] == 2
+
+    def test_an_unopened_close_delimiter(self, judge, vllm_stub, rubric):
+        """The same observation's second half: "the strip trimmed something — a
+        `</think>` did appear later". So a completion can carry a close with no
+        open, which is the shape that breaks a delimiter-based split worst — it
+        either deletes the answer or keeps all of the reasoning."""
+        vllm_stub.answers(
+            text=f"Weighing fit against actionability.</think>\n{self._scores(fit=1)}"
+        )
+
+        assert judge.score(output="a", rubric=rubric.text, prompt="q").scores["fit"] == 1
+
+    def test_scores_drafted_in_the_reasoning_do_not_win(
+        self, judge, vllm_stub, rubric
+    ):
+        """The realistic failure, and the reason the rule is *last* object.
+
+        A model that shows its work drafts the scores, reconsiders, and restates
+        them. Both drafts are valid JSON. Taking the first would record the
+        number the model talked itself out of.
+        """
+        vllm_stub.answers(
+            text="<think>First pass: "
+            + self._scores(voice=1)
+            + " — no, the voice is closer than that.</think>\n"
+            + self._scores(voice=4)
+        )
+
+        assert judge.score(output="a", rubric=rubric.text, prompt="q").scores["voice"] == 4
+
     def test_a_run_scored_by_the_model_records_it_as_the_judge(
         self, runner, rubric, vllm_stub, judge, generate
     ):
