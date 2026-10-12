@@ -12,7 +12,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { chromium, type Browser } from "playwright-core";
+import { chromium, type Browser, type Page } from "playwright-core";
 
 const WEB = resolve(import.meta.dirname, "..");
 const API = resolve(WEB, "..", "api");
@@ -58,8 +58,19 @@ function requireBuilt(): void {
   }
 }
 
-/** Seed one synthetic night into a fresh database and serve it. */
-export async function startOrchestrator(seed = 42): Promise<Orchestrator> {
+/**
+ * Seed one synthetic night into a fresh database and serve it.
+ *
+ * `profile` is pinned rather than probed, and that closes the one hole in this
+ * harness's claim to be hermetic: without it the served profile is whatever the
+ * host resolves to, so the same test reads `cloud` on a machine with no GPU and
+ * `spark` on the always-on one. Anything keyed to the profile — the demo label
+ * is — would then pass or fail by which machine ran it.
+ */
+export async function startOrchestrator(
+  seed = 42,
+  profile = "cloud",
+): Promise<Orchestrator> {
   requireBuilt();
   const dir = mkdtempSync(join(tmpdir(), "second-shift-e2e-"));
   const db = join(dir, "e2e.db");
@@ -79,7 +90,12 @@ export async function startOrchestrator(seed = 42): Promise<Orchestrator> {
     PYTHON,
     ["-m", "uvicorn", "secondshift.api.main:app", "--host", "127.0.0.1", "--port", String(port)],
     {
-      env: { ...process.env, SECOND_SHIFT_DB: db, SECOND_SHIFT_SYNTHETIC: "1" },
+      env: {
+        ...process.env,
+        SECOND_SHIFT_DB: db,
+        SECOND_SHIFT_SYNTHETIC: "1",
+        SECOND_SHIFT_PROFILE: profile,
+      },
       stdio: ["ignore", "ignore", "pipe"],
     },
   );
@@ -116,6 +132,37 @@ export async function startOrchestrator(seed = 42): Promise<Orchestrator> {
   throw new Error(
     `the orchestrator did not answer ${url}/capabilities within ${READY_WITHIN_MS / 1000}s:\n${stderr}`,
   );
+}
+
+/**
+ * Wait until the shell has hydrated, by waiting for the thing only hydration
+ * does.
+ *
+ * A static export serves the markup before any JavaScript runs, so waiting for
+ * an element to *exist* is satisfied by a page that cannot yet respond to a key
+ * or a click.
+ *
+ * The barrier is the shell's own capability fetch. `useDemoProfile` runs it in
+ * an effect on mount, so the response arriving proves React mounted and ran
+ * effects.
+ *
+ * **What this is actually for is asserting an absence.** A test that counts
+ * zero demo labels on a local profile passes just as well against a page whose
+ * effects have not run, so without this it proved nothing. It is not what fixed
+ * the keyboard tests: those were failing against a stale `out/`, which is the
+ * trap `scripts/gate.py` runs `build:clean` to prevent and which this author
+ * walked into anyway.
+ */
+export async function visitHydrated(page: Page, url: string): Promise<void> {
+  const settled = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/capabilities",
+    { timeout: 20_000 },
+  );
+  await page.goto(url);
+  await settled;
+  // One frame for the state update the response causes to be painted. Waited
+  // for by asking the renderer, not by sleeping.
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => done(null))));
 }
 
 /**

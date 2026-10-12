@@ -11,7 +11,12 @@ import { after, before, test } from "node:test";
 
 import type { Browser, Page } from "playwright-core";
 
-import { launchBrowser, startOrchestrator, type Orchestrator } from "./support.ts";
+import {
+  launchBrowser,
+  startOrchestrator,
+  visitHydrated,
+  type Orchestrator,
+} from "./support.ts";
 
 let orchestrator: Orchestrator;
 let browser: Browser;
@@ -21,7 +26,11 @@ before(async () => {
   orchestrator = await startOrchestrator();
   browser = await launchBrowser();
   page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-  await page.goto(`${orchestrator.url}/night/`);
+  // Hydrated, not merely served. Waiting for the slider to exist is satisfied
+  // by the exported markup, so every keyboard test below was racing hydration —
+  // and the race was invisible, because a playhead that has not hydrated sits
+  // exactly where a broken one would.
+  await visitHydrated(page, `${orchestrator.url}/night/`);
   await page.getByRole("slider").waitFor({ timeout: 15_000 });
 });
 
