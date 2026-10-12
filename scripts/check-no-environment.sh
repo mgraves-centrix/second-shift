@@ -21,6 +21,18 @@ PATTERNS=(
   '/home/[a-z][a-z0-9_-]+'            # someone's home directory
   '/Users/[a-z][a-z0-9_-]+'
   '[A-Za-z]:\\{1,2}Users\\{1,2}[a-z][a-z0-9_-]+'  # a Windows profile path, escaped or not
+  # A machine named in an ssh invocation. The patterns above catch a tailnet
+  # name only in its full `*.tail____.ts.net` form, and MagicDNS means the short
+  # name is what anyone actually types. That gap is worse than it looks here:
+  # the always-on machine's short name is also this project's compute-profile
+  # name, so the leaked token is indistinguishable from a domain term that
+  # appears legitimately in hundreds of places. Nothing can catch it by its
+  # spelling; this catches it by its position.
+  #
+  # Anchored to the start of a command so prose about ssh is not a finding.
+  # Deliberately narrow: it does not catch a host that follows flags
+  # (`ssh -o ... host`). Use `<spark>` and this never fires.
+  '(^|[;&|(]|\$\()[[:space:]]*ssh[[:space:]]+[a-z0-9]'
 )
 
 status=0
@@ -30,7 +42,7 @@ for pattern in "${PATTERNS[@]}"; do
   # git grep defaults to tracked files only, which meant a brand-new file passed
   # the check right up until the moment it was added — the one moment it matters.
   hits=$(git -C "$ROOT" grep -InE --untracked "$pattern" -- . ':!package-lock.json' ':!scripts/check-no-environment.sh' 2>/dev/null \
-         | grep -vE '<host>|<tailnet>|<spark-host>|REPLACE_USER|\$HOME|\$\{?USER' || true)
+         | grep -vE '<host>|<tailnet>|<spark>|<spark-host>|REPLACE_USER|\$HOME|\$\{?USER' || true)
   if [ -n "$hits" ]; then
     echo "environment detail found ($pattern):"
     echo "$hits" | sed 's/^/  /'

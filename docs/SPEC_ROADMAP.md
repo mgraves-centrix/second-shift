@@ -1309,8 +1309,16 @@ carries the tailnet's shared range — which means "do not relay this range", no
 "a route exists", and is a static default present whether or not a tailnet is.
 Use that entry as evidence of nothing.
 
+**Confirmed 12 Oct: the laptop has SSH to the machine.** So a session there can
+drive every step a machine session owes, remotely, and the cloud container's
+lack of a route stops being the binding constraint — what remains is that the
+database, the brain and the model are all on the machine, so the work executes
+there whatever drives it. `docs/prompts/ENDGAME.md` carries the four traps that
+route brings with it, the reboot dropping its own connection being the one that
+cannot be worked around.
+
 `pkgs.tailscale.com` and `login.tailscale.com` do answer, so the only missing
-piece is an auth key. That is a credential and a hard stop: a session does not
+piece for a cloud session would be an auth key. That is a credential and a hard stop: a session does not
 obtain one. It is also not a small decision for somebody else to make quickly —
 joining a cloud sandbox to the tailnet gives it the home LAN, and ADR 0012 put
 the origin on the always-on machine deliberately.

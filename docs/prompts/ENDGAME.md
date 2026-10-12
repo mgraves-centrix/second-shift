@@ -49,7 +49,8 @@ here; it moves.
 
 1. **The machine session.** Everything below. Run it first, and run the eval
    inside it — the generation and the scoring both need the local reasoner, so
-   splitting them across sessions buys nothing and risks the window.
+   splitting them across sessions buys nothing and risks the window. It runs on
+   the machine or over SSH from the laptop; see *Where this session runs*.
 2. **`SUBMISSION.md`** (the prompt, not the document): rewrite the measured
    table from the rows the machine session produced, and strike the claims that
    stayed unrun. The document already names its own unrun rows; the job is
@@ -67,6 +68,39 @@ here; it moves.
 Read `openspec/constitution.md`, `CLAUDE.md`, `docs/SPEC_ROADMAP.md`'s *Owed
 verification* section and `docs/operations/RECOVERY.md` first. They are the
 rules, not background.
+
+## Where this session runs, confirmed 12 Oct
+
+**On the always-on machine, or from a session on the laptop that drives it over
+SSH.** Both work; neither is a cloud session.
+
+A cloud container has no route — tested, and the test is recorded under *Owed
+verification*, including the trap that makes a naive probe report success. The
+laptop has SSH to the machine, so a session there can run the steps below
+remotely. What it cannot do is run them *locally*: the database, the brain
+repository and the model all live on the machine, so every command below
+executes there whatever drives it.
+
+Four things about the SSH route specifically, each of which will bite:
+
+- **Write `<spark>`, never the machine's name.** The repository is public.
+  `scripts/check-no-environment.sh` now enforces this for ssh invocations —
+  added 12 Oct, because the short MagicDNS name is also this project's
+  compute-profile name, so no pattern can catch it by spelling and the check
+  catches it by position instead.
+- **`ops doctor` checks data ownership, and over SSH you are whoever you logged
+  in as.** That check exists because a service running as the wrong account
+  corrupted the write-ahead log on that machine. Running it as a different
+  account than the services use reports on the wrong thing — confirm who owns
+  the database and who the units run as before believing the result.
+- **The reboot drops the connection.** Step 8 ends the session that issued it.
+  Expect the disconnect, do not read it as a failure, and reconnect to verify
+  what came back up rather than inferring it from a command that never
+  returned.
+- **A real night outlives an SSH session.** Do not run step 7 in the foreground
+  of a connection that can close. Use the installed timer, or `systemd-run`, and
+  then watch `ops night-status` — a night killed by a closing terminal leaves a
+  run to quarantine and teaches nothing.
 
 ## What already exists — do not invent any of it
 
