@@ -29,10 +29,15 @@ PATTERNS=(
   # appears legitimately in hundreds of places. Nothing can catch it by its
   # spelling; this catches it by its position.
   #
-  # Anchored to the start of a command so prose about ssh is not a finding.
+  # Anchored to the start of a command so prose about ssh is not a finding. The
+  # backtick is in that set because reports are markdown and a command inside
+  # one is written inline — `ssh <spark> 'uptime'` — which the first version of
+  # this pattern walked straight past. Prose like "the `ssh` under set -e" still
+  # does not fire, because a name has to follow whitespace.
+  #
   # Deliberately narrow: it does not catch a host that follows flags
   # (`ssh -o ... host`). Use `<spark>` and this never fires.
-  '(^|[;&|(]|\$\()[[:space:]]*ssh[[:space:]]+[a-z0-9]'
+  '(^|[;&|(`'"'"'"]|\$\()[[:space:]]*ssh[[:space:]]+[a-z0-9]'
 )
 
 status=0

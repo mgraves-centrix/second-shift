@@ -20,6 +20,10 @@ set -uo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
 
+# Read once and reuse. Two passes need these refs, and stdin only gives them up
+# the first time.
+payload="$(cat)"
+
 # A deletion has no tree to check. `git push --delete` sends an all-zero local
 # hash, and making it wait two minutes is the friction that gets a hook
 # uninstalled.
@@ -29,9 +33,85 @@ while read -r _local_ref local_sha _remote_ref _remote_sha; do
     case "${local_sha}" in
         *[!0]*) only_deletions=false ;;
     esac
-done
+done <<EOF
+${payload}
+EOF
 if [ "${only_deletions}" = true ]; then
     exit 0
+fi
+
+# Where a machine session leaves what it found. A report is prose: it changes no
+# code, so the suites, the build, the browser test and the mutations say nothing
+# about it, and a session on the always-on machine should not need a web
+# toolchain to hand back a result.
+#
+# The alternative was teaching those sessions `git push --no-verify`, which
+# defeats the one mechanism that stopped two red commits in three days. This is
+# narrower: it is scoped by path, it runs the checks that DO apply to prose in a
+# public repository, and it refuses the moment a push touches anything else.
+REPORTS_DIR="docs/operations/reports/"
+
+# Every path this push would introduce, or failure if that cannot be determined.
+# Returning failure means the full gate runs, which is the safe direction: a
+# push whose contents are unknown is not a push known to be reports.
+pushed_paths() {
+    local local_sha remote_sha base
+    while read -r _local_ref local_sha _remote_ref remote_sha; do
+        [ -z "${local_sha:-}" ] && continue
+        case "${local_sha}" in *[!0]*) ;; *) continue ;; esac
+        case "${remote_sha:-}" in
+            # An existing branch: everything since what the remote has.
+            *[!0]*) base="${remote_sha}" ;;
+            # A new branch has no remote side, so compare against the trunk it
+            # forked from. No trunk reachable means no fast path.
+            *) base="$(git -C "${ROOT}" merge-base "${local_sha}" \
+                        "${REPORTS_BASE_REF:-origin/main}" 2>/dev/null)" || return 1 ;;
+        esac
+        [ -n "${base}" ] || return 1
+        git -C "${ROOT}" diff --name-only "${base}" "${local_sha}" 2>/dev/null || return 1
+    done <<EOF
+${payload}
+EOF
+}
+
+reports_only() {
+    local paths path
+    paths="$(pushed_paths)" || return 1
+    # Nothing listed means the paths could not be read, which is not the same
+    # as a push that carries only reports.
+    [ -n "${paths//[[:space:]]/}" ] || return 1
+    while IFS= read -r path; do
+        [ -z "${path}" ] && continue
+        case "${path}" in
+            "${REPORTS_DIR}"*) ;;
+            *) return 1 ;;
+        esac
+    done <<EOF
+${paths}
+EOF
+    return 0
+}
+
+if reports_only; then
+    echo "pre-push: a report only. Running the source checks, not the suites." >&2
+    # These two and not the drift check: a report carries no derived figure and
+    # no change bookkeeping, and these are the two that apply to prose in a
+    # public repository. Both are shell, so this path needs git and bash and
+    # nothing else.
+    if "${ROOT}/scripts/check-no-environment.sh" && \
+       "${ROOT}/scripts/check-american-english.sh"; then
+        exit 0
+    fi
+    cat >&2 <<'WHYREPORT'
+
+pre-push: refusing a report. The check above says what it found.
+
+A report is pushed to a public repository, so a hostname, a tailnet name, a
+private address or a home path in it is the one thing this path still checks
+for. Replace it with a placeholder — `<spark>`, `<host>`, `$HOME` — rather than
+reaching for --no-verify.
+WHYREPORT
+    exit 1
 fi
 
 echo "pre-push: running the gate. About two minutes." >&2

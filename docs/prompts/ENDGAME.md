@@ -249,6 +249,28 @@ Stop, record the question with your recommendation, and move on:
 - Anything in `NOT_BUILDING.md`.
 - A refusal you are tempted to relax.
 
+## How to hand the report back
+
+**Push it, do not paste it.** A session on the machine, or on the laptop driving
+it, runs somewhere its findings are invisible to whoever asked — and relaying by
+hand works once, not for a sequence, and the endgame is a sequence.
+
+```bash
+git checkout -b reports/$(date +%F)-machine-session
+# write docs/operations/reports/$(date +%F)-machine-session.md
+git add docs/operations/reports/ && git commit && git push -u origin HEAD
+```
+
+`docs/operations/reports/README.md` is the contract. The short version:
+one file, a branch rather than the trunk, placeholders always, and **say what
+did not work** — a refusal, a missing file, an unreachable reasoner and a step
+not attempted are all findings.
+
+`.githooks/pre-push` runs the two source checks on a report-only push and not
+the suites, so this needs git and bash rather than a web toolchain. The
+exemption is scoped by path and refuses the moment the push touches anything
+else; a mutation holds it to that. Do not reach for `--no-verify`.
+
 ## Report
 
 1. Which of the nine steps produced evidence, and what the evidence was.

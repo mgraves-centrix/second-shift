@@ -157,6 +157,18 @@ MUTATIONS = [
         PYTEST + [str(ROOT / "apps/api/tests/test_push_gate.py")],
     ),
     Mutation(
+        "report-exemption-wider-than-its-name",
+        "12 Oct: the push gate skips the suites for a push that carries only a "
+        "machine-session report, because none of them says anything about "
+        "prose. A path check that stops refusing anything else turns "
+        "docs/operations/reports/ into the way to push code unchecked — which "
+        "is worse than the --no-verify habit the exemption exists to avoid.",
+        ".githooks/pre-push",
+        '            "${REPORTS_DIR}"*) ;;\n            *) return 1 ;;',
+        '            "${REPORTS_DIR}"*) ;;\n            *) ;;',
+        PYTEST + [str(ROOT / "apps/api/tests/test_push_gate.py")],
+    ),
+    Mutation(
         "score-forgets-its-generator",
         "10 Oct: eval_results.model_call_id existed from the first migration and "
         "the INSERT never named it, so the curve could not refuse a week 1 "
