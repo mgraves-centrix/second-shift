@@ -19,11 +19,11 @@ Overnight, a machine you own researches it and builds something. In the morning
 you open it and ask what happened. You get a briefing, and then it asks you the
 questions it could not answer for itself:
 
-> *The critic ranked the third build above the first. Keep it, or do you want
-> the one that matched the brief more literally?*
+> *The critic ranked the third build above the first. Keep its ranking, or the
+> order they were generated in?*
 >
-> *Should a note that spans two topics be filed under both, or does that make
-> the index useless?*
+> *Should a note that spans two topics be filed under both, or under the one it
+> is mostly about?*
 
 Each question carries the stage it blocked and its rationale, and **each says
 whether answering it will send anything off the machine**. Your answer becomes a
@@ -31,7 +31,10 @@ tracked decision, and the next night reads it.
 
 > Those two are from the reproducible demo, not from a real night — they
 > regenerate with `--seed 42` and ship with a `[synthetic]` prefix that is
-> stripped above only for readability. The real night of 16 Sep produced one
+> stripped above only for readability. They are now verbatim from
+> `packages/seed/secondshift_seed/content.py`; until 16 Oct both second clauses
+> were paraphrased, so running the seed produced different text than this
+> document showed inside quotation marks. The real night of 16 Sep produced one
 > real question; it is on the always-on machine and is somebody's actual idea,
 > so it is not quoted here.
 
@@ -318,8 +321,24 @@ None of this is tidied, and it is not left in by neglect.
 - **A drift gate was added because documents kept going stale**, and its own
   addition immediately made ten of them say "ten gates". Every count of that
   kind is now derived from the repository rather than typed.
+- **Three of those derived counts were checked by nothing, in this file.** A
+  marker binds to the nearest number on its own line; a paragraph reflow had
+  left three figures one line up, so the gate matched nothing and reported the
+  document clean. Two were stale. The bullet above was therefore true in
+  intent and false in fact for weeks, which is the exact shape it describes.
+  An unbound marker is now a failure rather than a skip.
+- **This document showed a verdict with invented numbers.** A monospace block
+  gave `+4.17`, `5 of 6`, `improved` for a measurement that has never run, with
+  nothing marking it as an illustration. It now shows the shape with
+  placeholders.
+- **And it paraphrased its own demo inside quotation marks.** Both questions
+  quoted above had invented second clauses, in a passage telling the reader they
+  regenerate from `--seed 42`. They are verbatim now.
 
 A system that records its own failures is making a claim a polished one cannot.
+Three of the bullets above were found on 16 Oct by reading this file against the
+code it describes — which is the practice the claim actually rests on, and the
+reason the list keeps growing after the mechanisms are in place.
 
 ---
 
