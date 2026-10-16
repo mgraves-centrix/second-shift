@@ -81,6 +81,23 @@ consumer is same-origin on one machine for one person (`docs/decisions/0013`);
 the day that stops being true, the capability with the new consumer carries the
 guard on its own router.
 
+**On 10 Oct it overruled a decision this project had already made.** ADR 0006
+bound the eval judge to a cloud model on 27 Aug. ADR 0010 then decided, on
+2 Sep, that brain topic files carry `local-only`, with the reasoning that a file
+distilled from `local-only` material inherits the restriction — "treating the
+output as less restricted than its most restricted input would launder the
+policy." An eval answer is generated from those files. So the cloud judge had
+been impermissible for five weeks, and nobody had noticed, because nothing in
+the system had ever scored anything: a dead clause is never executed, so it
+never fails.
+
+`docs/decisions/0015` retires it. The judge is the local reasoner, and the
+policy is a constant in the code rather than configuration, because a value
+that could be set to `cloud-assisted` is the switch 0010 refused to build.
+**That is the difference between a constraint and a paragraph** — it cost the
+better instrument, a 550B grader traded for a 30B one, and the trade is recorded
+with what it cost rather than argued away.
+
 ---
 
 ## What runs on Nebius, and why that split
@@ -165,9 +182,19 @@ echo reasoner returns its own input.
 
 ## The learning claim, and what would falsify it
 
-The centerpiece is the same fixed prompts, scored in week 1 and week 8, against
-one pinned rubric and two pinned brain states. If the brain learned something,
-the same questions get better answers.
+The interview is the product; this is how one claim inside it gets checked.
+*It gets better at being me* is the claim, and the check is the same fixed
+prompts scored in week 1 and week 8 against one pinned rubric and two pinned
+brain states. If the brain learned something, the same questions get better
+answers.
+
+**As of 16 Oct that comparison has not been run.** The week-1 baseline is
+recorded and the only eval run in the system still reads
+`judge_model = 'awaiting-scoring'`. Week 8 is 15–21 Oct, and running it needs a
+session on the always-on machine, where the model, the database and the brain
+are. What follows is therefore about the apparatus, not about a result — and the
+apparatus is the part worth reading, because it was built to make the result
+hard to fake before there was a result to fake.
 
 **The bar was fixed on 23 Sep, while nothing had been scored.** At that moment
 the only eval run in the system read `judge_model = 'awaiting-scoring'`, so there
@@ -186,17 +213,31 @@ support the negative claim either.
 Two things make that checkable rather than assertable. The threshold's addition
 is in the history — `git log --diff-filter=A -- config/evals/threshold.md`
 against the commit that records the run — and its content hash prints beside the
-verdict every time:
+verdict every time, so a bar edited after the fact is visible in the output
+rather than only in the history.
+
+The verdict's shape, **with invented numbers, because there is no result yet**:
 
 ```
-  per prompt +4.17  standard error 0.83  5 of 6 agreeing
+  per prompt <mean>  standard error <se>  <k> of <n> agreeing
   bar: 2 standard errors and 67% agreeing, fixed 2026-09-23 (998120e365b6)
 
-  VERDICT: improved
+  VERDICT: <improved | regressed | no improvement shown>
 ```
 
+The hash is real and checkable today: `sha256sum config/evals/threshold.md`.
+The numbers are placeholders on purpose. An earlier draft of this document put
+plausible figures there — `+4.17`, `5 of 6`, `improved` — and nothing marked
+them as an illustration. In a section about a measurement that has not run, a
+number in a monospace block is something a reader can quote. That is the same
+defect as the seeded demo questions this document used to present as the
+product's output, found the same way: by re-reading our own claims against what
+had actually happened.
+
 **The same arithmetic runs either way.** If it comes out the other direction,
-this document will say the brain got worse, with the same prominence.
+this document will say the brain got worse, with the same prominence. And if it
+does not run before the deadline, this section will say that, which is what it
+says now.
 
 The comparison also refuses, rather than warns, in 10 <!-- derived: matches apps/api/secondshift/evals/runner.py raise NotComparable\( --> cases where the
 number would mean something other than it looks like: different rubrics,
