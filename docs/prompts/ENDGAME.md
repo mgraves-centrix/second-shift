@@ -69,6 +69,46 @@ Read `openspec/constitution.md`, `CLAUDE.md`, `docs/SPEC_ROADMAP.md`'s *Owed
 verification* section and `docs/operations/RECOVERY.md` first. They are the
 rules, not background.
 
+## Starting it — the mechanics
+
+**You do not need Claude on the machine to get the most valuable result.** Step 5
+below is four shell commands, and what it produces is something a person can
+read and paste. Decide between these on how much judgment you want delegated,
+not on what the file assumes:
+
+| | What it buys | What it costs |
+|---|---|---|
+| **A terminal, no Claude** | Step 5 in about fifteen minutes. Enough to answer whether `ModelJudge` survives a real completion, which is what the week-8 window turns on | Everything after step 5 is yours to sequence, and step 8's reconnect is manual |
+| **`claude` in the clone on the machine** | All nine steps, adapting to what each one returns — which matters most at step 6, where a refused judgement is a finding about the prompt rather than a failure | A session running commands on the always-on machine, so read the boundaries first |
+| **`claude` on a laptop, over SSH** | The steps that are pure commands | Cannot do the reboot, the NAS backup or the container build well, and the four traps below all apply |
+
+```bash
+cd ~/second-shift && git pull origin main    # evals score only exists since 10 Oct
+claude
+```
+
+Then paste this file. The clone on the machine already has a working virtual
+environment, because it has been running nights — a **fresh** clone needs the
+bootstrap in `docs/development/GATES.md` first, and the gate refuses by name
+rather than guessing when it is missing.
+
+### Handing the result back
+
+Push it; do not paste it. `docs/operations/reports/README.md` is the contract.
+
+```bash
+git checkout -b reports/$(date +%F)-machine-session
+# write docs/operations/reports/$(date +%F)-machine-session.md
+git config core.hooksPath .githooks    # per clone; without it no check runs
+git add docs/operations/reports/ && git commit && git push -u origin HEAD
+```
+
+A push touching only that directory runs the two source checks rather than the
+suites, so this needs git and bash and not a web toolchain. **If it is refused
+it will be a hostname or a home path** — use `<spark>` or `~/...` rather than
+`--no-verify`. The machine's short name is also this project's compute-profile
+name, so nothing can catch it by spelling and the check catches it by position.
+
 ## Where this session runs, confirmed 12 Oct
 
 **On the always-on machine, or from a session on the laptop that drives it over
