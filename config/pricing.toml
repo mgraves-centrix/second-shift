@@ -60,7 +60,12 @@ effective_from = "2026-03-01"
 prompt_usd_per_mtok = 0.15
 completion_usd_per_mtok = 0.45
 
-# --- Nemotron 3 Ultra — frontier turns and the pinned eval judge --------------
+# --- Nemotron 3 Ultra — frontier turns ----------------------------------------
+# Was "and the pinned eval judge" until 16 Oct. ADR 0015 moved the judge off
+# Token Factory on 10 Oct: an eval answer is generated from brain topic files,
+# which carry local-only, so a cloud judge was never permissible. The rate stays
+# because frontier turns still bind here; a rate is never deleted, only
+# superseded by a later effective_from.
 
 [[rate]]
 provider = "token-factory"
