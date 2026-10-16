@@ -46,6 +46,16 @@ _DERIVED = re.compile(
     r"(\d[\d,]*)(?:[^\d<\n]*?)<!--\s*derived:\s*(\w+)\s+(\S+)(?:\s+(.*?))?\s*-->"
 )
 
+#: A marker, with or without a number bound to it. `_DERIVED` cannot span a
+#: newline — deliberately, since the nearest number is the claim and a search
+#: across lines would bind the wrong one — so this is how a marker that bound to
+#: nothing gets noticed rather than skipped.
+#: `\w` after the colon, so prose *about* the syntax is not a marker. An
+#: archived task list reads "over `<!-- derived: ... -->` markers only", and the
+#: first version of this reported it as inert — which would have taught whoever
+#: read the output to distrust it.
+_MARKER = re.compile(r"<!--\s*derived:\s*\w")
+
 
 def tree_entries(doc: Path) -> list[tuple[str, bool]]:
     """Every path the tree asserts, and whether it is marked planned."""
@@ -113,6 +123,16 @@ def check_derived(files: list[Path]) -> list[str]:
     guessed at: this repository's prose is full of real numbers that derive from
     nothing in it — five rubric dimensions, six night stages — and a checker
     that tried to tell them apart would be wrong often enough to be turned off.
+
+    **The converse is a failure, not a skip.** A marker with no number on its
+    line binds to nothing, so this said nothing about it — and said nothing
+    about saying nothing. Three markers in `docs/SUBMISSION.md` had been inert
+    that way since they were written, because a paragraph reflowed and left the
+    figure on the line above; two of them were stale, and this gate reported
+    the document clean every time. `check-mutations.py` already refuses the
+    same shape — "a mutation whose target no longer appears exactly once is a
+    failure, not a skip" — for the same reason: a guard that quietly stops
+    applying is worse than no guard, because the summary still reassures.
     """
     problems = []
     for path in files:
@@ -124,7 +144,14 @@ def check_derived(files: list[Path]) -> list[str]:
             # that is not there has no claims in it.
             continue
         for line_no, line in enumerate(path.read_text().splitlines(), 1):
-            for claimed, kind, target, pattern in _DERIVED.findall(line):
+            bound = _DERIVED.findall(line)
+            if _MARKER.search(line) and not bound:
+                problems.append(
+                    f"{path.relative_to(ROOT)}:{line_no}: a derived marker with "
+                    "no number on its line, so it checks nothing. Put the "
+                    "figure and its marker on one line."
+                )
+            for claimed, kind, target, pattern in bound:
                 stated = int(claimed.replace(",", ""))
                 try:
                     actual = derive(kind, target, pattern)

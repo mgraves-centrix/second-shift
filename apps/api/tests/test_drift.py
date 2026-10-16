@@ -310,3 +310,58 @@ def test_this_repository_passes_its_own_check():
     )
 
     assert result.returncode == 0, result.stderr
+
+
+class TestAMarkerThatBindsToNothing:
+    """A derived marker binds to the nearest number on its own line, so a
+    paragraph reflow that leaves the figure on the line above makes the marker
+    inert — and the old checker matched nothing, reported nothing, and called
+    the document clean. Three markers in `docs/SUBMISSION.md` had been in that
+    state since they were written, two of them stale."""
+
+    def test_a_marker_with_its_number_on_the_line_above_is_a_finding(self, repo):
+        root = repo(extra={"docs/COUNT.md": (
+            "Across the project there are 2\n"
+            "capabilities <!-- derived: count openspec/specs/*/ --> today.\n"
+        )})
+        _checker_for(root)
+
+        result = run(root)
+
+        assert result.returncode == 1
+        assert "binds to nothing" in result.stderr or "checks nothing" in result.stderr
+
+    def test_a_bound_marker_is_still_checked_on_its_value(self, repo):
+        """The pre-existing behavior, asserted beside the new one: the point is
+        a marker that binds and disagrees, not merely one that binds."""
+        (tmp := repo(extra={"docs/COUNT.md":
+            "1 capability <!-- derived: count openspec/specs/*/ --> exists.\n"}))
+        (tmp / "openspec" / "specs" / "alpha").mkdir()
+        (tmp / "openspec" / "specs" / "beta").mkdir()
+        _checker_for(tmp)
+
+        result = run(tmp)
+
+        assert result.returncode == 1
+        assert "says 1, but count openspec/specs/*/ is 2" in result.stderr
+
+    def test_prose_about_the_syntax_is_not_a_marker(self, repo):
+        """The false-positive case that decides whether anybody keeps the check.
+        An archived task list reads "over `<!-- derived: ... -->` markers only",
+        and the first version of this reported it."""
+        root = repo(extra={"docs/NOTE.md":
+            "The check runs over `<!-- derived: ... -->` markers only.\n"})
+        _checker_for(root)
+
+        result = run(root)
+
+        assert result.returncode == 0, result.stderr
+
+    def test_a_marker_bound_and_correct_passes(self, repo):
+        root = repo(extra={"docs/COUNT.md":
+            "0 capabilities <!-- derived: count openspec/specs/*/ --> so far.\n"})
+        _checker_for(root)
+
+        result = run(root)
+
+        assert result.returncode == 0, result.stderr

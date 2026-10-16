@@ -131,9 +131,27 @@ MUTATIONS = [
         "that read bare numbers would fire on five rubric dimensions and six "
         "night stages, and a check with false positives is one people suppress.",
         "scripts/check-drift.py",
-        'for claimed, kind, target, pattern in _DERIVED.findall(line):',
-        'for claimed, kind, target, pattern in (_DERIVED.findall(line) or '
-        '[(n, "lines", "README.md", "") for n in re.findall(r"\\b(\\d+)\\b", line)]):',
+        # Anchored to the binding rather than the loop, after 16 Oct moved the
+        # findall into its own statement so an unbound marker could be noticed.
+        # The runner reported that itself — "its target appears 0 times; the
+        # code moved" — which is the whole reason it fails instead of skipping.
+        '            bound = _DERIVED.findall(line)',
+        '            bound = _DERIVED.findall(line) or '
+        '[(n, "lines", "README.md", "") for n in re.findall(r"\\b(\\d+)\\b", line)]',
+        PYTEST + [str(ROOT / "apps/api/tests/test_drift.py")],
+    ),
+    Mutation(
+        "drift-skips-a-marker-that-binds-to-nothing",
+        "16 Oct: a derived marker binds to the nearest number on its own line, "
+        "so a paragraph reflow that leaves the figure one line up makes it "
+        "inert. Three markers in docs/SUBMISSION.md had been in that state "
+        "since they were written — two of them stale, at 12 mutations against "
+        "19 and 14 decision records against 15 — and this gate called the "
+        "document clean every time. A guard that quietly stops applying is "
+        "worse than no guard, because the summary still reassures.",
+        "scripts/check-drift.py",
+        "            if _MARKER.search(line) and not bound:",
+        "            if False:",
         PYTEST + [str(ROOT / "apps/api/tests/test_drift.py")],
     ),
     Mutation(

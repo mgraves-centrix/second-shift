@@ -102,29 +102,66 @@ with what it cost rather than argued away.
 
 ## What runs on Nebius, and why that split
 
-`docs/NEBIUS_USAGE.md` is the evidence document. The short version:
+`docs/NEBIUS_USAGE.md` is the evidence document. **This section separates the
+split as decided from the split as exercised, because they are not the same and
+the measured table below says so.**
 
-**Serverless Jobs run the build stage, fanned out to three to five parallel
-variants, ranked afterward by the critic.** That is the strongest claim available
-because it is the thing one DGX Spark *cannot* do. The parallelism is not a
-speed-up — it is why the artifact is better, because the critic gets alternatives
-to choose between instead of one draft to accept.
+### Decided, and not yet exercised
 
-**Token Factory runs the research-synthesis, architect and critic turns** on
-`cloud-assisted` ideas: long-context work against a quality bar where a 3B-active
-local model is the wrong tool rather than a slower one.
+**Serverless Jobs are to run the build stage, fanned out to three to five
+parallel variants, ranked afterward by the critic** (`docs/decisions/0004`).
+That is the strongest claim available because it is the thing one DGX Spark
+*cannot* do, and the parallelism is not a speed-up — it is why the artifact
+would be better, because the critic gets alternatives to choose between instead
+of one draft to accept.
 
-**Everything else is local on every profile** — capture, ASR, embedding,
-retrieval, redaction, the orchestrator, every database write, and all reasoning
-for `local-only` ideas.
+**It has not run.** `providers/` contains no Nebius module;
+`openspec/changes/2026-09-02-add-nebius-executor/` stands at 3 of 23 tasks, all
+three of them decisions. What exists is the interface the night calls
+(`Executor`), the schema that would record the fan-out, and a credential
+verified end to end on 2 Sep — a hand-built RS256 JWT exchanged for a real
+access token, which then authorized `GET /ai/v1/jobs` with a 200 and an empty
+list. What is missing is the client, and a session on the machine that holds the
+key.
 
-**Every model in the runtime path is an NVIDIA open model** — Nemotron 3.5
-Lightning locally, Nemotron 3 Super and Ultra on Token Factory, Nemotron Speech
-Streaming for ASR, Llama Nemotron Embed for retrieval, Magpie for TTS.
-`docs/MODELS.md` binds each role to a checkpoint and names the ADR that chose it.
+**Token Factory is to run the research-synthesis, architect and critic turns**
+on `cloud-assisted` ideas: long-context work against a quality bar where a
+3B-active local model is the wrong tool rather than a slower one. Its rates were
+read from the console on 27 Aug and are in `config/pricing.toml`, with batch at
+exactly half. No cloud `Reasoner` is implemented either, and on 10 Oct that
+stopped being only a gap: `docs/decisions/0015` found that brain-derived text
+cannot reach a remote provider at all, so the eval judge that was bound to Token
+Factory is now local.
 
-Costs are **views over recorded rows**, never stored numbers, and every view
-excludes synthetic rows:
+**Nothing is stubbed to close either gap**, and that is the deliberate part. A
+stub executor returning plausible job results writes `model_calls` rows
+indistinguishable from a real fan-out — and that fan-out is the entire evidence
+for the claim. Every other stand-in here is visibly inert: the echo reasoner
+returns its own input.
+
+### Running now
+
+**Everything else is local, on every profile** — capture, embedding, retrieval,
+redaction, the orchestrator, every database write, and all reasoning for
+`local-only` ideas. Two real nights ran against the live local reasoner on
+16 Sep and a six-of-six night with research on 17 Sep.
+
+ASR and TTS are in neither list: the speech spike has not run and no
+`Transcriber` is implemented. Text capture has been live since 28 Aug, so voice
+gates nothing — but it is not in the runtime path, and the model list below is
+what each role is *bound* to rather than what each has done.
+
+**Every model bound to a role is an NVIDIA open model, and no third-party LLM
+appears anywhere in the runtime path** — Nemotron 3.5 Lightning locally,
+Nemotron 3 Super and Ultra on Token Factory, Nemotron Speech Streaming for ASR,
+Llama Nemotron Embed for retrieval, Magpie for TTS. `docs/MODELS.md` binds each
+role to a checkpoint and names the ADR that chose it. Of those, the ones that
+have actually produced output are Lightning and the embedder; Magpie's spike
+passed on 28 Aug without being wired in.
+
+Costs are **views over recorded rows**, never stored numbers, and the exclusion
+of generated data is on the run — `run_cost` carries `WHERE r.is_synthetic = 0`
+and `night_totals` is built on it, so neither can report a seeded night:
 
 ```sql
 SELECT * FROM night_totals;               -- local vs cloud tokens, per night
@@ -145,7 +182,7 @@ estimating it.**
 
 | | Status |
 |---|---|
-| Capture, phone to database | **Live, taking real ideas daily** |
+| Capture, phone to database | **Live since 28 Aug.** Four real entries by 17 Sep, which is the number the redaction row below checked against; the count since is in the database on that machine |
 | Two real nights on the Spark against the live reasoner, 16 Sep | **Run.** The second completed five stages in 192 seconds, clean and distinct artifacts, one real question |
 | A six-of-six night with research on, 17 Sep | **Run** |
 | Redaction against the four real captured entries | **Run**, 17 Sep. Every query checked for a capitalized word, an identifier or address shape, and a four-word run from its source. None survived |
@@ -157,26 +194,28 @@ estimating it.**
 | **The week-8 eval score** | **Not run.** Week 8 is 15–21 Oct. The week-1 baseline is recorded; a judge that drives any reasoner exists as of 10 Oct and has been tested against a stub endpoint, never against a real checkpoint |
 | **The judge container built and stood up** | **Not run** |
 
-**The unrun rows are one blocker, not four — and it is a credential, not a
-machine.** The Nebius credentials exist and were verified end to end on 2 Sep: a
-hand-built RS256 JWT exchanged for an access token, which then authorized a live
-`GET /ai/v1/jobs`. They live on the always-on machine, outside any git-tracked
-path.
+**Those four rows are three different blockers, and this document claimed one
+until 16 Oct.** It read "one blocker, not four — and it is a credential, not a
+machine", which was written on 10 Oct and contradicted by a decision made the
+same day. Separating them:
 
-This document said until 10 Oct that what was missing was a session on that
-machine. That was imprecise in a way that mattered: the Token Factory and
-Serverless Jobs endpoints both answer from anywhere —
-`api.studio.nebius.com/v1/models` returns 401, which is a missing key rather
-than a missing route. What is missing is a key in the place the work is being
-done, and where a key should be allowed to live is a decision, not a fact about
+| Unrun row | What it waits on |
+|---|---|
+| The parallel Jobs fan-out, and the cost comparison beside it | **A credential**, plus the client that has not been written |
+| The week-8 eval score | **A session on the machine.** ADR 0015 made the judge local, so this needs no credential at all — the database, the brain and the model are simply all there |
+| The judge container | **A container runtime.** Every step inside the image has been run outside it; the layering has not |
+
+The Nebius credentials exist and were verified end to end on 2 Sep: a hand-built
+RS256 JWT exchanged for an access token, which then authorized a live
+`GET /ai/v1/jobs`. They live on the always-on machine, outside any git-tracked
+path. Both endpoints answer from anywhere —
+`api.studio.nebius.com/v1/models` returns 401, a missing key rather than a
+missing route — so where a key may live is a decision rather than a fact about
 the network. `docs/SPEC_ROADMAP.md` tracks every unrun row under *Owed
 verification*.
 
-**Nothing is stubbed to fill those rows**, and that is deliberate. A stub
-executor returning plausible job results writes `model_calls` rows
-indistinguishable from a real fan-out — and that fan-out is the entire evidence
-for the Nebius claim. Every other stand-in in this system is visibly inert: the
-echo reasoner returns its own input.
+Nothing is stubbed to fill them, for the reason given above: a plausible job
+result is indistinguishable from a real one once it is a row.
 
 ---
 
@@ -286,16 +325,25 @@ A system that records its own failures is making a claim a polished one cannot.
 
 ## Check any of this yourself
 
-A clone and no credentials is enough for all of it:
+**No credentials, and no access to the always-on machine.** A bootstrap first,
+though — Python 3.12, Node, and a Chrome the browser test can drive:
 
 ```bash
+python3 -m venv apps/api/.venv
+apps/api/.venv/bin/pip install -c apps/api/constraints.txt -e "apps/api[dev]" -e packages/seed
+npm --prefix apps/web ci
+npm install --global @fission-ai/openspec@1.11.0
 python3 scripts/gate.py
 ```
 
+That is `docs/development/GATES.md`'s clean-clone section, repeated here because
+this document said "a clone and no credentials is enough" and the gate's first
+act is to refuse: *no interpreter at `apps/api/.venv/bin/python`*. It says which
+and why, which is the behavior wanted, but it is not what the sentence promised.
+
 11 gates <!-- derived: matches scripts/gate.py ^    \(" --> — the airlock tests
 first, two repository guards, a drift check, spec validation, the orchestrator
-suite, web unit/types/build, a browser test against a real Chromium, and 12
-mutations <!-- derived: matches scripts/check-mutations.py ^    Mutation\( -->
+suite, web unit/types/build, a browser test against a real Chromium, and 20 mutations <!-- derived: matches scripts/check-mutations.py ^    Mutation\( -->
 that reintroduce defects this project has actually shipped and require the gate
 that should catch each one to fail. CI runs the same file; there is no second
 definition of passing.
@@ -306,17 +354,37 @@ SECOND_SHIFT_DB=/tmp/night.db SECOND_SHIFT_PROFILE=cloud SECOND_SHIFT_SYNTHETIC=
   apps/api/.venv/bin/uvicorn secondshift.api.main:app --port 8080
 ```
 
-The night is **deterministic by seed**, so every screenshot in this submission
-regenerates from that command. Every row it writes carries `is_synthetic = 1`,
-every view excludes those rows, and `scripts/check-judge-package.py` refuses to
-package a database carrying unmarked rows or any `model_call_payloads` at all.
+The night is **deterministic by seed**, so the night this document describes is
+the one that command produces — the same 1,232 events, the same stages, the same
+questions. This file carries no images; the repository has none. Any screenshot
+shown alongside the submission regenerates from that seed rather than being a
+picture of a state nobody else can reach, which is the only property worth
+claiming here.
 
-The record is in the repository: 22 capabilities
-<!-- derived: count openspec/specs/*/ --> with their specifications in
-`openspec/specs/`, 33 <!-- derived: count openspec/changes/archive/*/ --> archived
-changes with the task lists that built them, and 14
-<!-- derived: count docs/decisions/*.md --> numbered decision records, each saying
-what it cost.
+Every row it writes carries `is_synthetic = 1`, every view excludes those rows,
+and `scripts/check-judge-package.py` refuses to package a database carrying
+unmarked rows in an evidence table or any `model_call_payloads` at all.
+
+The record is in the repository: 22 capabilities <!-- derived: count openspec/specs/*/ -->
+with their specifications in `openspec/specs/`,
+33 <!-- derived: count openspec/changes/archive/*/ --> archived changes with the
+task lists that built them, and 15 <!-- derived: count docs/decisions/*.md -->
+numbered decision records, each saying what it cost.
+
+**Three of those figures were checked by nothing until 16 Oct.** A derived
+marker binds to the nearest number on its own line, and a paragraph reflow had
+left three of them with the figure on the line above — so the drift gate matched
+nothing, reported nothing, and called this document clean. Two were stale: the
+mutation count read 12 against 19, and the decision count 14 against 15. The
+gate now treats a marker that binds to nothing as a failure rather than a skip,
+which is the rule `scripts/check-mutations.py` already applied to its own stale
+anchors.
+
+**It then demonstrated itself inside the hour.** Binding those markers was worth
+a mutation of its own, which moved the mutation count to 20 — and the
+newly-bound marker failed the gate on the figure that had been corrected minutes
+earlier. The number above is 20 because a check caught it, not because anybody
+remembered.
 
 ---
 
