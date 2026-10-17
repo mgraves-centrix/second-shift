@@ -24,7 +24,14 @@ import pytest
 from secondshift.brain.repo import BrainRepo
 from secondshift.evals.__main__ import main
 from secondshift.evals.content import PromptCandidate, Rubric, load_rubric
-from secondshift.evals.judge import _ASK, ASK_SHA, DIMENSIONS, Judgement, ModelJudge
+from secondshift.evals.judge import (
+    _ASK,
+    ASK_SHA,
+    DIMENSIONS,
+    Judgement,
+    ModelJudge,
+    UnreadableJudgement,
+)
 from secondshift.evals.runner import AlreadyScored, EvalRunner, NotComparable
 from secondshift.providers.base import Message, RawCompletion, Reasoner
 
@@ -186,7 +193,7 @@ class TestTheJudgeIsPinnedByWhatItAsks:
         judge = ModelJudge(_Scripted(recorder, []), policy="local-only", version="pinned")
 
         assert ASK_SHA == hashlib.sha256(_ASK.encode()).hexdigest()
-        assert judge.version == f"pinned/ask:{ASK_SHA[:12]}"
+        assert judge.version.startswith(f"pinned/ask:{ASK_SHA[:12]}/read:")
 
     def test_a_scored_run_records_it(self, runner, rubric, recorder, repo):
         judge = ModelJudge(_Scripted(recorder, [GOOD]), policy="local-only", version="pinned")
@@ -197,7 +204,7 @@ class TestTheJudgeIsPinnedByWhatItAsks:
         recorded = repo.connection.execute(
             "SELECT judge_model_version FROM eval_runs WHERE id = ?", (run,)
         ).fetchone()[0]
-        assert recorded == f"pinned/ask:{ASK_SHA[:12]}"
+        assert recorded == judge.version and f"/ask:{ASK_SHA[:12]}/" in recorded
 
     def test_the_curve_refuses_one_judge_asking_two_ways(self, runner, rubric, recorder, brain):
         """Same model, same name, a different ask: two instruments. The curve
@@ -228,3 +235,61 @@ class TestTheCommandFindsItsContentFromAnywhere:
 
         assert code == 0
         assert "rubric on disk" in capsys.readouterr().out
+
+
+def _scores(**overrides) -> str:
+    scores = {d: 3 for d in DIMENSIONS}
+    scores.update(overrides)
+    return json.dumps({"scores": scores, "note": "fine"})
+
+
+class TestTheFinalJudgementIsReadWhateverCameBeforeIt:
+    """The shape a real refusal had on 17 Oct, read back from its kept text:
+    the template echoed with `<1-5>` placeholders during the judge's
+    deliberation, then a draft that was not valid JSON — an odd number of
+    unescaped quotes in its note — then a valid final judgement. The forward scan treated that
+    stray quote as opening a string for the rest of the completion, never saw
+    the final object, and refused the echo. Strictness about what a judgement
+    must contain is unchanged; what changed is that a malformed draft no
+    longer hides the answer after it."""
+
+    ECHO = '{"scores": {"interrogation": <1-5>, "fit": <1-5>, "judgement": <1-5>, "actionability": <1-5>, "voice": <1-5>}, "note": "<one sentence>"}'
+    BROKEN_DRAFT = '{"scores": {"interrogation": 2, "fit": 2, "judgement": 1, "actionability": 4, "voice": 2}, "note": "the "voice is off"}'
+
+    def _judge(self, recorder, text):
+        return ModelJudge(_Scripted(recorder, [text]), policy="local-only", version="pinned")
+
+    def test_the_observed_shape_reads_the_final_object(self, recorder):
+        text = (
+            f"Deliberating. The format is {self.ECHO}. A first draft:\n"
+            f"{self.BROKEN_DRAFT}\nCorrecting the note:\n"
+            + _scores(interrogation=1, fit=2, judgement=1, actionability=4, voice=2)
+        )
+
+        judgement = self._judge(recorder, text).score(output="a", rubric="r", prompt="q")
+
+        assert judgement.scores == {
+            "interrogation": 1, "fit": 2, "judgement": 1, "actionability": 4, "voice": 2,
+        }
+
+    def test_a_malformed_final_object_is_refused_not_replaced_by_a_draft(self, recorder):
+        """The last form is the answer. If the last form is broken, an earlier
+        valid draft is a number the model talked itself out of, and reading it
+        would record that number."""
+        text = f"Draft: {_scores(voice=1)}\nFinal: {self.BROKEN_DRAFT}"
+
+        with pytest.raises(UnreadableJudgement, match="final judgement"):
+            self._judge(recorder, text).score(output="a", rubric="r", prompt="q")
+
+    def test_an_echoed_template_as_the_last_word_is_refused(self, recorder):
+        text = f"{_scores(voice=4)}\nThe required format was {self.ECHO}"
+
+        with pytest.raises(UnreadableJudgement):
+            self._judge(recorder, text).score(output="a", rubric="r", prompt="q")
+
+    def test_the_reader_is_part_of_the_pin(self, recorder):
+        from secondshift.evals.judge import READER_SHA
+
+        judge = ModelJudge(_Scripted(recorder, []), policy="local-only", version="pinned")
+
+        assert judge.version == f"pinned/ask:{ASK_SHA[:12]}/read:{READER_SHA[:12]}"

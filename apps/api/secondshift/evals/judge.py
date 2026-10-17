@@ -10,7 +10,9 @@ brain.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
+import re
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -157,6 +159,42 @@ def last_object(text: str) -> str:
     return found
 
 
+#: Where a judgement in the instrument's own form begins. `_ASK` asks for
+#: `{"scores": ...}`, so an object opening with that key is the shape a final
+#: answer takes and anything else is deliberation around it.
+_JUDGEMENT_START = re.compile(r'\{\s*"scores"\s*:')
+
+
+def final_judgement(text: str) -> str:
+    """The judge's final judgement as written, or "" if it wrote none.
+
+    The last object opening with the ask's own key is the final form, decoded by
+    the JSON decoder from where it starts. Nothing before it is read at all — not
+    the deliberation's quotes, not a template it echoed, not a draft it got
+    wrong. That is the defect this replaces: on 17 Oct a draft with an odd
+    number of unescaped quotes left `last_object`'s forward scan inside a
+    "string" for the rest of the completion, the valid final judgement after it
+    was never seen, and an echoed template was refused in its place.
+
+    If that final form does not decode, the judgement is refused. An earlier
+    valid draft is a number the model talked itself out of, and reading it
+    would record that number.
+
+    Where nothing opens with the key, `last_object`'s scan is the fallback, for
+    a judge that wrote its dimensions bare — `Judgement.parse` accepts both.
+    """
+    starts = [match.start() for match in _JUDGEMENT_START.finditer(text)]
+    if not starts:
+        return last_object(text)
+    try:
+        _, end = json.JSONDecoder().raw_decode(text, starts[-1])
+    except json.JSONDecodeError as exc:
+        raise UnreadableJudgement(
+            f"the final judgement is not structured data: {exc}"
+        ) from exc
+    return text[starts[-1]:end]
+
+
 class ModelJudge:
     """Scores an output by asking a model for them.
 
@@ -190,16 +228,17 @@ class ModelJudge:
 
     @property
     def version(self) -> str:
-        """The configured pin, and the hash of what the judge is asked.
+        """The configured pin, the hash of the ask, and the hash of the reader.
 
-        The ask is half the instrument. `judge_version` in `config/models.toml`
-        names the checkpoint and nothing named the prompt, so an edit to `_ASK`
-        between two runs would have changed how both were graded while the curve
-        — which compared judges by name — still called them comparable. The
-        generating agent's prompt was pinned this way from the start
-        (`architect.v1:<sha>`); the judge's was the one that was not.
+        The ask and the reader are the instrument, beside the checkpoint.
+        `judge_version` in `config/models.toml` names the checkpoint and nothing
+        named the rest, so an edit to `_ASK` or to how its answer is read between
+        two runs would have changed how both were graded while the curve — which
+        compared judges by name — still called them comparable. The generating
+        agent's prompt was pinned this way from the start (`architect.v1:<sha>`);
+        the judge's was the one that was not.
         """
-        return f"{self._version}/ask:{ASK_SHA[:12]}"
+        return f"{self._version}/ask:{ASK_SHA[:12]}/read:{READER_SHA[:12]}"
 
     def score(self, *, output: str, rubric: str, prompt: str) -> Judgement:
         completion = self._reasoner.complete(
@@ -217,15 +256,14 @@ class ModelJudge:
                 "judgement can still parse, so it is refused rather than read.",
                 model_call_id=completion.model_call_id,
             )
-        found = last_object(completion.text)
-        if not found:
-            raise UnreadableJudgement(
-                "the judge wrote no JSON object. Scores read out of prose would "
-                "make the measurement depend on the model's formatting, which is "
-                "what pinning the judge exists to exclude.",
-                model_call_id=completion.model_call_id,
-            )
         try:
+            found = final_judgement(completion.text)
+            if not found:
+                raise UnreadableJudgement(
+                    "the judge wrote no JSON object. Scores read out of prose "
+                    "would make the measurement depend on the model's formatting, "
+                    "which is what pinning the judge exists to exclude."
+                )
             return Judgement.parse(found)
         except UnreadableJudgement as exc:
             exc.model_call_id = completion.model_call_id
@@ -258,3 +296,11 @@ Every dimension is required and every value is a whole number from 1 to 5.
 #: What a judge's recorded version pins, beside the checkpoint. Computed from the
 #: text rather than written down, so an edit cannot forget to update it.
 ASK_SHA = hashlib.sha256(_ASK.encode()).hexdigest()
+
+#: The same for how an answer is read, hashed from the source of the two
+#: functions that read it. A comment edited in either moves the pin too, which
+#: is the conservative direction: two runs scored in one sitting share it
+#: whatever happens to the file between sittings.
+READER_SHA = hashlib.sha256(
+    (inspect.getsource(final_judgement) + inspect.getsource(last_object)).encode()
+).hexdigest()
