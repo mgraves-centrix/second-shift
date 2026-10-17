@@ -204,3 +204,33 @@ class TestEndpointConfiguration:
         monkeypatch.setattr(config, "_MODELS_CONFIG", tmp_path / "absent.toml")
         assert config.local_endpoint() == ("127.0.0.1", 8000)
         assert config.expected_local_model() == ""
+
+
+class TestARefusedIdentityRequestIsReleased:
+    def test_an_http_error_from_the_models_endpoint_is_closed(self, monkeypatch):
+        """An `HTTPError` holds the open response. The probe caught it as an
+        `OSError` and returned, so every refused identity request leaked a
+        handle — which Python 3.14 reports as a `ResourceWarning`, and which
+        failed `TestTheScoreCommand` on any machine running it. `vllm.py`
+        already closed its own; the probe was the one that did not.
+
+        Observed through the error's own body rather than through the warning,
+        so this holds on 3.12 too, where nothing would be printed."""
+        import io
+        import urllib.error
+        import urllib.request
+
+        from secondshift.config import served_models
+
+        body = io.BytesIO(b"Unsupported method")
+        refused = urllib.error.HTTPError(
+            "http://127.0.0.1:1/v1/models", 501, "Unsupported method", {}, body
+        )
+
+        def refuse(*_args, **_kwargs):
+            raise refused
+
+        monkeypatch.setattr(urllib.request, "urlopen", refuse)
+
+        assert served_models("127.0.0.1", 1, 0.1) is None
+        assert body.closed

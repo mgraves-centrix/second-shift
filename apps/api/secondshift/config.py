@@ -363,6 +363,12 @@ def served_models(host: str, port: int, timeout: float) -> list[str] | None:
     try:
         with urllib.request.urlopen(url, timeout=timeout) as response:
             payload = json.load(response)
+    except urllib.error.HTTPError as exc:
+        # Holds the open response, and catching it as an `OSError` below left
+        # it to the collector — a leaked handle per refused request, which
+        # Python 3.14 reports. `providers/vllm.py` closes its own the same way.
+        exc.close()
+        return None
     except (OSError, urllib.error.URLError, json.JSONDecodeError, ValueError):
         return None
     data = payload.get("data") if isinstance(payload, dict) else None
