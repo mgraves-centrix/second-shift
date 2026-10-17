@@ -128,13 +128,28 @@ skip what happens to them. `test_job_telemetry.py`.
 
 ### 2.3 The cloud reasoner
 
-- [ ] 2.3.1 A `Reasoner` for Token Factory covering the turns ADR 0004 assigns
+**Done 17 Oct, and verified by one real call from the machine** — a synthetic
+prompt under `cloud-assisted`, into a throwaway database: `finish_reason`
+`stop`, a `model_calls` row naming `token-factory` and the served id, its
+payload kept, and `night_totals` reading the cloud tokens and cost directly.
+The key never left the machine; the call was made from it.
+
+Two defects surfaced and are fixed: every Token Factory id in the rate table
+was a console display name the API answers 404 to, and reasoning tokens —
+billed as output — were not priced.
+
+**What this does not do is route an idea to it.** The privacy-airlock spec
+requires a `cloud-assisted` turn to leave as redacted, policy-filtered
+context, and neither the redaction of a reasoning prompt nor that assembly
+exists. The night refuses the cloud profile until they do; see 2.2.4.
+
+- [x] 2.3.1 A `Reasoner` for Token Factory covering the turns ADR 0004 assigns
       to it — research synthesis, architect, critic — under `cloud-assisted`
       only.
-- [ ] 2.3.2 Standard rates, not Batch. A Token Factory key confirmed on 2 Sep
+- [x] 2.3.2 Standard rates, not Batch. A Token Factory key confirmed on 2 Sep
       that Batch is unavailable for these models; `config/pricing.toml` carries
       both and a missing rate fails loudly.
-- [ ] 2.3.3 The cost of a cloud night is readable from `model_calls` without
+- [x] 2.3.3 The cost of a cloud night is readable from `model_calls` without
       arithmetic, because the demo's two-ideas-side-by-side comparison is read
       from there.
 
