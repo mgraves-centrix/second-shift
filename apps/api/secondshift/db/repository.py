@@ -765,6 +765,13 @@ class Repository:
             (run_id,),
         ).fetchall()
 
+    def payload_for(self, model_call_id: str) -> sqlite3.Row | None:
+        """Where one call's prompt and completion were kept, or None."""
+        return self._conn.execute(
+            "SELECT * FROM model_call_payloads WHERE model_call_id = ?",
+            (model_call_id,),
+        ).fetchone()
+
     def model_calls_for_run(self, run_id: str) -> list[sqlite3.Row]:
         return self._conn.execute(
             "SELECT * FROM model_calls WHERE run_id = ? ORDER BY ts_ms, id", (run_id,)

@@ -22,6 +22,7 @@ from ..db.connection import now_ms
 from ..db.repository import Repository
 from . import context as ctx
 from .failures import FailureType, classify, signature
+from .payloads import payload_root, write_payload
 from .pricing import PricingTable
 
 
@@ -237,6 +238,54 @@ class Recorder:
                 ts_ms=ts,
                 is_synthetic=is_synthetic,
             )
+
+    def record_payload(
+        self,
+        model_call_id: str,
+        *,
+        prompt: list[dict[str, str]],
+        completion: str,
+        finish_reason: str,
+        redacted: bool = False,
+        is_synthetic: bool = False,
+    ) -> str | None:
+        """Keep what a call said, beside the row recording what it cost.
+
+        Returns the completion's path relative to the payload root, or None if
+        the text could not be written. A failed write is recorded as a failure
+        and the caller still gets its answer: the call happened and its output
+        is usable, so a full disk under the payload directory must not become a
+        lost night. What it must not become either is a silent gap, which is
+        what this table was for six nights.
+
+        The files are written before the row, as artifacts are, so a row never
+        names a file that is not there.
+        """
+        try:
+            written = write_payload(
+                payload_root(),
+                model_call_id,
+                prompt=prompt,
+                completion=completion,
+                finish_reason=finish_reason,
+                ts_ms=now_ms(),
+            )
+        except OSError as exc:
+            self.record_failure(exc, scope="payload", is_synthetic=is_synthetic)
+            return None
+        with self._lock:
+            self._repo.insert_model_call_payload(
+                model_call_id=model_call_id,
+                prompt_path=written.prompt_path,
+                completion_path=written.completion_path,
+                prompt_bytes=written.prompt_bytes,
+                completion_bytes=written.completion_bytes,
+                redacted=redacted,
+                # Synthetic text is never training data. The schema's comment
+                # says so and this is the only writer, so it is said here.
+                training_eligible=not is_synthetic,
+            )
+        return written.completion_path
 
     def record_tool_call(
         self,

@@ -182,6 +182,16 @@ class Reasoner(Provider):
             cache_hit=raw.cache_hit,
             redaction_applied=redaction_applied,
         )
+        # What the call said, beside what it cost. Here rather than in each
+        # backend for the reason the cost row is here: a backend cannot forget
+        # to record what it never writes.
+        self._recorder.record_payload(
+            call_id,
+            prompt=[{"role": m.role, "content": m.content} for m in messages],
+            completion=raw.text,
+            finish_reason=raw.finish_reason,
+            redacted=redaction_applied,
+        )
         return Completion(
             text=raw.text,
             model_call_id=call_id,

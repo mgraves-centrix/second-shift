@@ -28,8 +28,13 @@ def _artifacts_under_tmp(tmp_path, monkeypatch):
     Autouse rather than opt-in: a test that writes outside tmp is a test nobody
     notices until it pollutes something, and remembering to ask for isolation is
     exactly the kind of thing that erodes.
+
+    Payloads for the same reason, and with more at stake: every completion
+    writes one, and on the always-on machine the default root is where a
+    training set would one day be drawn from.
     """
     monkeypatch.setenv(config.ENV_ARTIFACTS, str(tmp_path / "artifacts"))
+    monkeypatch.setenv(config.ENV_PAYLOADS, str(tmp_path / "payloads"))
 
 
 @pytest.fixture
