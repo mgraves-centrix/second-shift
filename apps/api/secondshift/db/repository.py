@@ -250,6 +250,7 @@ class Repository:
         started_at_ms: int | None = None,
         invocation_id: str | None = None,
         is_synthetic: bool = False,
+        external_key: str | None = None,
     ) -> str:
         ts = started_at_ms if started_at_ms is not None else now_ms()
         iid = self._id(invocation_id, ts)
@@ -265,9 +266,23 @@ class Repository:
                 "started_at_ms": ts,
                 "input_summary": input_summary,
                 "is_synthetic": int(is_synthetic),
+                "external_key": external_key,
             },
         )
         return iid
+
+    def recorded_by_external_key(self, table: str, external_key: str) -> str | None:
+        """The id already recorded under a collected report's key, or None.
+
+        `table` is one of the two tables collection writes; anything else is a
+        programming error, refused rather than interpolated.
+        """
+        if table not in ("agent_invocations", "model_calls"):
+            raise ValueError(f"{table!r} holds no collected telemetry")
+        row = self._conn.execute(
+            f"SELECT id FROM {table} WHERE external_key = ?", (external_key,)
+        ).fetchone()
+        return row["id"] if row else None
 
     def insert_model_call(
         self,
@@ -292,6 +307,7 @@ class Repository:
         ts_ms: int | None = None,
         call_id: str | None = None,
         is_synthetic: bool = False,
+        external_key: str | None = None,
     ) -> str:
         ts = ts_ms if ts_ms is not None else now_ms()
         cid = self._id(call_id, ts)
@@ -318,6 +334,7 @@ class Repository:
                 "policy": policy,
                 "redaction_applied": int(redaction_applied),
                 "is_synthetic": int(is_synthetic),
+                "external_key": external_key,
             },
         )
         return cid

@@ -21,6 +21,7 @@ from typing import Any
 
 from ..airlock.policy import assert_permitted
 from ..telemetry.recorder import Recorder, TelemetryDescriptor
+from ..telemetry.reports import UnreadableReport, parse_report
 
 #: The backend's word for generation ending because the model finished. Shared
 #: across OpenAI-compatible servers; a backend that says something else is
@@ -80,6 +81,21 @@ class JobSpec:
 @dataclass(frozen=True, slots=True)
 class JobHandle:
     job_id: str
+    #: The invocation the job was dispatched under, and its run. Set by
+    #: `Executor.dispatch`, never by an implementation: collection attaches the
+    #: job's report here, and a report is believed only for its own dispatch.
+    dispatcher: str | None = None
+    run_id: str | None = None
+
+
+#: What `_do_collect_telemetry` returns for work whose telemetry was recorded in
+#: this process as it ran. A sentinel rather than an empty string or `None`, so
+#: "nothing came back" and "nothing needed to" cannot be confused.
+RECORDED_IN_PROCESS = object()
+
+
+class TelemetryMissing(RuntimeError):
+    """A dispatched job's cost and work are unknown — not zero."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,9 +285,20 @@ class Executor(Provider):
             kind="job_dispatch",
             label=f"dispatched {job.kind} as {handle.job_id}",
         )
-        return handle
+        return JobHandle(
+            job_id=handle.job_id,
+            dispatcher=telemetry.dispatching_invocation_id,
+            run_id=telemetry.run_id,
+        )
 
     def await_result(self, handle: JobHandle) -> JobResult:
+        """Wait for a job, then collect what it reported doing.
+
+        Collected here, by the poller, rather than received: no inbound path
+        exists to the machine that holds the brain (`nebius-executor`'s design,
+        third option). The work product is returned whatever happened to the
+        report — a lost report must not cost the night its output.
+        """
         started = time.perf_counter()
         with self._recording_failures(f"executor:{self.provider_kind}"):
             result = self._do_await_result(handle)
@@ -282,7 +309,40 @@ class Executor(Provider):
             duration_ms=int((time.perf_counter() - started) * 1000),
             severity="info" if result.status == "success" else "warn",
         )
+        self._collect(handle)
         return result
+
+    def _collect(self, handle: JobHandle) -> None:
+        """Record the job's report under its dispatcher, or record that it is missing.
+
+        A job with no readable report is recorded as a failure against its run,
+        so the run reads as unaccounted rather than as a fan-out that was free.
+        Ingest goes through the recorder, under its lock, on its connection:
+        there is one writer.
+        """
+        report = self._do_collect_telemetry(handle)
+        if report is RECORDED_IN_PROCESS:
+            return
+        try:
+            if report is None:
+                raise TelemetryMissing(
+                    f"job {handle.job_id} reported no telemetry. Its cost is "
+                    "unknown, not zero."
+                )
+            if handle.dispatcher is None:
+                raise TelemetryMissing(
+                    f"job {handle.job_id} has no recorded dispatch to attach "
+                    "its report under. Its cost is unknown, not zero."
+                )
+            invocations, calls = parse_report(report, dispatcher=handle.dispatcher)
+        except (TelemetryMissing, UnreadableReport) as exc:
+            self._recorder.record_failure(
+                exc, scope="executor:telemetry", run_id=handle.run_id
+            )
+            return
+        self._recorder.ingest_external(
+            handle.dispatcher, invocations=invocations, model_calls=calls
+        )
 
     @abstractmethod
     def _do_dispatch(
@@ -291,3 +351,8 @@ class Executor(Provider):
 
     @abstractmethod
     def _do_await_result(self, handle: JobHandle) -> JobResult: ...
+
+    @abstractmethod
+    def _do_collect_telemetry(self, handle: JobHandle) -> str | None | object:
+        """The job's telemetry report as written, `None` if there is none, or
+        `RECORDED_IN_PROCESS`. Abstract so every executor has to say which."""

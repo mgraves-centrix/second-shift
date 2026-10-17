@@ -81,9 +81,9 @@ same file.
   does not recognize rather than resolving to false — do not reintroduce a
   permissive parse. `python -m secondshift.config show` prints what both
   resolved to and where from.
-- 3 migrations <!-- derived: count apps/api/secondshift/db/migrations/*.sql -->:
-  `0001_initial.sql`, `0002_capture.sql` and
-  `0003_eval_synthetic.sql`.
+- 4 migrations <!-- derived: count apps/api/secondshift/db/migrations/*.sql -->:
+  `0001_initial.sql`, `0002_capture.sql`, `0003_eval_synthetic.sql` and
+  `0004_external_keys.sql`.
 
 ## The open decision
 

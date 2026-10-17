@@ -153,7 +153,7 @@ class TestWhatABackupRecords:
 
         assert manifest.tables["entries"] == 1
         assert manifest.tables["runs"] == 0
-        assert manifest.schema_version == 3
+        assert manifest.schema_version == 4
 
     def test_it_counts_the_artifacts(self, machine, tmp_path):
         db, artifacts = machine
@@ -226,10 +226,11 @@ class TestARefusal:
                 payloads_root=db.parent / "payloads",
             )
 
-        # Four, not one: the entry, and the three rows `migrate` wrote to
-        # `schema_version`. A count that excluded the schema's own bookkeeping
-        # would describe a different database from the one being protected.
-        assert "17 tables and 4 rows" in str(raised.value)
+        # Five, not one: the entry, and the four rows `migrate` wrote to
+        # `schema_version` — one per migration, so this moves when one is
+        # added. A count that excluded the schema's own bookkeeping would
+        # describe a different database from the one being protected.
+        assert "17 tables and 5 rows" in str(raised.value)
 
     def test_the_overwrite_proceeds(self, machine, tmp_path):
         db, artifacts = machine

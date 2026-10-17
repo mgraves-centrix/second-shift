@@ -58,6 +58,9 @@ class ExternalModelCall:
     total_tokens: int = 0
     latency_ms: int | None = None
     ts_ms: int | None = None
+    #: The id the job gave this call when it made it. With the dispatcher it
+    #: keys the row, so a report collected twice records the call once.
+    local_id: str | None = None
 
 
 @dataclass(slots=True)
@@ -435,6 +438,12 @@ class Recorder:
 
         It validates that the dispatcher exists, so an unknown or forged parent
         cannot create orphaned rows.
+
+        Idempotent. Each row is keyed by the dispatcher and the id the job gave
+        it when it did the work, so the same report collected twice — a retried
+        poll, a restarted job — returns the ids already recorded and writes
+        nothing. Enforced here, by `0004_external_keys.sql`'s unique indexes,
+        rather than trusted to whoever reported.
         """
         with self._lock:
             dispatcher = self._repo.get_invocation(dispatching_invocation_id)
@@ -449,6 +458,11 @@ class Recorder:
             resolved: dict[str, str] = {}
 
             for external in invocations or []:
+                key = f"{dispatching_invocation_id}:{external.local_id}"
+                already = self._repo.recorded_by_external_key("agent_invocations", key)
+                if already is not None:
+                    resolved[external.local_id] = already
+                    continue
                 if external.parent_local_id is None:
                     parent_id = dispatching_invocation_id
                     depth = base_depth + 1
@@ -471,6 +485,7 @@ class Recorder:
                     input_summary=external.input_summary,
                     started_at_ms=external.started_at_ms,
                     is_synthetic=is_synthetic,
+                    external_key=key,
                 )
                 self._repo.close_invocation(
                     recorded,
@@ -484,6 +499,15 @@ class Recorder:
                     raise UnknownDispatcher(
                         f"model call names unknown invocation {call.parent_local_id!r}"
                     )
+                call_key = (
+                    f"{dispatching_invocation_id}:{call.local_id}"
+                    if call.local_id
+                    else None
+                )
+                if call_key and self._repo.recorded_by_external_key(
+                    "model_calls", call_key
+                ):
+                    continue
                 ts = call.ts_ms if call.ts_ms is not None else now_ms()
                 self._repo.insert_model_call(
                     provider=call.provider,
@@ -506,6 +530,7 @@ class Recorder:
                     run_id=run_id,
                     ts_ms=ts,
                     is_synthetic=is_synthetic,
+                    external_key=call_key,
                 )
 
             return resolved

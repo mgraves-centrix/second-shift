@@ -73,22 +73,30 @@ happened here.
 
 ### 2.1 Telemetry collection
 
-- [ ] 2.1.1 `await_result` collects the telemetry the job wrote beside its
+**Done 17 Oct, without a credential — the sentence above was wrong about this
+group.** Collection is the poller's half, and the poller is this process, so
+nothing in it touches Nebius. It lives in the base `Executor`, the way recording
+a model call lives in the base `Reasoner`: an implementation supplies the
+report's bytes through `_do_collect_telemetry`, which is abstract, and cannot
+skip what happens to them. `test_job_telemetry.py`.
+
+- [x] 2.1.1 `await_result` collects the telemetry the job wrote beside its
       artifacts and calls `Recorder.ingest_external` locally, holding the
       recorder's lock. **No inbound route.** The design argued three transports
       and took the third; `ingest_external`'s own docstring said otherwise until
       21 Sep and now says this.
-- [ ] 2.1.2 A deserializer from the job's written form to `ExternalInvocation`
+- [x] 2.1.2 A deserializer from the job's written form to `ExternalInvocation`
       and `ExternalModelCall`, refusing anything it cannot map rather than
       dropping it — a silently skipped model call is a cloud night that reads
       as cheaper than it was.
-- [ ] 2.1.3 Invocations parents-first, so a partially written telemetry file
+- [x] 2.1.3 Invocations parents-first, so a partially written telemetry file
       cannot half-apply. `ingest_external` already refuses a model call naming
       an unrecorded invocation; this is the ordering that lets it not have to.
-- [ ] 2.1.4 The same job collected twice adds no rows. Enforced by the recorder,
+- [x] 2.1.4 The same job collected twice adds no rows. Enforced by the recorder,
       never trusted to the reporter — the spec says so and this is where that
-      is proved.
-- [ ] 2.1.5 A job whose telemetry is absent or unreadable leaves the run
+      is proved. `0004_external_keys.sql`: a partial unique index on the
+      dispatcher and the job's own id, per table.
+- [x] 2.1.5 A job whose telemetry is absent or unreadable leaves the run
       identifiable as incomplete, and never as a job that cost nothing.
       Principle 7 does not stop at the network boundary.
 

@@ -12,6 +12,7 @@ which is the property the base classes exist to guarantee.
 from __future__ import annotations
 
 from .base import (
+    RECORDED_IN_PROCESS,
     Embedder,
     Executor,
     JobHandle,
@@ -94,6 +95,10 @@ class InProcessExecutor(Executor):
             artifacts=[f"{job.kind}.md"],
             payload={"kind": job.kind},
         )
+
+    def _do_collect_telemetry(self, handle: JobHandle) -> object:
+        # Ran in this process, so anything it did was recorded as it did it.
+        return RECORDED_IN_PROCESS
 
     def descriptor_seen(self, job_id: str) -> TelemetryDescriptor:
         """Test seam: what descriptor did the remote side receive?"""
