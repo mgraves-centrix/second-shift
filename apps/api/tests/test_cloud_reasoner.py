@@ -163,3 +163,19 @@ def test_a_cloud_night_s_cost_reads_off_the_view(cloud, recorder, conn, run_id, 
     row = conn.execute("SELECT cloud_tokens, model_cost_usd FROM night_totals").fetchone()
     assert row["cloud_tokens"] == 1_000_000
     assert row["model_cost_usd"] == pytest.approx(0.30)
+
+
+def test_reasoning_is_priced_as_the_output_it_is(cloud, recorder, repo, run_id, agent_id, vllm_stub):
+    """Token Factory's `completion_tokens` includes the reasoning, and that is
+    what it bills: on 17 Oct a call reported 121 completion tokens of which 73
+    were reasoning, with `total_tokens` 149 = 28 + 121. The parser splits the
+    reasoning out so the recorded total is not counted twice, and the recorder
+    then priced only what was left — 48 of 121, on that call. Local rates are
+    zero, which is why it never showed."""
+    vllm_stub.answers(prompt_tokens=1_000_000, completion_tokens=1_000_000, reasoning_tokens=500_000)
+
+    _ask(cloud, recorder, agent_id, run_id)
+
+    call = repo.model_calls_for_run(run_id)[0]
+    assert call["total_tokens"] == 2_000_000, "the total is still counted once"
+    assert call["estimated_cost_usd"] == pytest.approx(0.30 + 0.90)

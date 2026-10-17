@@ -209,7 +209,14 @@ class Recorder:
         ts_ms: int | None = None,
         is_synthetic: bool = False,
     ) -> str:
-        """Record a completion. Cost is computed from the rate in effect."""
+        """Record a completion. Cost is computed from the rate in effect.
+
+        Reasoning is priced as output, because it is output: the provider bills
+        `completion_tokens`, which includes it. The counts arrive split so the
+        recorded total is not the reasoning counted twice, and pricing the
+        completion alone understated a real Token Factory call by three fifths
+        on 17 Oct. Local rates are zero, which is why it never showed before.
+        """
         active = ctx.current()
         ts = ts_ms if ts_ms is not None else now_ms()
         cost = self._pricing.cost_usd(
@@ -217,7 +224,7 @@ class Recorder:
             model=model,
             ts_ms=ts,
             prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
+            completion_tokens=completion_tokens + reasoning_tokens,
         )
         with self._lock:
             return self._repo.insert_model_call(
