@@ -18,8 +18,11 @@
       the backup unit names it; `RECOVERY.md` lists `payloads/`.
 - [x] 2.3 Tests: `test_backup_payloads.py`; every existing call site in
       `test_operations.py` passes the root, because the contract changed.
-- [ ] 2.4 On the machine: a backup taken after the first payload-capturing run
-      holds payload files and `ops verify` passes it.
+- [x] 2.4 On the machine: a backup taken after the first payload-capturing run
+      holds payload files and `ops verify` passes it. 17 Oct, the scoring copy's
+      70 payload files — 35 calls, 1.09 MB — onto the NAS in a directory apart
+      from production's, so `doctor`'s view of real backups is not muddied:
+      110 members intact, all 70 payload files among them.
 
 ## 3. A refused judgement can be read back
 
@@ -58,9 +61,12 @@
       an earlier draft. `_ASK` is unchanged; `Judgement.parse` is unchanged.
       The reader is hashed into the judge's version beside the ask.
 - [x] 6.3 Measure before and after on the same completions: every judge
-      completion kept on the copy, re-read by both readers. 16 kept; the old
-      reader read 15, the new reads 16. The only difference is the one the old
-      reader refused; no score it could read changed.
+      completion kept on the copy, re-read by both readers. 17 kept; the old
+      reader read 15, the new reads all 17. The two differences are the two
+      refusals — in the second, the final judgement had been restated three
+      times identically after four malformed drafts — and no score the old
+      reader could read changed. The run finished 15 of 18; under the new
+      reader it would have been 17, the one remaining sample being 6.4's.
 - [x] 6.4 A second failure mode, which is not the judge's: an answer that ran to
       the 16,000-token limit without finishing (`TurnDidNotFinish`). Refused
       correctly — a truncated answer graded is a wrong number. Whether a failed
