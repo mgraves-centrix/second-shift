@@ -9,6 +9,7 @@ brain.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from typing import Protocol
@@ -27,7 +28,16 @@ class UnreadableJudgement(ValueError):
     Recorded as a failure rather than a zero. A zero is a real score meaning "the
     worst possible answer", and a judge that malfunctioned is not evidence that
     the system performed badly.
+
+    `model_call_id` names the judge's completion when there was one, so the
+    refused text can be opened from the failure row. On 16 Oct three refusals
+    on the always-on machine could be described only by the offset the parser
+    died at, because neither the text nor the call that wrote it was kept.
     """
+
+    def __init__(self, message: str, *, model_call_id: str | None = None) -> None:
+        super().__init__(message)
+        self.model_call_id = model_call_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,11 +182,24 @@ class ModelJudge:
         """
         self._reasoner = reasoner
         self._policy = policy
-        self.version = version
+        self._version = version
 
     @property
     def name(self) -> str:
         return self._reasoner.model
+
+    @property
+    def version(self) -> str:
+        """The configured pin, and the hash of what the judge is asked.
+
+        The ask is half the instrument. `judge_version` in `config/models.toml`
+        names the checkpoint and nothing named the prompt, so an edit to `_ASK`
+        between two runs would have changed how both were graded while the curve
+        — which compared judges by name — still called them comparable. The
+        generating agent's prompt was pinned this way from the start
+        (`architect.v1:<sha>`); the judge's was the one that was not.
+        """
+        return f"{self._version}/ask:{ASK_SHA[:12]}"
 
     def score(self, *, output: str, rubric: str, prompt: str) -> Judgement:
         completion = self._reasoner.complete(
@@ -191,16 +214,22 @@ class ModelJudge:
             # exactly this shape of partial output being read as whole.
             raise UnreadableJudgement(
                 f"the judge stopped: {completion.finish_reason}. A truncated "
-                "judgement can still parse, so it is refused rather than read."
+                "judgement can still parse, so it is refused rather than read.",
+                model_call_id=completion.model_call_id,
             )
         found = last_object(completion.text)
         if not found:
             raise UnreadableJudgement(
                 "the judge wrote no JSON object. Scores read out of prose would "
                 "make the measurement depend on the model's formatting, which is "
-                "what pinning the judge exists to exclude."
+                "what pinning the judge exists to exclude.",
+                model_call_id=completion.model_call_id,
             )
-        return Judgement.parse(found)
+        try:
+            return Judgement.parse(found)
+        except UnreadableJudgement as exc:
+            exc.model_call_id = completion.model_call_id
+            raise
 
 
 #: Asks for the object and nothing about its surroundings. The judge tolerates
@@ -225,3 +254,7 @@ Reply with one JSON object and nothing that needs to be read as part of it:
 
 Every dimension is required and every value is a whole number from 1 to 5.
 """
+
+#: What a judge's recorded version pins, beside the checkpoint. Computed from the
+#: text rather than written down, so an edit cannot forget to update it.
+ASK_SHA = hashlib.sha256(_ASK.encode()).hexdigest()

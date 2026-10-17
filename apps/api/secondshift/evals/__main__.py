@@ -26,6 +26,7 @@ import argparse
 import os
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 from ..agents.invoke import invoke
 from ..agents.roster import discover, register
@@ -41,6 +42,7 @@ from .content import Rubric, load_prompts, load_rubric, load_threshold
 from .judge import ModelJudge
 from .runner import (
     NO_IMPROVEMENT_SHOWN,
+    AlreadyScored,
     DeploymentMismatch,
     EvalRunner,
     NotComparable,
@@ -55,9 +57,16 @@ from .runner import (
 POLICY = "local-only"
 
 DEFAULT_DB = os.path.expanduser("~/second-shift-data/second-shift.db")
-DEFAULT_CANDIDATES = "config/evals/candidates.md"
-DEFAULT_RUBRIC = "config/evals/rubric.md"
-DEFAULT_THRESHOLD = "config/evals/threshold.md"
+
+#: Where `config/` sits relative to this file, in a clone and in the deployed
+#: tree alike: `apps/api/secondshift/evals/` is four levels below it in both.
+#: These resolved against the working directory until 17 Oct, so `status` run
+#: over SSH on the always-on machine died with a traceback naming a relative
+#: path — the one place this command is meant to be run.
+_CONTENT = Path(__file__).resolve().parents[4] / "config" / "evals"
+DEFAULT_CANDIDATES = str(_CONTENT / "candidates.md")
+DEFAULT_RUBRIC = str(_CONTENT / "rubric.md")
+DEFAULT_THRESHOLD = str(_CONTENT / "threshold.md")
 
 
 def _status(runner: EvalRunner, rubric: Rubric) -> int:
@@ -82,7 +91,14 @@ def _status(runner: EvalRunner, rubric: Rubric) -> int:
 
     print(f"{len(runs)} recorded run{'' if len(runs) == 1 else 's'}")
     for run in runs:
-        state = "awaiting scoring" if run.awaiting else f"judged by {run.judge_model}"
+        if run.interrupted:
+            state = (f"interrupted with {run.results} result"
+                     f"{'' if run.results == 1 else 's'}; cannot be scored, "
+                     "record a new baseline")
+        elif run.awaiting:
+            state = "awaiting scoring"
+        else:
+            state = f"judged by {run.judge_model}"
         agrees = run.rubric_sha == rubric.sha
         print(
             f"  {run.eval_run_id}  week {run.week_of}"
@@ -327,7 +343,7 @@ def _score(
         summary = runner.score(
             eval_run_id, judge=judge, generate=generate, rubric=rubric
         )
-    except DeploymentMismatch as exc:
+    except (DeploymentMismatch, AlreadyScored) as exc:
         print(f"not scoring: {exc}", file=sys.stderr)
         return 2
 

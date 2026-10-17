@@ -66,6 +66,18 @@ class NotComparable(RuntimeError):
     """
 
 
+class AlreadyScored(RuntimeError):
+    """A run that already holds results, scored or interrupted.
+
+    A run is scored once. `score` generates every sample from scratch, so a
+    second pass collided with `UNIQUE(eval_run_id, eval_prompt_id,
+    sample_index)` on the first sample already recorded and died with a raw
+    `IntegrityError` — and a run killed partway reads as awaiting scoring, so
+    that crash was the obvious next step. Refused before anything is generated,
+    naming the way out.
+    """
+
+
 class RubricMismatch(RuntimeError):
     """Scoring was attempted under a rubric the run did not pin.
 
@@ -256,6 +268,21 @@ def _completion_of(value):
     return value
 
 
+def _failure_context(exc: BaseException, completion) -> str | None:
+    """The calls a failed sample can be read back from, as the failure's context.
+
+    The judge's completion is the text the parser refused; the answer is what it
+    was judging. Either may be absent — generation can fail before there is an
+    answer, and a judge that raised before completing has no call to name.
+    """
+    context = {
+        "judge_model_call_id": getattr(exc, "model_call_id", None),
+        "answer_model_call_id": getattr(completion, "model_call_id", None),
+    }
+    named = {k: v for k, v in context.items() if v}
+    return json.dumps(named) if named else None
+
+
 def _spread_of(summary: RunSummary) -> float:
     values = [s for p in summary.prompts for s in p.samples]
     return statistics.stdev(values) if len(values) > 1 else 0.0
@@ -270,10 +297,17 @@ class RecordedRun:
     rubric_sha: str
     brain_sha: str
     judge_model: str
+    results: int = 0
 
     @property
     def awaiting(self) -> bool:
         return self.judge_model == AWAITING
+
+    @property
+    def interrupted(self) -> bool:
+        """Results recorded and the judge never written back: a process that
+        died partway. It reads as awaiting scoring and can never be scored."""
+        return self.awaiting and self.results > 0
 
 
 #: How a run with results that name no model call reports its generator. Not a
@@ -310,6 +344,9 @@ class RunSummary:
     #: Both runs carrying only `UNRECORDED` compare equal: generating without an
     #: agent is a legitimate shape, and what is refused is a change.
     prompt_versions: tuple[str | None, ...] = ()
+    #: What `judge_model_version` recorded: the pinned checkpoint and, for a
+    #: model judge, the hash of what it was asked.
+    judge_version: str | None = None
 
     @property
     def mean(self) -> float:
@@ -448,13 +485,16 @@ class EvalRunner:
                 rubric_sha=r["rubric_sha"],
                 brain_sha=r["brain_sha"],
                 judge_model=r["judge_model"],
+                results=r["results"],
             )
             for r in self._repo.connection.execute(
                 # The curve is the real instance's. A demo deployment's scores
                 # are a number like any other once they are in the table, and
                 # there is no way to tell them apart afterwards — which is why
                 # the exclusion is here and not left to whoever reads it.
-                "SELECT id, week_of, rubric_sha, brain_sha, judge_model FROM eval_runs "
+                "SELECT id, week_of, rubric_sha, brain_sha, judge_model, "
+                "(SELECT COUNT(*) FROM eval_results WHERE eval_run_id = eval_runs.id) "
+                "AS results FROM eval_runs "
                 "WHERE is_synthetic = 0 ORDER BY started_at_ms"
             )
         ]
@@ -529,6 +569,17 @@ class EvalRunner:
                 "scores with nothing afterwards able to tell."
             )
 
+        existing = self._repo.connection.execute(
+            "SELECT COUNT(*) FROM eval_results WHERE eval_run_id = ?", (eval_run_id,)
+        ).fetchone()[0]
+        if existing:
+            raise AlreadyScored(
+                f"eval run {eval_run_id} already holds {existing} result"
+                f"{'' if existing == 1 else 's'}. A run is scored once: its samples "
+                "are generated together under one judge. Record a new baseline "
+                "and score that."
+            )
+
         # The rubric arrives from disk and the run recorded a hash. Nothing
         # compared them until now, so a rubric edited after a baseline was
         # recorded would have graded that baseline and stamped the result with a
@@ -549,6 +600,7 @@ class EvalRunner:
 
         for prompt_id, slug, prompt in self.active_prompts():
             for index in range(self._samples):
+                completion = None
                 try:
                     completion = _completion_of(
                         generate(prompt=prompt, brain=brain, sample=index)
@@ -565,6 +617,7 @@ class EvalRunner:
                         failure_type="bad_output",
                         signature=f"eval:{slug}:{type(exc).__name__}",
                         message=str(exc) or type(exc).__name__,
+                        context_json=_failure_context(exc, completion),
                     )
                     continue
                 self._record_result(
@@ -587,14 +640,17 @@ class EvalRunner:
         judgement: Judgement,
         model_call_id: str,
     ) -> None:
-        import json
-
+        # The answer that was scored, as the generating call kept it — relative
+        # to the payload root, like every payload path. Null when the text could
+        # not be written, which the failure ledger then says.
+        kept = self._repo.payload_for(model_call_id)
         self._repo.connection.execute(
             "INSERT INTO eval_results (id, eval_run_id, eval_prompt_id, sample_index, "
-            "score, subscores_json, model_call_id, is_synthetic) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "score, subscores_json, output_path, model_call_id, is_synthetic) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (new_ulid(now_ms()), eval_run_id, prompt_id, sample,
-             float(judgement.total), json.dumps(judgement.scores), model_call_id,
+             float(judgement.total), json.dumps(judgement.scores),
+             kept["completion_path"] if kept else None, model_call_id,
              int(self._is_synthetic)),
         )
 
@@ -652,6 +708,12 @@ class EvalRunner:
                 f"different judges — {earlier.judge_model} and {later.judge_model}. "
                 "Two judges are two instruments, and a curve across instruments is "
                 "not a curve."
+            )
+        if earlier.judge_version != later.judge_version:
+            raise NotComparable(
+                f"different judge versions — {earlier.judge_version} and "
+                f"{later.judge_version}. One model asked two ways is two "
+                "instruments as surely as two models are."
             )
 
         # Unrecorded before different, and not folded into one check. "I cannot
@@ -774,6 +836,7 @@ class EvalRunner:
             prompts=[PromptSummary(slug=s, samples=v) for s, v in sorted(by_slug.items())],
             generators=self._generators(eval_run_id),
             prompt_versions=self._prompt_versions(eval_run_id),
+            judge_version=run["judge_model_version"],
         )
 
     def _prompt_versions(self, eval_run_id: str) -> tuple[str | None, ...]:

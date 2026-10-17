@@ -281,7 +281,7 @@ this document will say the brain got worse, with the same prominence. And if it
 does not run before the deadline, this section will say that, which is what it
 says now.
 
-The comparison also refuses, rather than warns, in 10 <!-- derived: matches apps/api/secondshift/evals/runner.py raise NotComparable\( --> cases where the
+The comparison also refuses, rather than warns, in 11 <!-- derived: matches apps/api/secondshift/evals/runner.py raise NotComparable\( --> cases where the
 number would mean something other than it looks like: different rubrics,
 different judges, a run never scored, a run scored incompletely, a synthetic
 run, different prompt sets, both runs pinning the same brain state — the one
@@ -292,6 +292,12 @@ models, and two runs whose outputs came from different agent prompts.** A week 1
 generated on the Spark and a week 8 generated in the cloud is a difference in
 the model; a role prompt edited in between is a difference in the prompt. This
 document would have called either one learning.
+
+The eleventh was added on 17 Oct, after the first real scoring found the judge
+refusing some of its own output: **one judge model asked two different ways.**
+The judge's prompt was pinned by nothing and the curve compared judges by name,
+so fixing that prompt between week 1 and week 8 would have passed every check
+above. A judge's recorded version now carries the hash of what it was asked.
 
 That figure derives from the refusals in the code rather than being typed here.
 Three documents disagreed about it — five, six, and the truth — for the three

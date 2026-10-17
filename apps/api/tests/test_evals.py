@@ -1318,7 +1318,10 @@ class TestTheJudgeIsAModel:
         graded rather than what somebody wrote down — and so no model identifier
         lands outside the providers package."""
         assert judge.name == "stub-served-model"
-        assert judge.version == "pinned-1"
+        # The configured pin, and since 17 Oct the hash of what the judge is
+        # asked — the ask is half the instrument. `test_eval_integrity.py` holds
+        # the hash to the text.
+        assert judge.version.startswith("pinned-1/ask:")
 
     def test_a_bare_object_is_read(self, judge, vllm_stub, rubric):
         vllm_stub.answers(text=self._scores())
