@@ -9,9 +9,18 @@
 # profile. There is no demo branch in here and nothing is stubbed. What differs
 # is two environment variables and the database the image was built with.
 #
-# Build from the repository root:
+# Build from the repository root, for the platform it will run on:
 #
-#     docker build -f deploy/judge/Dockerfile -t second-shift-judge .
+#     docker buildx build --platform linux/amd64 \
+#         -f deploy/judge/Dockerfile -t second-shift-judge --load .
+#
+# `--platform` is not optional. ADR 0009's target is a no-GPU Compute VM, which
+# is x86, and the two machines most likely to build this are both arm64: the
+# first build, on 16 Oct on the always-on machine, produced an arm64 image that
+# could not have run there. Built for amd64 from an arm64 laptop through Docker
+# Desktop's emulation on 17 Oct — the seed and the package check below ran
+# inside the build, and the emulated container served `/health` and the
+# capability report.
 #
 # ---------------------------------------------------------------------------
 # What this image must not carry, and how that is enforced
