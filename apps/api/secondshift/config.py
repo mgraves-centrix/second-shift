@@ -45,6 +45,10 @@ ENV_PAYLOADS = "SECOND_SHIFT_PAYLOADS"
 #: too. Registered here anyway: a resolved view that omits a credential the
 #: system depends on is a view with a hole where the important part goes.
 ENV_TAVILY_KEY = "TAVILY_API_KEY"
+#: Token Factory's key, under the name the machine's secrets file already uses.
+#: Read when a cloud call is made and nowhere else; the night unit's environment
+#: deliberately does not carry it (see `deploy/spark/second-shift-night.user.service`).
+ENV_NEBIUS_KEY = "NEBIUS_API_KEY"
 
 _MODELS_CONFIG = Path(__file__).resolve().parents[3] / "config" / "models.toml"
 
@@ -252,6 +256,38 @@ def local_reasoner_settings() -> LocalReasonerSettings:
         max_tokens=int(local.get("reasoner_max_tokens", 4096)),
         temperature=float(local.get("reasoner_temperature", 0.7)),
         timeout_s=float(local.get("reasoner_timeout_s", 300)),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class CloudReasonerSettings:
+    """Where the cloud reasoner is and what it is asked to be.
+
+    No credential here. The key is read from the environment at the call, so it
+    is never part of a value that might be printed, compared or logged.
+    """
+
+    base_url: str
+    model: str
+    max_tokens: int
+    temperature: float
+    timeout_s: float
+
+
+def cloud_reasoner_settings() -> CloudReasonerSettings:
+    """The `[cloud]` block of the models config.
+
+    The model is the identifier the API serves, not the console's display name:
+    on 17 Oct `/v1/models` showed the two differ for every model this project
+    binds, and the rate table had been keyed by the display names since 27 Aug.
+    """
+    cloud = _read_toml(_MODELS_CONFIG)[0].get("cloud", {})
+    return CloudReasonerSettings(
+        base_url=cloud.get("reasoner_base_url", ""),
+        model=cloud.get("reasoner_model", ""),
+        max_tokens=int(cloud.get("reasoner_max_tokens", 16000)),
+        temperature=float(cloud.get("reasoner_temperature", 0.7)),
+        timeout_s=float(cloud.get("reasoner_timeout_s", 300)),
     )
 
 
@@ -627,6 +663,11 @@ SETTINGS: tuple[Setting, ...] = (
         "providers.tavily.TavilyProvider",
         "search credential; absent means the research stage is skipped",
     ),
+    Setting(
+        ENV_NEBIUS_KEY,
+        "providers.tokenfactory.TokenFactoryReasoner",
+        "Token Factory credential; absent means the cloud reasoner refuses",
+    ),
     Setting(ENV_SYNTHETIC, "api.main", "mark written rows as synthetic"),
     Setting(
         ENV_RUBRIC_OVERWRITE,
@@ -706,12 +747,13 @@ def resolve_all(env: dict[str, str] | None = None) -> list[Resolved]:
         _path_setting(ENV_PRICING, environment, default_pricing_path()),
         _path_setting(ENV_ARTIFACTS, environment, default_artifact_root()),
         _path_setting(ENV_PAYLOADS, environment, default_payload_root()),
-        Resolved(
-            setting=by_name(ENV_TAVILY_KEY),
-            value=environment.get(ENV_TAVILY_KEY, ""),
-            origin=Origin.ENVIRONMENT
-            if environment.get(ENV_TAVILY_KEY)
-            else Origin.DEFAULT,
+        *(
+            Resolved(
+                setting=by_name(name),
+                value=environment.get(name, ""),
+                origin=Origin.ENVIRONMENT if environment.get(name) else Origin.DEFAULT,
+            )
+            for name in (ENV_TAVILY_KEY, ENV_NEBIUS_KEY)
         ),
         _synthetic_row(environment),
         Resolved(

@@ -175,16 +175,22 @@ def _night(args: argparse.Namespace) -> int:
 
         resolved = resolve_profile()
         if resolved.profile is Profile.CLOUD:
-            # No cloud reasoner exists until `nebius-executor` lands, and the
-            # registry binds an echo in its place. A night run against it closed
-            # every stage `complete` with the prompt echoed back as the artifact
-            # and moved each idea to `answered` — so the first night after a
-            # reboot, before the model servers came up, could consume every idea
-            # with fabricated work. Refusing leaves them queued for a night that
-            # can do them.
+            # Until 17 Oct this profile bound an echo, and a night run against it
+            # closed every stage `complete` with the prompt echoed back — so the
+            # first night after a reboot, before the model servers came up, could
+            # consume every idea with fabricated work.
+            #
+            # It now binds Token Factory, and the refusal stands for a different
+            # reason: a `cloud-assisted` turn may leave the machine only as
+            # redacted, policy-filtered context (privacy-airlock spec, Principle
+            # 2), and neither the redaction of a reasoning prompt nor that
+            # assembly exists. Until both do, an idea sent from here would leave
+            # as its raw text. Refusing leaves it queued for a night that can.
             reason = resolved.degradation_reason or "the profile resolved to cloud"
             print(
-                f"not starting a night: no reasoner can do the work ({reason})",
+                f"not starting a night: no reasoner can do the work ({reason}); "
+                "the cloud reasoner may not be sent an idea until redaction and "
+                "policy-filtered context assembly exist",
                 file=sys.stderr,
             )
             return EXIT_NO_REASONER

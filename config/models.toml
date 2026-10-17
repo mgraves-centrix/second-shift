@@ -81,3 +81,25 @@ embedder_timeout_s = 30
 [evals]
 judge_version = "nemotron-3.5-lightning-nvfp4-2026-08"
 generating_role = "architect"
+
+# The cloud reasoner: Token Factory, for the turns ADR 0004 assigns to the
+# cloud — research synthesis, architect, critic — under `cloud-assisted` only.
+#
+# `reasoner_model` is the identifier `/v1/models` serves, read from the API on
+# 17 Oct, not the console's display name. They differ for every Nemotron model
+# (`nvidia/nemotron-3-super-120b-a12b` against "Nvidia-Nemotron-3-Super-120B-
+# A12B"), and a request naming the display name is refused. Super rather than
+# 3.5 Super VL, which is multimodal and priced the same: nothing here sends an
+# image, and `docs/MODELS.md` binds Super.
+#
+# The standard endpoint, never Batch: `POST /v1/batches` answered 403 on 2 Sep.
+#
+# The credential is not here and never will be. It is `NEBIUS_API_KEY`, read
+# from the environment at the call.
+
+[cloud]
+reasoner_base_url = "https://api.tokenfactory.nebius.com/v1"
+reasoner_model = "nvidia/nemotron-3-super-120b-a12b"
+reasoner_max_tokens = 16000
+reasoner_temperature = 0.7
+reasoner_timeout_s = 300

@@ -192,11 +192,15 @@ class TestAnEntryFailureNamesItsRun:
 
 
 class TestNoSilentSubstitute:
-    """On `cloud` the registry binds an echo reasoner labeled `local-vllm`. The
+    """On `cloud` the registry bound an echo reasoner labeled `local-vllm`. The
     night ran every `cloud-assisted` idea against it, closed the stages
     `complete` with the prompt echoed back as the artifact, and moved the ideas
     to `answered` — so the first night after a reboot, before the model servers
-    came up, could consume every idea with fabricated output."""
+    came up, could consume every idea with fabricated output.
+
+    Since 17 Oct `cloud` binds Token Factory, and the night still refuses: an
+    idea may leave only as redacted, policy-filtered context, and that does not
+    exist yet."""
 
     def test_a_cloud_deployment_with_no_cloud_reasoner_refuses_to_start(
         self, db_path, command, capsys

@@ -1615,14 +1615,16 @@ class TestTheScoreCommand:
 
     def test_no_local_reasoner_refuses(self, baseline, rubric, tmp_path, capsys):
         """Today's real answer in this container, and the one it must not dress
-        up as a score. The registry binds an echo on `cloud`, and an echo's
-        numbers are indistinguishable from a model's once recorded."""
+        up as a score. Until 17 Oct `cloud` bound an echo, whose numbers are
+        indistinguishable from a model's once recorded; it now binds Token
+        Factory, which may not see the brain content an eval answer is
+        generated from. The refusal stands and its reason is the stronger one."""
         code = self._run(tmp_path, rubric, baseline)
 
         assert code == 2
         err = capsys.readouterr().err
         assert "no local reasoner can do the work" in err
-        assert "fabricated numbers" in err
+        assert "ADR 0010" in err and "ADR 0015" in err
 
     def test_missing_configuration_refuses_and_writes_nothing(
         self, local, baseline, rubric, tmp_path, repo, capsys, monkeypatch

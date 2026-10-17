@@ -158,22 +158,28 @@ def _describe(exc: urllib.error.HTTPError) -> str:
     return (detail or str(exc.reason))[:500]
 
 
-def _read_completion(endpoint: str, body: dict) -> RawCompletion:
-    """Read one chat completion, refusing anything that is not one."""
+def _read_completion(
+    endpoint: str, body: dict, *, source: str = "local reasoner"
+) -> RawCompletion:
+    """Read one chat completion, refusing anything that is not one.
+
+    Any OpenAI-compatible server answers in this shape, so the cloud reasoner
+    reads it here too; `source` is only what the refusal calls the server.
+    """
     choices = body.get("choices")
     if not isinstance(choices, list) or not choices:
-        raise BadOutput(f"local reasoner at {endpoint} answered with no choices")
+        raise BadOutput(f"{source} at {endpoint} answered with no choices")
     choice = choices[0]
     if not isinstance(choice, dict):
-        raise BadOutput(f"local reasoner at {endpoint} answered with an unreadable choice")
+        raise BadOutput(f"{source} at {endpoint} answered with an unreadable choice")
     message = choice.get("message")
     if not isinstance(message, dict):
-        raise BadOutput(f"local reasoner at {endpoint} answered with no message")
+        raise BadOutput(f"{source} at {endpoint} answered with no message")
 
     text = message.get("content") or ""
     if not isinstance(text, str):
         raise BadOutput(
-            f"local reasoner at {endpoint} answered with content that is "
+            f"{source} at {endpoint} answered with content that is "
             f"{type(text).__name__}, not text"
         )
 

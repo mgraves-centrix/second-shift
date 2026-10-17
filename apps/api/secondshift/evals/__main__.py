@@ -261,8 +261,8 @@ def _score(
 ) -> int:
     """Generate a run's answers and grade them, or refuse and say why.
 
-    Every refusal here is a substitution not made. The registry binds an echo
-    reasoner on the `cloud` profile, `StubJudge` exists for exercising the
+    Every refusal here is a substitution not made. The `cloud` profile binds a
+    remote reasoner that may not see brain content, `StubJudge` exists for exercising the
     runner, and either of them reaching a real run writes scores that look like
     every other score in the table. Unlike a bad artifact, a scored eval run
     cannot be withdrawn: the claim is a week-1 to week-8 comparison, and nothing
@@ -288,14 +288,17 @@ def _score(
 
     resolved = resolve_profile()
     if resolved.profile is Profile.CLOUD:
-        # The same refusal the night makes, for a sharper reason. A night run
-        # against the echo produced artifacts somebody would eventually read and
-        # disbelieve. Scoring against it produces numbers that are the evidence.
+        # Refused for what the cloud reasoner is, not for what it lacks. Until
+        # 17 Oct this profile bound an echo and the refusal guarded against its
+        # fabricated numbers; it now binds Token Factory, and scoring there
+        # would send answers generated from the brain's topic files — local-only
+        # by ADR 0010 — off the machine, graded by a judge ADR 0015 keeps local.
         reason = resolved.degradation_reason or "the profile resolved to cloud"
         print(
-            f"not scoring: no local reasoner can do the work ({reason}). The "
-            "judge runs local-only by ADR 0015, and the registry binds an echo "
-            "here — scoring against it would put fabricated numbers in the curve.",
+            f"not scoring: no local reasoner can do the work ({reason}). Eval "
+            "answers are generated from local-only brain content (ADR 0010) and "
+            "graded by a local judge (ADR 0015); this profile's reasoner is "
+            "remote, so nothing here may score.",
             file=sys.stderr,
         )
         return 2

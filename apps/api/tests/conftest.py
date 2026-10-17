@@ -134,6 +134,9 @@ class VllmStub:
 
     def __init__(self) -> None:
         self.requests: list[dict] = []
+        #: The headers of each request, in order, so a test can see what
+        #: authenticated it — and assert what must never be sent.
+        self.headers: list[dict[str, str]] = []
         self.status = 200
         self.body: object = None
         self.raw: bytes | None = None
@@ -215,6 +218,7 @@ class _StubHandler(BaseHTTPRequestHandler):
         stub: VllmStub = self.server.stub  # type: ignore[attr-defined]
         length = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(length)
+        stub.headers.append({k.lower(): v for k, v in self.headers.items()})
         try:
             stub.requests.append(json.loads(raw))
         except ValueError:

@@ -22,7 +22,8 @@ from dataclasses import dataclass
 from ..config import local_embedder_settings, local_reasoner_settings
 from ..telemetry.recorder import Recorder
 from .base import Embedder, Executor, Reasoner, Transcriber
-from .null import EchoReasoner, InProcessExecutor, NullTranscriber
+from .null import InProcessExecutor, NullTranscriber
+from .tokenfactory import TokenFactoryReasoner
 from .vllm import VllmReasoner
 from .vllm_embed import VllmEmbedder
 
@@ -74,8 +75,12 @@ class Registry:
         """
         recorder = self._recorder
         if profile == "cloud":
+            # Token Factory, which refuses at the call when it has no key. The
+            # `EchoReasoner` placeholder that stood here recorded a model call
+            # and returned the prompt — the substitution this module's
+            # docstring says is refused everywhere else.
             return Providers(
-                reasoner=EchoReasoner(recorder, model="cloud-placeholder"),
+                reasoner=TokenFactoryReasoner(recorder),
                 transcriber=NullTranscriber(recorder, model="cloud-placeholder"),
                 embedder=self._local_embedder(),
                 executor=InProcessExecutor(recorder, model="cloud-placeholder"),
