@@ -111,17 +111,18 @@ claim whose age you can see.
 
 | | read |
 |---|---|
-| Eval baseline | 2 Sep — `01M1FYFECEXC5ZJEWHNP7WZMXB`, six prompts, rubric `b4decd6fe774`, brain `ad17b3bcddb6`, **awaiting scoring** |
-| Entries | 2 Sep — 4 real: 1 archived, **3 still queued and never processed** |
-| Runs | 2 Sep — **0.** No night has ever executed |
-| Production code | 2 Sep — deployed tree dated 30 Aug; `retrieval`, `agents` and the embedder are **not** on the machine |
-| Reasoner | 2 Sep — container up, but **unmanaged**: the systemd unit was never installed, so a reboot ends it |
-| API / brain sync | 2 Sep — both live as enabled user units |
+| Eval baseline | 17 Oct — week 1 `01M1FYFECEXC5ZJEWHNP7WZMXB` (brain `ad17b3bcddb6`) **untouched, awaiting scoring**. `01M53FX6MV5D9ZWF4Z6117YVSE`, a week-8 baseline, was interrupted on 16 Oct and can never be scored; `status` names it as interrupted |
+| Entries | 17 Oct — 7 real: 6 `answered` (all `cloud-assisted`), 1 `archived`. **Nothing queued** |
+| Runs | 17 Oct — 6 real nights, the last three `complete` on 18 Sep |
+| Production code | 17 Oct — deployed from `endgame/finish-openspec`, schema 4. It had been a tree from 17 Sep with no `secondshift.ops` at all |
+| Reasoner | 16 Oct — on its user unit, enabled, loopback-only. **No reboot has tested it** |
+| API / brain sync / night / backup | 17 Oct — enabled user units; the 02:00 night pulled the backup in and it landed on the NAS |
+| Session clone | 16 Oct — `~/second-shift-src`, with its own venv. `~/second-shift` is the deployed tree and is not a clone |
 
-**Nothing reasons in production.** `local-inference` and `agents` both shipped,
-and a real completion was made through an agent from a development window — but
-the deployed code predates all of it, and `model_calls` on the machine is still
-empty. The gap is a deploy, not a missing capability.
+**Production reasons, and has since 16 Sep** — this section said otherwise
+until 17 Oct, read on 2 Sep and never re-read. Six real nights ran. What
+production lacked until 17 Oct was the code: no `ops`, no payload capture, and
+schema 2.
 
 ---
 

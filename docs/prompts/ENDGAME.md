@@ -30,16 +30,18 @@ has to explain why. The deadline has slack; the window does not.
 
 ## What is left, and the one thing it waits on
 
-Four claims in `docs/SUBMISSION.md` read **not run**, and after 10 Oct they are
-no longer one blocker:
+**Updated 17 Oct, after the machine session ran** —
+`docs/operations/reports/2026-10-16-machine-session.md` and the work that
+followed it. This table said every row waited on the machine; most now wait on
+a decision instead.
 
 | | Needs |
 |---|---|
-| The week-8 eval score | **The machine only.** ADR 0015 made the judge local, so no credential |
-| A real night proposing a belief against the real brain | The machine only. Closes `2026-09-17-the-night-revises-what-it-believes` at 7/7 |
-| The judge container built and stood up | A container runtime. The NAS runs containers |
-| A build stage fanned out to real parallel Nebius Jobs | A credential, and `nebius-executor` is 3/23 |
-| A cloud night's cost beside a local one | The same credential, plus the local night's rows |
+| The week-8 eval score | **A decision on retrying a failed sample.** The judge's reader is fixed and pinned; what remains is an answer that sometimes never finishes, which leaves a run incomplete and an incomplete week 1 cannot be retaken. See `2026-10-17-what-the-first-scoring-found`, task 6.4 |
+| A real night proposing a belief against the real brain | An idea queued from the phone. Closes `2026-09-17-the-night-revises-what-it-believes` at 7/7 |
+| The judge container built and stood up | **Done 16 Oct** on the machine (arm64). An amd64 build for ADR 0009's target is checked from the laptop |
+| A build stage fanned out to real parallel Nebius Jobs | **A decision on putting a Token Factory key in Nebius**, so a job can reason, and prompt redaction for any real idea it carries |
+| A cloud night's cost beside a local one | **Prompt redaction and policy-filtered context assembly**, which the privacy-airlock spec requires and nothing implements. The cloud reasoner itself works and is verified |
 
 `docs/SPEC_ROADMAP.md`'s **Owed verification → Open** table is the authoritative
 list and is longer than this one. Read it before starting. Do not re-derive it
@@ -83,14 +85,20 @@ not on what the file assumes:
 | **`claude` on a laptop, over SSH** | The steps that are pure commands | Cannot do the reboot, the NAS backup or the container build well, and the four traps below all apply |
 
 ```bash
-cd ~/second-shift && git pull origin main    # evals score only exists since 10 Oct
-claude
+git -C ~/second-shift-src pull origin main
+claude    # started in ~/second-shift-src
 ```
 
-Then paste this file. The clone on the machine already has a working virtual
-environment, because it has been running nights — a **fresh** clone needs the
-bootstrap in `docs/development/GATES.md` first, and the gate refuses by name
-rather than guessing when it is missing.
+Then paste this file.
+
+**`~/second-shift` is not a clone and must never become one.** This section said
+it was until 17 Oct, with a working virtual environment from running nights. It
+is the tree `deploy/spark/deploy.sh` lands — no `.git`, no `docs/`, no
+`openspec/`, no `scripts/` — and the deploy begins with `rm -rf` on it, so a
+clone placed there is destroyed by the next deploy. The session clone is
+`~/second-shift-src`, made on 16 Oct with its own venv by the bootstrap in
+`docs/development/GATES.md`. Production code reaches the machine through the
+deploy, never through `git pull` in the live tree.
 
 ### Handing the result back
 
@@ -121,7 +129,7 @@ remotely. What it cannot do is run them *locally*: the database, the brain
 repository and the model all live on the machine, so every command below
 executes there whatever drives it.
 
-Four things about the SSH route specifically, each of which will bite:
+Five things about the SSH route specifically, each of which will bite:
 
 - **Write `<spark>`, never the machine's name.** The repository is public.
   `scripts/check-no-environment.sh` now enforces this for ssh invocations —
@@ -133,10 +141,15 @@ Four things about the SSH route specifically, each of which will bite:
   corrupted the write-ahead log on that machine. Running it as a different
   account than the services use reports on the wrong thing — confirm who owns
   the database and who the units run as before believing the result.
-- **The reboot drops the connection.** Step 8 ends the session that issued it.
-  Expect the disconnect, do not read it as a failure, and reconnect to verify
-  what came back up rather than inferring it from a command that never
-  returned.
+- **The reboot drops the connection — if it can be issued at all.** Step 8 ends
+  the session that issued it; expect the disconnect and reconnect to verify
+  what came back up. On 16 Oct it could not be issued: `sudo` on that machine
+  asks for a password, and a session over SSH has none to give. The reboot is
+  somebody's at the machine.
+- **`pkill -f` matches your own SSH session.** The command line of the remote
+  shell carries the pattern you passed it, so `ssh <spark> 'pkill -f
+  secondshift.evals'` killed the connection along with the scoring run on 16
+  Oct. Find the process id first and kill that.
 - **A real night outlives an SSH session.** Do not run step 7 in the foreground
   of a connection that can close. Use the installed timer, or `systemd-run`, and
   then watch `ops night-status` — a night killed by a closing terminal leaves a

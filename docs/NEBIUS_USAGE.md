@@ -99,20 +99,29 @@ a demo deployment's rows cannot reach a measurement.
 | Token Factory credentials work end to end | **Verified 2 Sep** | A hand-built RS256 JWT exchanged for an access token, which then authorized `GET /ai/v1/jobs` with a 200. The private key never left the always-on machine. |
 | Batch is unavailable for these models | **Verified 2 Sep** | Console check; rates recorded and unused |
 | Nights run locally, end to end | **Recorded 16–17 Sep** | Two real nights on the Spark against the live reasoner; the second completed five stages in 192 seconds, and a later one completed six of six with research on |
+| **Token Factory answers a real completion through the cloud reasoner** | **Verified 17 Oct** | One synthetic prompt under `cloud-assisted`, from the machine, into a throwaway database: a `model_calls` row naming `token-factory` and `nvidia/nemotron-3-super-120b-a12b`, its payload kept, `night_totals` reading the cost. It exposed that every Token Factory id in the rate table was a console display name the API answers 404 to, and that reasoning tokens — billed as output — were not priced. Both fixed |
 | **A build stage fanned out to real parallel Jobs** | **Not yet run** | `SELECT count(*), sum(total_tokens), sum(estimated_cost_usd) FROM model_calls WHERE provider = 'nebius-job' AND is_synthetic = 0` — returns nothing today. **The `is_synthetic = 0` is not decoration**: the seeded night writes ten `nebius-job` rows, and the first draft of this table omitted the filter and would have shown a reader a fan-out that never happened |
-| **A cloud night's cost, side by side with a local one** | **Not yet run** | `SELECT * FROM night_totals` — the demo's two-ideas comparison reads exactly this |
+| **A cloud night's cost, side by side with a local one** | **Not yet run, and blocked on redaction** | `SELECT * FROM night_totals` — the demo's two-ideas comparison reads exactly this. The view reads a real cloud call correctly; no night may send an idea to the cloud reasoner until prompt redaction and policy-filtered context assembly exist |
 | **The week-1 to week-8 eval curve** | **Baseline recorded, not scored. The bar is fixed.** | `python -m secondshift.evals curve` — says "nothing to compare yet" today, refuses 11 <!-- derived: matches apps/api/secondshift/evals/runner.py raise NotComparable\( --> ways if the comparison would mean something other than it looks like, and prints its verdict against `config/evals/threshold.md`, fixed 23 Sep while no week-8 output existed |
 
 **They are not one blocker, and this said they were until 16 Oct.** The
 credentials exist and were verified, and they live on the always-on machine
 outside any git-tracked path — but the three rows wait on different things:
 
-- **The fan-out and the cost comparison** need the credential *and* a client
-  nobody has written. `providers/` contains no Nebius module, and
-  `openspec/changes/2026-09-02-add-nebius-executor/` stands at 3 of 23 tasks.
+- **The fan-out** needs a decision before it needs code: a job runs on
+  Nebius, so to reason it needs a Token Factory key *there*, in its secret
+  store, and whether a key may live anywhere but the machine is the
+  subject's question. The collection half is built — the poller reads a
+  job's report and records it once — and the cloud reasoner is built and
+  verified; dispatch is not. `openspec/changes/2026-09-02-add-nebius-executor/`
+  stands at 11 of 23 tasks.
+- **The cost comparison** needs a cloud night, and a cloud night needs the
+  prompt redaction and context assembly the privacy-airlock spec requires
+  and nothing implements.
 - **The eval curve** needs no credential at all, since `docs/decisions/0015`
-  made the judge local on 10 Oct. It needs a session on the machine, because the
-  database, the brain and the model are all there.
+  made the judge local on 10 Oct. The first real scoring, 16–17 Oct, found the
+  judge's reader refusing valid judgements, now fixed and pinned; what is left
+  is a decision on retrying a sample whose answer never finished.
 
 `docs/SPEC_ROADMAP.md` tracks each under "what a machine session owes".
 

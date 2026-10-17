@@ -118,23 +118,30 @@ That is the strongest claim available because it is the thing one DGX Spark
 would be better, because the critic gets alternatives to choose between instead
 of one draft to accept.
 
-**It has not run.** `providers/` contains no Nebius module;
-`openspec/changes/2026-09-02-add-nebius-executor/` stands at 3 of 23 tasks, all
-three of them decisions. What exists is the interface the night calls
-(`Executor`), the schema that would record the fan-out, and a credential
-verified end to end on 2 Sep — a hand-built RS256 JWT exchanged for a real
-access token, which then authorized `GET /ai/v1/jobs` with a 200 and an empty
-list. What is missing is the client, and a session on the machine that holds the
-key.
+**It has not run.** `openspec/changes/2026-09-02-add-nebius-executor/` stands at
+11 of 23 tasks. Built since 17 Oct: the poller's half, which collects a job's
+report of what it did and records it exactly once however often it is collected,
+and refuses to present a job whose report never came as one that cost nothing.
+Not built: dispatch. A job runs on Nebius, so to reason it needs a Token Factory
+key there, in Nebius's secret store — and whether a key may live anywhere but
+the always-on machine is a decision for the subject, not one this document or
+its author makes by convenience. The credential itself was verified end to end
+on 2 Sep: a hand-built RS256 JWT exchanged for a real access token, which then
+authorized `GET /ai/v1/jobs` with a 200 and an empty list.
 
 **Token Factory is to run the research-synthesis, architect and critic turns**
 on `cloud-assisted` ideas: long-context work against a quality bar where a
-3B-active local model is the wrong tool rather than a slower one. Its rates were
-read from the console on 27 Aug and are in `config/pricing.toml`, with batch at
-exactly half. No cloud `Reasoner` is implemented either, and on 10 Oct that
-stopped being only a gap: `docs/decisions/0015` found that brain-derived text
-cannot reach a remote provider at all, so the eval judge that was bound to Token
-Factory is now local.
+3B-active local model is the wrong tool rather than a slower one. **The cloud
+reasoner exists and answered a real call from the machine on 17 Oct**, recorded
+with its cost. That call found the rate table keyed by console display names the
+API rejects with a 404, and reasoning tokens — billed as output — unpriced; both
+are fixed, and the rates were re-read from the API's own `/v1/models`. **No idea
+is sent to it.** The privacy-airlock spec requires a `cloud-assisted` turn to
+leave as redacted, policy-filtered context, and neither the redaction of a
+reasoning prompt nor that assembly exists, so the night refuses the cloud
+profile. And on 10 Oct `docs/decisions/0015` found that brain-derived text cannot
+reach a remote provider at all, so the eval judge that was bound to Token Factory
+is now local.
 
 **Nothing is stubbed to close either gap**, and that is the deliberate part. A
 stub executor returning plausible job results writes `model_calls` rows
@@ -193,20 +200,21 @@ estimating it.**
 | Retrieval on the machine | **Run.** 40ms index rebuild, 48 KiB index |
 | The scrubber at 20× | **Measured.** 0.1ms per steady frame against a 16.7ms budget, and flat in night size |
 | **A build stage fanned out to real parallel Jobs** | **Not run** |
-| **A cloud night's cost beside a local one** | **Not run** |
-| **The week-8 eval score** | **Not run.** Week 8 is 15–21 Oct. The week-1 baseline is recorded; a judge that drives any reasoner exists as of 10 Oct and has been tested against a stub endpoint, never against a real checkpoint |
-| **The judge container built and stood up** | **Not run** |
+| **A cloud night's cost beside a local one** | **Not run.** One real Token Factory call, 17 Oct, reads correctly off `night_totals`; no night may send an idea to the cloud until redaction exists |
+| **The week-8 eval score** | **Not run.** Week 8 is 15–21 Oct. The judge ran against the real checkpoint on 16–17 Oct and found a defect in itself: its reader refused two valid judgements, misled by malformed drafts earlier in the same completions. Fixed and pinned into the judge's version; re-read over every kept completion, no other score moved. What remains is an answer that sometimes runs to the token limit, which leaves a run incomplete |
+| **The judge container built and stood up** | **Run**, 16 Oct on the machine and 17 Oct for amd64, ADR 0009's target. The seed and the package check ran inside the build; the container served `/health` and the honest capability report. Not yet read by somebody who has not seen it |
 
-**Those four rows are three different blockers, and this document claimed one
-until 16 Oct.** It read "one blocker, not four — and it is a credential, not a
+**The rows still unrun are four different blockers, and this document claimed
+one until 16 Oct.** It read "one blocker, not four — and it is a credential, not a
 machine", which was written on 10 Oct and contradicted by a decision made the
 same day. Separating them:
 
 | Unrun row | What it waits on |
 |---|---|
-| The parallel Jobs fan-out, and the cost comparison beside it | **A credential**, plus the client that has not been written |
-| The week-8 eval score | **A session on the machine.** ADR 0015 made the judge local, so this needs no credential at all — the database, the brain and the model are simply all there |
-| The judge container | **A container runtime.** Every step inside the image has been run outside it; the layering has not |
+| The parallel Jobs fan-out | **A decision on a Token Factory key inside Nebius**, then the dispatch client |
+| The cost comparison | **Prompt redaction and policy-filtered context assembly**, which the privacy-airlock spec requires and nothing implements |
+| The week-8 eval score | **A decision on retrying a sample whose answer never finished.** At the rate observed, an 18-sample run with no such sample is not the likely outcome, and an incomplete week 1 cannot be retaken |
+| A real night revising a belief | **An idea queued from the phone** |
 
 The Nebius credentials exist and were verified end to end on 2 Sep: a hand-built
 RS256 JWT exchanged for an access token, which then authorized a live

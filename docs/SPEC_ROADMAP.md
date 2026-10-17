@@ -43,25 +43,43 @@ with the Tavily credential (`add-research` 5.1): the redacted query was the only
 thing sent, five results came back for one credit in 1.2s, and the one
 `tool_calls` row holds the redacted query and no entry text.
 
-### Open, as of 21 Sep — what a machine session owes
+### Open, as of 17 Oct — what is still owed, and what it waits on
 
 Consolidated here because each of these is recorded in its own capability's
-section below, and a reader deciding what a Spark session should do needs one
-list rather than six. The detail stays where it is; this is the index.
+section below, and a reader deciding what to do next needs one list rather than
+six. The detail stays where it is; this is the index. **On 16 and 17 Oct a
+session drove the machine over SSH and closed most of the 21 Sep list**; what is
+left mostly waits on a decision or on somebody at the machine, not on a route
+to it. `docs/operations/reports/2026-10-16-machine-session.md` has the evidence.
 
-| What | Owed by | Detail |
+| What | Owed by | Waits on |
 |---|---|---|
-| A reboot, with the API, brain sync and reasoner serving afterward | `operations` | `docs/operations/RECOVERY.md` |
-| A restore of the **real** data onto a scratch path, diffed and timed | `operations` | The mechanism is rehearsed against a generated night; that disk and that data are not. |
-| `ops doctor` run there, which subsumes `config show` | `operations` | Its `data ownership` check exists because a service running as the wrong account has corrupted the write-ahead log on that machine. |
-| The reasoner switched to its unit | `operations` | **Decided 22 Sep: now.** `docs/operations/SUPERVISING_THE_REASONER.md`, gated on `ops night-status`. **Read step 2 before starting**: the unit removes `second-shift-reasoner` and the running container is `nemotron-lightning`, so a naive switch fails every fifteen seconds while the reasoner looks healthy — the old container is still serving on the port the probe checks. |
-| The backup unit installed, and one backup observed landing on the NAS | `operations` | **Decided 22 Sep: the NAS, nightly after the night run.** `second-shift-backup.user.service` plus a `backup.env` holding the path. Also the first real test of the same-device guard — an unmounted share fails the unit instead of quietly filling the local disk. |
-| The judge container built, stood up, and read by a stranger | `judge-mode` | Three gaps, below. The NAS runs containers. |
-| One real night, to exercise the night's events against a live reasoner | `night-pipeline` | Also closes `2026-09-17-the-night-revises-what-it-believes` at 7/7. |
-| Live dispatch and telemetry collection against Nebius | `nebius-executor` | The credentials exist — on that machine, at `~/.config/second-shift/secrets.env`. Not a missing credential; a missing route to where it is. |
-| `ModelJudge` against the real local reasoner | `evals` | **Added 10 Oct and tested only against a stub.** A stub cannot predict what a real checkpoint writes around its JSON, and the extraction rule is the whole risk surface. One completion on the machine settles it. |
-| The week-8 eval run | `eval-scoring` | **Week 8 is 15–21 Oct.** The curve exists, the threshold is fixed (`config/evals/threshold.md`, 23 Sep, while nothing had been scored), and as of 10 Oct a judge exists that drives any reasoner. **It does not need Token Factory.** Resolved 10 Oct: the judge is the local reasoner, `local-only`, because ADR 0010 had made a cloud judge impermissible since 2 Sep — `docs/decisions/0015`. Both runs need the same judge on both sides; the curve refuses two judges as two instruments. |
+| A reboot, with the API, brain sync and reasoner serving afterward | `operations` | **Somebody at the machine.** `sudo` asks for a password a session over SSH does not have. |
+| The week-8 eval run | `eval-scoring` | **A decision on retrying a failed sample.** The judge's reader is fixed and pinned (`2026-10-17-what-the-first-scoring-found`); an answer that runs to the token limit still leaves a run incomplete, and an incomplete week 1 cannot be retaken. Week 8 is 15–21 Oct. |
+| One real night, to exercise the night's events against a live reasoner | `night-pipeline` | **An idea queued from the phone.** Nothing is queued. Closes `2026-09-17-the-night-revises-what-it-believes` at 7/7. |
+| Live dispatch against Nebius Serverless Jobs | `nebius-executor` | **A decision on a Token Factory key inside Nebius**, so a job can reason. The route was never the blocker: a session driving the machine over SSH runs where the key is. A job runs on Nebius, so it needs one there. |
+| A cloud night, and its cost beside a local one | `nebius-executor`, `privacy-airlock` | **Prompt redaction and policy-filtered context assembly**, which the privacy-airlock spec requires for any `cloud-assisted` turn and nothing implements. The cloud reasoner exists and answered a real call on 17 Oct; the night refuses the cloud profile until these do. |
+| The judge container read by somebody who has not seen it | `judge-mode` | **A reader.** Built and stood up on 16 Oct; built for amd64, ADR 0009's target, on 17 Oct. |
+| A dedicated NAS share for backups | `operations` | **The NAS's administrator.** Backups land under `scratch`, the only writable export. |
 | Spike F, and `Transcriber` | `asr` | The model runs on the Spark and nowhere else. |
+
+Closed on 16 and 17 Oct:
+
+- ~~A restore of the real data, diffed and timed~~ — byte-identical, 0.174 s.
+- ~~`ops doctor` run there~~ — eight of eight, as the account the units run as.
+- ~~The reasoner switched to its unit~~ — the trap in step 2 was present and
+  avoided; loopback-only and enabled.
+- ~~The backup unit installed, and one backup observed landing on the NAS~~ —
+  pulled in by the 02:00 night on 17 Oct; the same-device guard refused the
+  local disk first, as a control.
+- ~~The judge container built and stood up~~ — on the machine, and for amd64.
+- ~~`ModelJudge` against the real local reasoner~~ — it found a defect in its
+  own reader, which refused two valid judgements; fixed, and re-read over every
+  kept completion with no other score moving.
+- ~~Telemetry collection from a job~~ and ~~the cloud reasoner~~ —
+  `nebius-executor` 2.1 and 2.3, built and tested; the reasoner verified by a
+  real call from the machine.
+
 
 **Most of these do not close from a cloud development session**, and that is
 tested rather than assumed — see the note under `judge-mode` for how, and for

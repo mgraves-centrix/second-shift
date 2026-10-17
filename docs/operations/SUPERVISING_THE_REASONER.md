@@ -4,9 +4,13 @@
 was written on 2 Sep and has never been started. The container serving local
 inference was started by hand, has no unit, and has been up for weeks.
 
-**Status: never run.** Every step below is written from what the unit and the
-running container actually say, not from having done it. The verification at
-the end is how you find out which part of this is wrong.
+**Status: steps 1 to 4 run on 16 Oct; step 5, the reboot, not run.** The trap
+below was real and present: the running container was `nemotron-lightning` on
+`0.0.0.0:8200`, the unit removes `second-shift-reasoner`, and step 2 removed the
+right one by name. Afterwards the unit was `enabled`, the reasoner listened on
+`127.0.0.1:8200` only, and `doctor` passed. The reboot needs `sudo`, which asks
+for a password, so a session over SSH cannot do it — it is somebody's at the
+machine, and until it is done nothing proves the unit survives one.
 
 Two things are being fixed, and they are not the same thing:
 
@@ -84,9 +88,11 @@ The user variant needs no sudo and no substitution — it uses `%h`. `loginctl
 enable-linger` is already enabled on that machine, which is what makes a user
 service start without a login.
 
-Roughly **three minutes** from a warm HuggingFace cache; a cold cache pulls 52
-shards first. The unit's `TimeoutStartSec=1800` is sized for that, and a
-shorter deadline would be a boot loop.
+About **five minutes** from a warm HuggingFace cache — measured at roughly 300
+seconds on 16 Oct, against the three minutes this said before anyone had run
+it. A cold cache pulls 52 shards first. The unit's `TimeoutStartSec=1800` is
+sized for that, and a shorter deadline would be a boot loop. Five minutes of
+`connection refused` on 8200 is the unit loading, not the unit failing.
 
 ```bash
 journalctl --user -u second-shift-reasoner -f

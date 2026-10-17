@@ -11,6 +11,7 @@ Read the status column before you read the step.
 | Status | Means |
 |---|---|
 | **exercised** | Runs in `apps/api/tests/test_operations.py` on every gate. |
+| **run on the machine** | Executed on the always-on machine against its real data, on the date given. |
 | **rehearsed** | Executed by hand, against a generated night rather than the real data. Timings below are from that. |
 | **never run** | Nobody has done this. Read it carefully and expect it to be wrong somewhere. |
 
@@ -117,8 +118,20 @@ beforehand.
 
 ## Restoring
 
-**Status: rehearsed.** Executed against a generated night, not against the
-machine's data. See the measurements below, and the caveat under them.
+**Status: run on the machine, 16 Oct.** The newest NAS backup restored onto a
+scratch path and compared against the live database:
+
+| | |
+|---|---|
+| `verify`, reading the backup from the NAS | **0.186 s** |
+| Restore onto local disk | **0.174 s** |
+| Restored dump vs. live dump | **byte-identical**, 72,497 bytes each |
+| Artifacts | `diff -r` clean, 39 files |
+
+That data is small — 220 rows — so these say the mechanism holds on that disk
+and that share, not how long a restore takes in a year. The rehearsal below,
+against a generated night, is kept because it exercised a concurrent writer,
+which the real restore did not.
 
 ```bash
 python -m secondshift.ops restore <backup>              # refuses an occupied path
@@ -153,7 +166,9 @@ objective.
 
 ## Checking the machine
 
-**Status: exercised. Never run on the always-on machine.**
+**Status: exercised, and run on the machine 16 and 17 Oct.** The first run
+failed three of eight — schema behind, no backup, backups on the same device —
+and each was a real fault, fixed in turn. It has passed since.
 
 ```bash
 python -m secondshift.ops doctor --backups <directory>
@@ -220,18 +235,23 @@ Listed here and in `docs/SPEC_ROADMAP.md`, because an obligation recorded only
 in the document that assumes it is a dropped one.
 
 - **A reboot.** Not `systemctl status`, not "linger is enabled" — an actual
-  reboot, with the API, the brain sync and the reasoner serving afterward.
-- **A restore of the real data** onto a scratch path, diffed against the live
-  database, and timed.
-- **`doctor` on that machine**, whose `data ownership` check exists because a
-  service running as the wrong account has corrupted the write-ahead log there
-  before.
-- **The reasoner switched to its unit**, following
-  `SUPERVISING_THE_REASONER.md` beside this file. Decided 22 Sep; the procedure
-  exists, and nobody has run it.
-- **The backup unit installed**, and `%h/.config/second-shift/backup.env`
-  written with the NAS path. The unit is `EnvironmentFile=` without a leading
-  `-`, so it fails loudly on a machine where that file is missing.
-- **One scheduled backup observed landing on the NAS**, which is also the first
-  real test of the same-device guard: if the share is not mounted, the unit
-  fails rather than quietly filling the local disk.
+  reboot, with the API, the brain sync and the reasoner serving afterward. Still
+  owed: it needs `sudo`, which needs a password a session over SSH does not
+  have, so it is somebody's at the machine.
+- **A dedicated share for the backups.** The NAS exports `scratch`, `docker`,
+  `datasets` and `models`, and the backups are under `scratch` because nothing
+  else was writable. A copy of every captured idea on a volume named for
+  disposable data is a decision nobody made on purpose.
+
+Closed on 16 and 17 Oct, each with its evidence in
+`docs/operations/reports/2026-10-16-machine-session.md`:
+
+- ~~A restore of the real data~~ — byte-identical, timed above.
+- ~~`doctor` on that machine~~ — eight of eight, run as the account that owns the
+  database and runs the units.
+- ~~The reasoner switched to its unit~~ — loopback-only and enabled.
+- ~~The backup unit installed~~ — with `backup.env`, and the night unit now
+  carries the `Wants=` that pulls it in; it did not until 16 Oct.
+- ~~One scheduled backup observed landing on the NAS~~ — the 02:00 night on 17
+  Oct pulled it in and it landed. The same-device guard was tested first, as a
+  control: pointed at the local disk, it refused with exit 2.

@@ -129,19 +129,29 @@ See `scripts/spikes/spike-c-tts-magpie/FINDINGS.md`.
 
 ## Cloud — Nebius Token Factory
 
-| Role | Model | Notes |
-|---|---|---|
-Model ids are the exact Token Factory console identifiers, including case.
-Every id guessed from the marketing name was wrong; these were read from the
-console on 2026-08-27, region `eu-north1`. Rates are USD per 1M tokens.
+Model ids are the identifiers the API serves, as `GET /v1/models` lists them,
+read on 17 Oct. Rates are USD per 1M tokens, and that same call reports them per
+token; they match what the console showed on 27 Aug.
 
-| Role | Console model id | Input | Output |
-|---|---|---|---|
-| Routine turns | `Nemotron-3.5-Lightning` | $0.06 | $0.24 |
-| Deep reasoning | `Nvidia-Nemotron-3-Super-120B-A12B` | $0.30 | $0.90 |
-| Frontier turns | `Nemotron-3-Ultra-550B-a55B` | $1.00 | $3.00 |
+| Role | API model id | Console display name | Input | Output |
+|---|---|---|---|---|
+| Routine turns | `nvidia/Nemotron-3_5-Lightning` | Nemotron-3.5-Lightning | $0.06 | $0.24 |
+| Deep reasoning | `nvidia/nemotron-3-super-120b-a12b` | Nvidia-Nemotron-3-Super-120B-A12B | $0.30 | $0.90 |
+| Frontier turns | `nvidia/Nemotron-3-Ultra-550b-a55b` | Nemotron-3-Ultra-550B-a55B | $1.00 | $3.00 |
 
-Every model also has a `-Batch` variant at **exactly half** both rates.
+**This table listed the display names as model ids until 17 Oct**, under a line
+saying every id guessed from the marketing name had been wrong — and these had
+been copied from the console, which shows a name the API does not accept. A
+request naming one is answered 404. `config/pricing.toml` was keyed by them too,
+so the first real Token Factory completion would have raised `MissingRate`.
+
+The console lists a `-Batch` variant of each at **exactly half** both rates.
+The API serves no `-Batch` identifier, and `POST /v1/batches` answered 403 on 2
+Sep, so Batch is not used.
+
+Reasoning tokens are billed as output: a real call on 17 Oct reported
+`completion_tokens` 121 including 73 of reasoning, with `total_tokens` 149 =
+28 + 121. The recorder prices them that way since that day.
 
 **The eval judge is not in this table any more.** ADR 0006 bound it to
 `Nemotron-3-Ultra-550B-a55B`, and ADR 0010 made that impermissible six days
