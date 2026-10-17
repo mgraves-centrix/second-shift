@@ -40,22 +40,41 @@
 - [x] 5.2 The curve refuses two judge versions. The derived count of its
       refusals moves from ten to eleven in the three documents that cite it.
 
-## 6. The ask, from evidence
+## 6. The reader, from evidence
 
-- [ ] 6.1 On the machine, with payloads kept, score a copy under week-8
-      conditions and read the refused judgements. Record their shape here —
-      never their text.
-- [ ] 6.2 Change the ask to remove the cause the evidence shows, test-first
-      against that shape. `Judgement.parse` and `last_object` do not change.
-- [ ] 6.3 Measure again on a fresh copy under the same conditions, and record
-      refusals before and after.
+- [x] 6.1 On the machine, with payloads kept, score a copy under week-8
+      conditions and read the refused judgements. Recorded here by shape, never
+      by text. Run `01M547MSED55JF2RP4RS7TKQ0Y` on a restored copy, 17 Oct: one
+      judgement refused with the same `char 29` the 16 Oct refusals showed. Its
+      completion held three objects of the judgement's form — the template
+      echoed with `<1-5>` placeholders at char 25,332, a draft that does not
+      decode at 31,957, and a valid judgement at 32,642. The draft's stray quote
+      left `last_object`'s forward scan inside a "string" for the rest of the
+      text, so it never saw the final object and returned the echo.
+- [x] 6.2 Fix the cause the evidence shows, test-first against that shape — which
+      turned out to be the reader, not the ask. The last object opening with
+      `"scores"` is decoded from where it starts, nothing before it affects the
+      reading, and a malformed final object is refused rather than replaced by
+      an earlier draft. `_ASK` is unchanged; `Judgement.parse` is unchanged.
+      The reader is hashed into the judge's version beside the ask.
+- [x] 6.3 Measure before and after on the same completions: every judge
+      completion kept on the copy, re-read by both readers. 16 kept; the old
+      reader read 15, the new reads 16. The only difference is the one the old
+      reader refused; no score it could read changed.
+- [x] 6.4 A second failure mode, which is not the judge's: an answer that ran to
+      the 16,000-token limit without finishing (`TurnDidNotFinish`). Refused
+      correctly — a truncated answer graded is a wrong number. Whether a failed
+      sample may be generated again is a methodology decision and is put to the
+      subject rather than made here; see 7.2.
 
 ## 7. The week-8 measurement
 
 - [ ] 7.1 Record a fresh week-8 baseline. `01M53FX6MV5D9ZWF4Z6117YVSE` was
       interrupted on 16 Oct and cannot be scored.
 - [ ] 7.2 Take a backup, then score week 8 and week 1 in one sitting under the
-      pinned judge.
+      pinned judge. Blocked on the subject's answer to 6.4: at the rate observed,
+      an 18-sample run with no failed sample is not the likely outcome, and an
+      incomplete week 1 cannot be retaken.
 - [ ] 7.3 `python -m secondshift.evals curve`, and record the verdict with its
       standard error, or the refusal with its cause.
 

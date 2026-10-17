@@ -53,10 +53,16 @@ died with a traceback naming `config/evals/rubric.md`.
 
 ## What this change is not
 
-- **Not a looser parse.** `ENDGAME.md` says a refused judgement on a real
-  checkpoint is a finding about the prompt, and `Judgement.parse` and
-  `last_object` are unchanged. The fix to the ask is chosen from the refused
-  text once it can be read, not from the offset.
+- **Not a looser parse.** `ENDGAME.md` expected a refused judgement on a real
+  checkpoint to be a finding about the prompt, and this change planned to fix
+  the ask. Once the refused text could be read, it said otherwise: the judge
+  had written a valid final judgement, and the *reader* missed it because a
+  malformed draft earlier in the completion desynchronized its scan. The fix
+  is to the reader; the ask is unchanged. `Judgement.parse` is unchanged, a
+  malformed final judgement is still refused, and no earlier draft is ever
+  read in its place — so nothing that was a refusal for a reason became a
+  number. Re-read with both readers, every real judgement kept so far scores
+  identically except the one the old reader refused.
 - **Not a retry.** A refused sample stays refused. Re-asking the judge until it
   produces something parseable would select for the answers it can grade.
 - **Not a migration.** Every column used here exists already.
@@ -79,7 +85,9 @@ died with a traceback naming `config/evals/rubric.md`.
    anything is generated, and `status` names an interrupted run as one.
 5. **The judge is pinned by what it asks.** Its recorded version carries the
    hash of its ask, and the curve refuses two versions as two instruments.
-6. **The ask is fixed from evidence**, measured before and after on a copy.
+6. **The reader is fixed from evidence.** The plan was the ask; the kept text
+   showed the cause was in how the answer is read. The reader is pinned into
+   the judge's version beside the ask.
 7. **The week-8 measurement runs**: a fresh week-8 baseline, both runs scored
    in one sitting under the pinned judge, and the curve's verdict or refusal
    recorded.

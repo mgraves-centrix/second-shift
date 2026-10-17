@@ -50,10 +50,11 @@ three of them could be described only by the offset the parser died at.
 An eval run SHALL record the judge model, its version, and the hash of the rubric
 used. These MUST be recorded at the time of the run.
 
-A model judge's recorded version SHALL include the hash of what it is asked, as
-well as the configured checkpoint. The ask is half the instrument: the same
-model asked differently grades differently, and a version naming only the
-checkpoint would let the ask change between two runs unseen.
+A model judge's recorded version SHALL include the hash of what it is asked and
+the hash of how its answer is read, as well as the configured checkpoint. The
+ask and the reader are the instrument: the same model asked differently, or
+read differently, grades differently, and a version naming only the
+checkpoint would let either change between two runs unseen.
 
 #### Scenario: Pinning is recorded
 - **WHEN** an eval run completes
@@ -65,6 +66,10 @@ checkpoint would let the ask change between two runs unseen.
 
 #### Scenario: A changed ask is a changed version
 - **WHEN** the text a model judge is asked changes
+- **THEN** runs it scores afterwards record a different judge version
+
+#### Scenario: A changed reader is a changed version
+- **WHEN** the code that reads a judge's answer changes
 - **THEN** runs it scores afterwards record a different judge version
 
 ### Requirement: Two runs are compared only when the comparison would mean something
@@ -145,3 +150,56 @@ meant to describe the variation within them.
 #### Scenario: The judge was asked differently between the runs
 - **WHEN** the two runs were graded by the same judge model at different recorded versions
 - **THEN** the comparison is refused and names both versions
+
+### Requirement: A judgement is read from an object, never from prose around it
+
+The judgement SHALL be the last JSON object in the completion that opens with
+the key the judge was asked for, decoded as structured data from where it
+begins. Where no object opens with that key, it SHALL be the last top-level JSON
+object. Anything else MUST be refused as an unreadable judgement.
+
+Nothing before the final object SHALL affect how it is read. On 17 Oct a
+malformed draft earlier in a real completion left a forward scan reading the
+rest of the text as the inside of a string, and the valid judgement after it
+was refused.
+
+If the final object does not decode, the judgement MUST be refused rather than
+replaced by an earlier one: an earlier valid draft is a number the model talked
+itself out of.
+
+A completion that did not stop cleanly MUST be refused before it is parsed.
+JSON truncated at a token limit can still parse as a smaller valid object, and a
+judgement missing two dimensions that scores on the rest is a wrong number that
+reads like a right one.
+
+#### Scenario: Deliberation before the scores
+- **WHEN** the completion contains the model's reasoning followed by a JSON object
+- **THEN** the object is read and the reasoning is ignored, with no delimiter required
+
+#### Scenario: A fenced block
+- **WHEN** the completion wraps the object in a code fence
+- **THEN** the object is read
+
+#### Scenario: Prose with no object
+- **WHEN** the completion contains scores written as text and no JSON object
+- **THEN** the judgement is refused, because reading numbers from prose makes the measurement depend on formatting
+
+#### Scenario: A truncated completion
+- **WHEN** the completion did not stop cleanly
+- **THEN** the judgement is refused before parsing, even if what arrived would parse
+
+#### Scenario: Two objects
+- **WHEN** the completion contains more than one object of the judgement's form
+- **THEN** the last one is the judgement, because a model that restates its answer puts the final form last
+
+#### Scenario: A malformed draft before the final judgement
+- **WHEN** an earlier object in the completion is not valid JSON and the last one is
+- **THEN** the last one is read, and nothing before it changes how
+
+#### Scenario: A malformed final judgement
+- **WHEN** the last object of the judgement's form does not decode
+- **THEN** the judgement is refused, even if an earlier one would have decoded
+
+#### Scenario: A refused judgement still cost tokens
+- **WHEN** a judgement is refused
+- **THEN** the model call is already recorded, because the provider layer records before the judge reads
