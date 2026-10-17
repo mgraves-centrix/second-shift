@@ -88,6 +88,19 @@ x86_64 and destroys it.
 `GATE_PYTHON` points the gate at a different interpreter, and `GATE_CHROME` the
 browser test at a Chrome binary other than the installed one.
 
+`GATE_OPENSPEC` points the specs gate at an `openspec` binary, and the gate
+refuses one that is not the pinned version before running anything. A machine
+whose own CLI is newer keeps it: install the pinned version under a prefix and
+point at it,
+
+```bash
+npm --prefix ~/.cache/openspec-pinned install @fission-ai/openspec@1.11.0
+GATE_OPENSPEC=~/.cache/openspec-pinned/node_modules/.bin/openspec python3 scripts/gate.py
+```
+
+because 1.14 fails `--strict` on long requirement text, and on 17 Oct a laptop
+with it failed the specs gate on `main` with nothing in the tree changed.
+
 ## Adding a mutation
 
 When a defect ships, add it to `scripts/check-mutations.py`: the exact text that

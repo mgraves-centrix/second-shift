@@ -34,6 +34,14 @@ API = ROOT / "apps/api"
 WEB = ROOT / "apps/web"
 PYTHON = os.environ.get("GATE_PYTHON", str(API / ".venv/bin/python"))
 
+#: The specs gate is pinned, as CI pins it in `.github/workflows/gate.yml`. A
+#: newer CLI is not a newer copy of the same gate: 1.14 fails `--strict` on
+#: requirement text over 500 characters, so on 17 Oct a machine with it failed
+#: this gate on `main` for a reason that was not in the tree. `GATE_OPENSPEC`
+#: points at a pinned binary without replacing a machine's own.
+OPENSPEC_VERSION = "1.11.0"
+OPENSPEC = os.environ.get("GATE_OPENSPEC", "openspec")
+
 PYTEST = [PYTHON, "-m", "pytest", "-q", "-p", "no:cacheprovider"]
 
 GATES: list[tuple[str, list[str]]] = [
@@ -46,7 +54,7 @@ GATES: list[tuple[str, list[str]]] = [
     # claims a machine can check; the ones it cannot are named in its own output
     # so a green row is not read as "the documents agree".
     ("drift", [sys.executable, str(ROOT / "scripts/check-drift.py")]),
-    ("specs", ["openspec", "validate", "--all", "--strict", "--no-interactive"]),
+    ("specs", [OPENSPEC, "validate", "--all", "--strict", "--no-interactive"]),
     ("api", PYTEST + [str(API / "tests")]),
     ("web unit", ["npm", "--prefix", str(WEB), "test"]),
     ("web types", ["npm", "--prefix", str(WEB), "run", "typecheck"]),
@@ -69,12 +77,23 @@ def preflight() -> str | None:
     if not Path(PYTHON).exists():
         return (f"no interpreter at {PYTHON}: create apps/api/.venv as "
                 "docs/development/GATES.md describes, or set GATE_PYTHON")
-    for tool in ("npm", "git", "openspec"):
+    for tool in ("npm", "git", OPENSPEC):
         if shutil.which(tool) is None:
             return f"`{tool}` is not on PATH; see docs/development/GATES.md"
+    version = _openspec_version()
+    if version != OPENSPEC_VERSION:
+        return (f"openspec {version or 'of unknown version'} is at `{OPENSPEC}`, and "
+                f"the specs gate is pinned to {OPENSPEC_VERSION} as CI is. Install "
+                f"@fission-ai/openspec@{OPENSPEC_VERSION}, or point GATE_OPENSPEC "
+                "at a binary of that version")
     if not (WEB / "node_modules").is_dir():
         return "apps/web/node_modules is missing: run `npm --prefix apps/web ci`"
     return None
+
+
+def _openspec_version() -> str:
+    result = subprocess.run([OPENSPEC, "--version"], capture_output=True, text=True)
+    return result.stdout.strip() if result.returncode == 0 else ""
 
 
 def main() -> int:
