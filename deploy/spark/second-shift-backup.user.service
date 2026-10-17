@@ -20,6 +20,7 @@ Type=oneshot
 WorkingDirectory=%h/second-shift
 Environment=SECOND_SHIFT_DB=%h/second-shift-data/second-shift.db
 Environment=SECOND_SHIFT_ARTIFACTS=%h/second-shift-data/artifacts
+Environment=SECOND_SHIFT_PAYLOADS=%h/second-shift-data/payloads
 # The destination, and nothing else. No leading `-`: a missing file fails this
 # unit loudly rather than starting a backup with nowhere to put it, and the
 # file is not in the repository because a network path is environment.

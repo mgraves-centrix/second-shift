@@ -82,8 +82,16 @@ What it writes, under a timestamped directory:
 2026-09-21T21-10-39Z/
   second-shift.db     the database, through SQLite's online backup API
   artifacts/          what the night wrote
+  payloads/           every model call's prompt and completion
   manifest.json       per-table row counts, schema version, a digest per member
 ```
+
+**`payloads/` is the part nothing else can rebuild.** ADR 0007's point is that a
+token count cannot be turned back into what a model was asked or what it said.
+Payloads were not captured at all until 17 Oct — the table existed and nothing
+wrote to it — so every backup before then holds none, and its manifest has no
+payload counts. That is an older backup, not a damaged one, and `verify`
+treats it so.
 
 The database is **never** copied as a file. It runs in write-ahead logging mode,
 so committed transactions — including `CREATE TABLE` — live in the `-wal` file

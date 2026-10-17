@@ -38,6 +38,7 @@ def _backup(db_path, artifacts_root, destination):
     return create_backup(
         db_path=db_path,
         artifacts_root=artifacts_root,
+        payloads_root=db_path.parent / "payloads",
         destination=destination,
         same_device_ok=True,
     )
@@ -205,7 +206,12 @@ class TestARefusal:
         _backup(db, artifacts, tmp_path / "b")
 
         with pytest.raises(BackupRefused, match="already exists"):
-            restore_backup(source=tmp_path / "b", db_path=db, artifacts_root=artifacts)
+            restore_backup(
+                source=tmp_path / "b",
+                db_path=db,
+                artifacts_root=artifacts,
+                payloads_root=db.parent / "payloads",
+            )
 
     def test_the_refusal_says_what_is_already_there(self, machine, tmp_path):
         """A refusal that does not say what it is protecting is an obstruction."""
@@ -213,7 +219,12 @@ class TestARefusal:
         _backup(db, artifacts, tmp_path / "b")
 
         with pytest.raises(BackupRefused) as raised:
-            restore_backup(source=tmp_path / "b", db_path=db, artifacts_root=artifacts)
+            restore_backup(
+                source=tmp_path / "b",
+                db_path=db,
+                artifacts_root=artifacts,
+                payloads_root=db.parent / "payloads",
+            )
 
         # Four, not one: the entry, and the three rows `migrate` wrote to
         # `schema_version`. A count that excluded the schema's own bookkeeping
@@ -228,6 +239,7 @@ class TestARefusal:
             source=tmp_path / "b",
             db_path=db,
             artifacts_root=artifacts,
+            payloads_root=db.parent / "payloads",
             overwrite=True,
         )
 
@@ -250,7 +262,10 @@ class TestABackupWillNotLandOnTheDiskItProtects:
 
         with pytest.raises(BackupRefused, match="same device"):
             create_backup(
-                db_path=db, artifacts_root=artifacts, destination=tmp_path / "b"
+                db_path=db,
+                artifacts_root=artifacts,
+                payloads_root=db.parent / "payloads",
+                destination=tmp_path / "b",
             )
 
     def test_the_refusal_names_the_way_out(self, machine, tmp_path):
@@ -260,7 +275,10 @@ class TestABackupWillNotLandOnTheDiskItProtects:
 
         with pytest.raises(BackupRefused) as raised:
             create_backup(
-                db_path=db, artifacts_root=artifacts, destination=tmp_path / "b"
+                db_path=db,
+                artifacts_root=artifacts,
+                payloads_root=db.parent / "payloads",
+                destination=tmp_path / "b",
             )
 
         assert "--same-device-ok" in str(raised.value)
@@ -272,6 +290,7 @@ class TestABackupWillNotLandOnTheDiskItProtects:
         manifest = create_backup(
             db_path=db,
             artifacts_root=artifacts,
+            payloads_root=db.parent / "payloads",
             destination=tmp_path / "b",
             same_device_ok=True,
         )
@@ -283,7 +302,10 @@ class TestABackupWillNotLandOnTheDiskItProtects:
         db, artifacts = machine
 
         manifest = create_backup(
-            db_path=db, artifacts_root=artifacts, destination=other_device / "b"
+            db_path=db,
+            artifacts_root=artifacts,
+            payloads_root=db.parent / "payloads",
+            destination=other_device / "b",
         )
 
         assert manifest.tables["entries"] == 1
@@ -298,6 +320,7 @@ class TestABackupWillNotLandOnTheDiskItProtects:
         manifest = create_backup(
             db_path=db,
             artifacts_root=artifacts,
+            payloads_root=db.parent / "payloads",
             destination=other_device / "nested" / "deeper" / "b",
         )
 
@@ -371,6 +394,7 @@ class TestVerifying:
                 source=backup,
                 db_path=tmp_path / "elsewhere.db",
                 artifacts_root=tmp_path / "elsewhere",
+                payloads_root=tmp_path / "elsewhere-payloads",
             )
 
 
@@ -385,6 +409,7 @@ class TestRestoring:
             source=tmp_path / "b",
             db_path=tmp_path / "restored" / "second-shift.db",
             artifacts_root=tmp_path / "restored" / "artifacts",
+            payloads_root=tmp_path / "restored" / "payloads",
         )
 
         original = sqlite3.connect(db)
@@ -403,6 +428,7 @@ class TestRestoring:
             source=tmp_path / "b",
             db_path=tmp_path / "restored" / "second-shift.db",
             artifacts_root=tmp_path / "restored" / "artifacts",
+            payloads_root=tmp_path / "restored" / "payloads",
         )
 
         landed = tmp_path / "restored" / "artifacts" / "2026-08-27" / "brief.md"
@@ -422,6 +448,7 @@ class TestRestoring:
             source=tmp_path / "b",
             db_path=target,
             artifacts_root=tmp_path / "restored" / "artifacts",
+            payloads_root=tmp_path / "restored" / "payloads",
         )
 
         assert not Path(f"{target}-wal").exists()

@@ -17,6 +17,7 @@ from .backup import (
     ARTIFACTS,
     DATABASE,
     MANIFEST,
+    PAYLOADS,
     BackupRefused,
     Manifest,
     digest,
@@ -108,6 +109,7 @@ def restore_backup(
     source: Path,
     db_path: Path,
     artifacts_root: Path,
+    payloads_root: Path,
     overwrite: bool = False,
 ) -> Manifest:
     """Rebuild from a backup, then check the result against what was taken.
@@ -139,10 +141,14 @@ def restore_backup(
     for sidecar in (f"{db_path}-wal", f"{db_path}-shm"):
         Path(sidecar).unlink(missing_ok=True)
 
-    if artifacts_root.exists() and overwrite:
-        shutil.rmtree(artifacts_root)
-    if (source / ARTIFACTS).is_dir():
-        shutil.copytree(source / ARTIFACTS, artifacts_root, dirs_exist_ok=True)
+    # Payloads with the same rule as artifacts: the restored database's
+    # `model_call_payloads` rows describe the backup's files, so newer files left
+    # beside them would be text no row points at.
+    for name, root in ((ARTIFACTS, artifacts_root), (PAYLOADS, payloads_root)):
+        if root.exists() and overwrite:
+            shutil.rmtree(root)
+        if (source / name).is_dir():
+            shutil.copytree(source / name, root, dirs_exist_ok=True)
 
     written = connect(db_path)
     try:
