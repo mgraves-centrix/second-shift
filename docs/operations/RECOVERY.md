@@ -194,14 +194,16 @@ and the units do, not from having done it. Expect it to be wrong somewhere.
    python -m secondshift.ops verify <backup>
    python -m secondshift.ops restore <backup>
    ```
-5. Install the units. They need sudo, so the deploy script prints them rather
-   than running them:
+5. Install the units as user services, which is what the machine runs — the API,
+   brain sync, night, backup and reasoner, each from its `*.user.*` file:
    ```bash
-   sudo cp deploy/spark/second-shift-api.service /etc/systemd/system/
-   sudo systemctl daemon-reload && sudo systemctl enable --now second-shift-api
+   install -m 644 deploy/spark/second-shift-api.user.service ~/.config/systemd/user/second-shift-api.service
+   systemctl --user daemon-reload && systemctl --user enable --now second-shift-api
    ```
-   The reasoner and embedder have both a system and a user variant. The user
-   variants need no sudo and no substitution.
+   No sudo and no substitution; `%h` resolves the home directory. This step
+   named a system unit installed with sudo until 17 Oct, which the machine has
+   never used — following it would have started a second API beside the
+   first. The backup unit also needs `~/.config/second-shift/backup.env`.
 6. Restore the brain from its NAS mirror. `git clone` from the mirror, and check
    that the result's log is the one you expect before anything writes to it.
 7. Expose the API:

@@ -175,3 +175,33 @@ def test_the_override_proceeds_and_says_what_it_replaces(deploy):
     assert "0" * 12 in completed.stdout
     assert _shipped_sha()[:12] in completed.stdout
     assert built
+
+
+class TestTheDeployedCodeIsTheRunningCode:
+    """Twice on 16 and 17 Oct the deploy landed and `doctor` reported the schema
+    one migration behind: migrations apply when the API starts, and nothing
+    restarted it. The API kept serving the code the deploy had just deleted."""
+
+    def test_the_api_is_restarted_after_the_tree_is_swapped_and_before_the_check(self):
+        script = DEPLOY.read_text()
+
+        swapped = script.index("mv '${INCOMING}' '${REMOTE}'")
+        restarted = script.index("systemctl --user restart second-shift-api")
+        checked = script.index("secondshift.ops doctor")
+        assert swapped < restarted < checked
+
+    def test_a_machine_without_the_unit_is_not_failed_by_the_restart(self):
+        """The first deploy onto a rebuilt machine runs before the unit is
+        installed, and must not stop there."""
+        script = DEPLOY.read_text()
+
+        assert "systemctl --user cat second-shift-api.service" in script
+
+    def test_the_closing_advice_names_the_units_this_machine_runs(self):
+        """It said to copy a system unit into /etc/systemd/system with sudo. The
+        machine runs user units under linger, and following that advice would
+        have started a second API beside the first."""
+        script = DEPLOY.read_text()
+
+        assert "/etc/systemd/system" not in script
+        assert "systemctl --user" in script

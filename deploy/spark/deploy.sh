@@ -108,14 +108,30 @@ ssh "${USER_NAME}@${HOST}" "
   mkdir -p /home/${USER_NAME}/second-shift-data
 "
 
+# The API runs from the tree just replaced, so until it restarts it serves the
+# code this deploy deleted — and migrations apply when it starts, so `doctor`
+# below would report the schema behind. Both happened on 16 and 17 Oct. Guarded,
+# because the first deploy onto a rebuilt machine runs before the unit exists.
+echo "restarting the API on the new tree..."
+ssh "${USER_NAME}@${HOST}" "
+  if systemctl --user cat second-shift-api.service >/dev/null 2>&1; then
+    systemctl --user restart second-shift-api.service
+  else
+    echo 'no second-shift-api user unit yet; install it, then start it'
+  fi
+"
+
 echo "checking the machine..."
 ssh "${USER_NAME}@${HOST}" "
   cd ${REMOTE}/apps/api
   ./.venv/bin/python -m secondshift.ops doctor --backups '${SPARK_BACKUPS}'
 " || echo "doctor reported problems above. The deploy landed; the machine is not well." >&2
 
-echo "done. To install the service (needs sudo, so it is not run from here):"
-echo "  sudo cp ${REMOTE}/deploy/spark/second-shift-api.service /etc/systemd/system/"
-echo "  sudo systemctl daemon-reload && sudo systemctl enable --now second-shift-api"
-echo "Then expose it:"
+# User units under linger, which is what the machine runs. This advised a system
+# unit installed with sudo until 17 Oct; following it would have started a second
+# API beside the first.
+echo "done. Units are user services; to install or update one:"
+echo "  install -m 644 ${REMOTE}/deploy/spark/<name>.user.service ~/.config/systemd/user/<name>.service"
+echo "  systemctl --user daemon-reload && systemctl --user enable --now <name>"
+echo "Then expose the API, once per machine:"
 echo "  tailscale serve --bg --https=443 http://127.0.0.1:8080"
