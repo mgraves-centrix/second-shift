@@ -194,8 +194,8 @@ MUTATIONS = [
         "column as NULL is the silent version of the same defect: it reads as "
         "populated and the guard that reads it reads as holding.",
         "apps/api/secondshift/evals/runner.py",
-        "json.dumps(judgement.scores), model_call_id,",
-        "json.dumps(judgement.scores), None,",
+        'kept["completion_path"] if kept else None, model_call_id,',
+        'kept["completion_path"] if kept else None, None,',
         PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
     ),
     Mutation(
@@ -253,7 +253,80 @@ MUTATIONS = [
         "apps/api/secondshift/evals/judge.py",
         "                if depth == 0 and started is not None:",
         "                if depth == 0 and started is not None and not found:",
-        PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
+        # The fallback since 17 Oct, for a judgement written without the
+        # `scores` key; `test_eval_integrity.py` exercises it.
+        PYTEST + [str(ROOT / "apps/api/tests/test_evals.py"),
+                  str(ROOT / "apps/api/tests/test_eval_integrity.py")],
+    ),
+    Mutation(
+        "judge-scans-past-a-malformed-draft",
+        "17 Oct, read back from a kept completion: a draft with an odd number of "
+        "unescaped quotes left the forward scan inside a string for the rest of "
+        "the text, so the valid final judgement after it was never seen and an "
+        "echoed template was refused in its place. Two real judgements were lost "
+        "this way before payloads were kept and they could be read.",
+        "apps/api/secondshift/evals/judge.py",
+        "found = final_judgement(completion.text)",
+        "found = last_object(completion.text)",
+        PYTEST + [str(ROOT / "apps/api/tests/test_eval_integrity.py")],
+    ),
+    Mutation(
+        "judge-reads-a-draft-not-the-final",
+        "17 Oct: the reader that replaced the scan keeps its rule — the last "
+        "object of the judgement's form is the answer, and a draft before it is "
+        "a number the model talked itself out of.",
+        "apps/api/secondshift/evals/judge.py",
+        "    final = starts[-1]",
+        "    final = starts[0]",
+        PYTEST + [str(ROOT / "apps/api/tests/test_evals.py"),
+                  str(ROOT / "apps/api/tests/test_eval_integrity.py")],
+    ),
+    Mutation(
+        "payload-capture-has-no-caller",
+        "17 Oct: insert_model_call_payload existed from the first migration and "
+        "nothing called it, so six real nights and the first scoring run kept no "
+        "text, and ADR 0007's training option was being lost a night at a time.",
+        "apps/api/secondshift/providers/base.py",
+        "self._recorder.record_payload(",
+        "(lambda *_args, **_kwargs: None)(",
+        PYTEST + [str(ROOT / "apps/api/tests/test_payloads.py")],
+    ),
+    Mutation(
+        "reasoning-is-not-priced",
+        "17 Oct: the first real Token Factory call billed 121 output tokens of "
+        "which 73 were reasoning, and the recorder priced the other 48.",
+        "apps/api/secondshift/telemetry/recorder.py",
+        "completion_tokens=completion_tokens + reasoning_tokens,",
+        "completion_tokens=completion_tokens,",
+        PYTEST + [str(ROOT / "apps/api/tests/test_cloud_reasoner.py")],
+    ),
+    Mutation(
+        "probe-leaks-a-refused-request",
+        "17 Oct: the probe caught an HTTPError as an OSError and left its open "
+        "response to the collector, which Python 3.14 reports and which failed "
+        "the score command's test on any machine running it.",
+        "apps/api/secondshift/config.py",
+        "exc.close()",
+        "pass",
+        PYTEST + [str(ROOT / "apps/api/tests/test_probe_identity.py")],
+    ),
+    Mutation(
+        "a-scored-run-is-scored-again",
+        "16 Oct: a run killed partway reads as awaiting scoring, and scoring it "
+        "died on the unique sample key with a raw IntegrityError.",
+        "apps/api/secondshift/evals/runner.py",
+        "        if existing:\n            raise AlreadyScored(",
+        "        if False:\n            raise AlreadyScored(",
+        PYTEST + [str(ROOT / "apps/api/tests/test_eval_integrity.py")],
+    ),
+    Mutation(
+        "collection-counts-twice",
+        "17 Oct: a job's report collected a second time — a retried poll, a "
+        "restarted job — must add nothing, or the cost curve inflates silently.",
+        "apps/api/secondshift/telemetry/recorder.py",
+        "                if already is not None:",
+        "                if False:",
+        PYTEST + [str(ROOT / "apps/api/tests/test_job_telemetry.py")],
     ),
 ]
 

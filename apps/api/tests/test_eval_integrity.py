@@ -293,3 +293,16 @@ class TestTheFinalJudgementIsReadWhateverCameBeforeIt:
         judge = ModelJudge(_Scripted(recorder, []), policy="local-only", version="pinned")
 
         assert judge.version == f"pinned/ask:{ASK_SHA[:12]}/read:{READER_SHA[:12]}"
+
+    def test_bare_dimensions_still_take_the_last_object(self, recorder):
+        """The fallback, for a judge that wrote its dimensions without the
+        `scores` key. It is `last_object`'s scan, and its rule is the same:
+        the final form wins over a draft."""
+        draft = json.dumps({d: 1 for d in DIMENSIONS})
+        final = json.dumps({d: 5 for d in DIMENSIONS})
+
+        judgement = self._judge(recorder, f"Draft {draft}, then {final}").score(
+            output="a", rubric="r", prompt="q"
+        )
+
+        assert judgement.scores == {d: 5 for d in DIMENSIONS}

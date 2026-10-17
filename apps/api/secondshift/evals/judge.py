@@ -186,13 +186,14 @@ def final_judgement(text: str) -> str:
     starts = [match.start() for match in _JUDGEMENT_START.finditer(text)]
     if not starts:
         return last_object(text)
+    final = starts[-1]
     try:
-        _, end = json.JSONDecoder().raw_decode(text, starts[-1])
+        _, end = json.JSONDecoder().raw_decode(text, final)
     except json.JSONDecodeError as exc:
         raise UnreadableJudgement(
             f"the final judgement is not structured data: {exc}"
         ) from exc
-    return text[starts[-1]:end]
+    return text[final:end]
 
 
 class ModelJudge:

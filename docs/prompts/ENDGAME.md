@@ -188,8 +188,10 @@ Five things about the SSH route specifically, each of which will bite:
   the reasoner**: the unit removes one container while another is still serving
   the port the probe checks, so a naive switch fails every fifteen seconds while
   the reasoner looks healthy.
-- **`deploy/judge/Dockerfile`** exists and has never been built.
-- 11 gates in `scripts/gate.py`, 17 mutations in `scripts/check-mutations.py`.
+- **`deploy/judge/Dockerfile`** was built on 16 Oct, and for amd64 — the
+  target's platform — on 17 Oct.
+- 11 gates <!-- derived: matches scripts/gate.py ^    \(" --> in `scripts/gate.py`, 27 mutations <!-- derived: matches scripts/check-mutations.py ^    Mutation\( --> in
+  `scripts/check-mutations.py`.
   The pre-push hook runs the gate; `git config core.hooksPath .githooks` enables
   it in a fresh clone.
 
