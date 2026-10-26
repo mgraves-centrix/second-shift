@@ -9,6 +9,7 @@ brain.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from typing import Protocol
@@ -101,8 +102,8 @@ class StubJudge:
         )
 
 
-def last_object(text: str) -> str:
-    """The last top-level JSON object in a completion, or "".
+def objects_in(text: str) -> list[str]:
+    """Every top-level JSON object in a completion, in the order written.
 
     A forward scan tracking three things — whether it is inside a string,
     whether the last character was an escape, and how deep the braces go. Not a
@@ -114,14 +115,15 @@ def last_object(text: str) -> str:
     which one it is depends on parse state that only exists ahead of it.
     Forwards, a quote outside a string always opens one.
 
-    The last object rather than the first, because a model that restates its
-    answer puts the final form last. Braces inside strings are skipped, so a
-    note containing `}` cannot truncate the object around it — and the note is
-    the one field a model writes freely.
+    All of them rather than only the last, because the caller chooses: the last
+    is the answer in every ordinary case, and the earlier ones are what stand
+    between one unparseable trailing object and a burned run. Braces inside
+    strings are skipped, so a note containing `}` cannot truncate the object
+    around it — and the note is the one field a model writes freely.
     """
     depth = 0
     started = None
-    found = ""
+    found: list[str] = []
     in_string = False
     escaped = False
     for index, char in enumerate(text):
@@ -143,8 +145,25 @@ def last_object(text: str) -> str:
             if depth > 0:
                 depth -= 1
                 if depth == 0 and started is not None:
-                    found = text[started:index + 1]
+                    found.append(text[started:index + 1])
     return found
+
+
+def ask_sha(ask: str = "") -> str:
+    """The content hash of the judge's instruction, twelve hex characters.
+
+    `eval_runs` pins the judge's model and version, and the generating agent's
+    prompt is pinned by content — a run records `architect.v1:6e0066df513b`. The
+    judge's own instruction was pinned by nothing, which made it the one input to
+    the measurement that could change without the comparison noticing. Two runs
+    either side of an edit to `_ASK` would pass all ten of the curve's refusals
+    while having been scored by different instruments.
+
+    Found on 16 Oct, by the machine session that then declined to edit `_ASK`
+    because the edit would have been invisible. Pinned before the edit, in the
+    same change, for that reason.
+    """
+    return hashlib.sha256((ask or _ASK).encode()).hexdigest()[:12]
 
 
 class ModelJudge:
@@ -172,7 +191,10 @@ class ModelJudge:
         """
         self._reasoner = reasoner
         self._policy = policy
-        self.version = version
+        # The configured pin, plus the hash of the instruction that produced the
+        # scores. Joined rather than kept apart because `eval_runs` has one
+        # column for it, and a version that omits the ask is a pin with a hole.
+        self.version = f"{version}+ask.{ask_sha()}"
 
     @property
     def name(self) -> str:
@@ -193,14 +215,40 @@ class ModelJudge:
                 f"the judge stopped: {completion.finish_reason}. A truncated "
                 "judgement can still parse, so it is refused rather than read."
             )
-        found = last_object(completion.text)
-        if not found:
+        candidates = objects_in(completion.text)
+        if not candidates:
             raise UnreadableJudgement(
                 "the judge wrote no JSON object. Scores read out of prose would "
                 "make the measurement depend on the model's formatting, which is "
                 "what pinning the judge exists to exclude."
             )
-        return Judgement.parse(found)
+        # Last to first, taking the first that parses as a judgement.
+        #
+        # The last object is still the answer in every ordinary case, and a model
+        # that restates its scores puts the final form last. This exists for the
+        # case measured on 16 Oct: one object that balances and does not parse
+        # refused the sample, and a refused sample burns the whole run —
+        # `eval_results` is unique per sample and `score` regenerates rather than
+        # tops up, so the run can never be completed. For the week-1 baseline
+        # that is unrecoverable.
+        #
+        # **The trade is deliberate and is a cost, not a free win.** If a model
+        # writes a superseded draft and then an unparseable final object, this
+        # scores the draft rather than refusing. A draft is a judgement the model
+        # actually produced; a destroyed baseline is the one artifact here that
+        # cannot be remade. Given that asymmetry, preferring the draft is right —
+        # but it is quieter than a refusal, and nothing records that a fallback
+        # was used.
+        last = None
+        for candidate in reversed(candidates):
+            try:
+                return Judgement.parse(candidate)
+            except UnreadableJudgement as exc:
+                last = exc
+        raise UnreadableJudgement(
+            f"none of the {len(candidates)} JSON object(s) the judge wrote is a "
+            f"set of scores. The last one failed with: {last}"
+        )
 
 
 #: Asks for the object and nothing about its surroundings. The judge tolerates
@@ -219,9 +267,11 @@ QUESTION
 ANSWER
 {output}
 
-Reply with one JSON object and nothing that needs to be read as part of it:
-{{"scores": {{"interrogation": <1-5>, "fit": <1-5>, "judgement": <1-5>,
-"actionability": <1-5>, "voice": <1-5>}}, "note": "<one sentence>"}}
+Reply with one JSON object and nothing that needs to be read as part of it.
 
-Every dimension is required and every value is a whole number from 1 to 5.
+The object has a "scores" member whose value is an object with exactly these
+five members, in this order, each a whole number from 1 to 5: interrogation,
+fit, judgement, actionability, voice. It also has a "note" member, one sentence.
+
+Every dimension is required. Do not restate these instructions.
 """

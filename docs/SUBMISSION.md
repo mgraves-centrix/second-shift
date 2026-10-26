@@ -362,7 +362,7 @@ and why, which is the behavior wanted, but it is not what the sentence promised.
 
 11 gates <!-- derived: matches scripts/gate.py ^    \(" --> — the airlock tests
 first, two repository guards, a drift check, spec validation, the orchestrator
-suite, web unit/types/build, a browser test against a real Chromium, and 20 mutations <!-- derived: matches scripts/check-mutations.py ^    Mutation\( -->
+suite, web unit/types/build, a browser test against a real Chromium, and 23 mutations <!-- derived: matches scripts/check-mutations.py ^    Mutation\( -->
 that reintroduce defects this project has actually shipped and require the gate
 that should catch each one to fail. CI runs the same file; there is no second
 definition of passing.
@@ -402,8 +402,8 @@ anchors.
 **It then demonstrated itself inside the hour.** Binding those markers was worth
 a mutation of its own, which moved the mutation count to 20 — and the
 newly-bound marker failed the gate on the figure that had been corrected minutes
-earlier. The number above is 20 because a check caught it, not because anybody
-remembered.
+earlier. The number above is right because a check caught it, not because
+anybody remembered — and it has since moved again, for the same reason.
 
 ---
 

@@ -1318,7 +1318,34 @@ class TestTheJudgeIsAModel:
         graded rather than what somebody wrote down — and so no model identifier
         lands outside the providers package."""
         assert judge.name == "stub-served-model"
-        assert judge.version == "pinned-1"
+        assert judge.version.startswith("pinned-1+ask.")
+
+    def test_the_version_carries_the_hash_of_the_ask(self, judge):
+        """The configured pin alone left the instruction unpinned, which made it
+        the one input to the measurement that could change without the comparison
+        noticing — the generating agent's prompt is content-pinned and this was
+        not. Two runs either side of an edit to the ask would pass all ten of the
+        curve's refusals while having been scored by different instruments."""
+        from secondshift.evals.judge import _ASK, ask_sha
+
+        assert judge.version.endswith(ask_sha())
+        assert ask_sha(_ASK + " ") != ask_sha(), "the hash does not follow the text"
+
+    def test_the_ask_contains_no_object_to_echo(self):
+        """The 16 Oct failure, by inspection. The ask used to show a balanced
+        `{...}` whose first value was `<1-5>`, so a model echoing the instruction
+        produced an object that balanced and did not parse — and `json.loads`
+        failed at char 29, which is exactly that `<`. Three failures, one offset.
+
+        A template the model can copy is a template it can copy *instead of
+        answering*, so there is no template now."""
+        from secondshift.evals.judge import _ASK, objects_in
+
+        rendered = _ASK.format(rubric="a rubric", prompt="a question", output="an answer")
+        assert objects_in(rendered) == [], (
+            "the ask contains a balanced JSON object; a model that echoes the "
+            "instruction will have it extracted as the judgement"
+        )
 
     def test_a_bare_object_is_read(self, judge, vllm_stub, rubric):
         vllm_stub.answers(text=self._scores())
@@ -1376,6 +1403,42 @@ class TestTheJudgeIsAModel:
         vllm_stub.answers(text="Interrogation: 4/5. Fit: strong. Voice: 3 out of 5.")
 
         with pytest.raises(UnreadableJudgement, match="no JSON object"):
+            judge.score(output="a", rubric=rubric.text, prompt="q")
+
+    def test_an_unparseable_last_object_does_not_refuse_the_sample(
+        self, judge, vllm_stub, rubric
+    ):
+        """The 16 Oct failure, and why it mattered more than one lost sample.
+
+        A refused sample burns the entire run: `eval_results` is unique per
+        sample and `score` regenerates rather than tops up, so a second attempt
+        collides and the curve refuses an incomplete run. For the week-1
+        baseline that is unrecoverable, which is why the machine session stopped
+        rather than spend it on those odds.
+
+        So when the last object balances and does not parse, earlier ones are
+        tried. The trade is deliberate: a superseded draft is a judgement the
+        model actually produced, and a destroyed baseline cannot be remade.
+        """
+        vllm_stub.answers(
+            text=self._scores(fit=5)
+            + "\n\nFor reference the format was:\n"
+            + '{"scores": {"interrogation": <1-5>, "fit": <1-5>}}'
+        )
+
+        judgement = judge.score(output="a", rubric=rubric.text, prompt="q")
+
+        assert judgement.scores["fit"] == 5, "the real judgement was not recovered"
+
+    def test_nothing_parseable_still_refuses_and_says_how_many(
+        self, judge, vllm_stub, rubric
+    ):
+        """The fallback must not become a reason never to refuse. With no
+        readable scores anywhere, a refusal is still correct — a zero would be
+        indistinguishable from a genuinely poor answer."""
+        vllm_stub.answers(text='{"a": <1>} and then {"b": <2>}')
+
+        with pytest.raises(UnreadableJudgement, match="none of the 2 JSON object"):
             judge.score(output="a", rubric=rubric.text, prompt="q")
 
     def test_a_truncated_completion_is_refused_before_it_is_parsed(

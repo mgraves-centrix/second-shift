@@ -255,6 +255,42 @@ MUTATIONS = [
         "                if depth == 0 and started is not None and not found:",
         PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
     ),
+    Mutation(
+        "one-bad-trailing-object-burns-the-run",
+        "16 Oct: three samples were refused because the last object balanced "
+        "and did not parse. A refused sample burns the whole run — "
+        "`eval_results` is unique per sample and `score` regenerates rather "
+        "than tops up — so for the week-1 baseline that is unrecoverable. "
+        "Reading only the last object reintroduces it.",
+        "apps/api/secondshift/evals/judge.py",
+        "        for candidate in reversed(candidates):",
+        "        for candidate in candidates[-1:]:",
+        PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
+    ),
+    Mutation(
+        "the-ask-shows-an-object-to-copy",
+        "16 Oct: the instruction carried a balanced `{...}` whose first value "
+        "was `<1-5>`, so a model echoing it produced an object that balanced "
+        "and did not parse. json.loads failed at char 29 on all three, which "
+        "is exactly that `<`. A template a model can copy is a template it "
+        "can copy instead of answering.",
+        "apps/api/secondshift/evals/judge.py",
+        "Every dimension is required. Do not restate these instructions.",
+        'Every dimension is required. Reply like {{"scores": {{"voice": <1-5>}}}}.',
+        PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
+    ),
+    Mutation(
+        "the-judge-version-omits-the-ask",
+        "16 Oct: `eval_runs` pinned the judge's model and version but not its "
+        "instruction, leaving the one input to the measurement that could "
+        "change without the comparison noticing. Two runs either side of an "
+        "edit to the ask pass all ten of the curve's refusals while having "
+        "been scored by different instruments.",
+        "apps/api/secondshift/evals/judge.py",
+        '        self.version = f"{version}+ask.{ask_sha()}"',
+        "        self.version = version",
+        PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
+    ),
 ]
 
 
