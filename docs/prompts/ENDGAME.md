@@ -110,6 +110,10 @@ cd ~/second-shift && git pull origin main    # the judge fix and payload
 claude
 ```
 
+Then paste `docs/prompts/MACHINE_SESSION_OPENER.md`, which is that text and
+nothing else so it can be copied whole. It points back here rather than
+restating any of this — one authority, so the two cannot drift apart.
+
 Then paste this file. The clone on the machine already has a working virtual
 environment, because it has been running nights — a **fresh** clone needs the
 bootstrap in `docs/development/GATES.md` first, and the gate refuses by name

@@ -65,6 +65,7 @@ all three cases differs from the prompt in at least one decision.
 | — | ~~`OPERATIONS.md`~~ | ✅ shipped 21 Sep — `python -m secondshift.ops`. The reboot and the on-machine restore are owed | — | — |
 | — | `ASR.md` | `providers/asr*`, spike F | — | everything |
 | — | `ENDGAME.md` | the order of what is left, and the machine session in full | — | nothing: it runs first |
+| — | `MACHINE_SESSION_OPENER.md` | nothing. It is the text you paste to start a local session against the machine, and it points at `ENDGAME.md` rather than restating it | — | — |
 
 **`ENDGAME.md` is the one file here that is not one session.** It owns the
 ordering of the rest and the full prompt for the machine session, because that
