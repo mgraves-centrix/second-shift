@@ -17,6 +17,7 @@ from .backup import (
     ARTIFACTS,
     DATABASE,
     MANIFEST,
+    PAYLOADS,
     BackupRefused,
     Manifest,
     digest,
@@ -108,6 +109,7 @@ def restore_backup(
     source: Path,
     db_path: Path,
     artifacts_root: Path,
+    payloads_root: Path,
     overwrite: bool = False,
 ) -> Manifest:
     """Rebuild from a backup, then check the result against what was taken.
@@ -143,6 +145,15 @@ def restore_backup(
         shutil.rmtree(artifacts_root)
     if (source / ARTIFACTS).is_dir():
         shutil.copytree(source / ARTIFACTS, artifacts_root, dirs_exist_ok=True)
+
+    # Guarded by `is_dir` for the same reason as the artifacts above, and for
+    # one more: a backup taken before 27 Oct has no payload directory at all,
+    # and those are the only backups that exist today. A restore of one must
+    # succeed, leaving the payload root as it found it.
+    if payloads_root.exists() and overwrite:
+        shutil.rmtree(payloads_root)
+    if (source / PAYLOADS).is_dir():
+        shutil.copytree(source / PAYLOADS, payloads_root, dirs_exist_ok=True)
 
     written = connect(db_path)
     try:

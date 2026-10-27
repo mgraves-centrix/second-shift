@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import pytest
 
 from secondshift.telemetry import context as ctx
+from secondshift.telemetry.payloads import (
+    PayloadWriteFailed,
+    relative_paths,
+    write_payload,
+)
 from secondshift.telemetry.failures import BadOutput, FailureType, classify, signature
 from secondshift.telemetry.pricing import MissingRate, PricingTable, Rate
 from secondshift.telemetry.recorder import (
@@ -313,3 +320,240 @@ class TestTimelineRendering:
         assert [r["lane"] for r in rows] == ["researcher", "builder"]
         # duration distinguishes a bar from a tick without any parsing
         assert rows[0]["duration_ms"] == 1400 and rows[1]["duration_ms"] is None
+
+
+class TestThePayloadStore:
+    """The path convention and the write, without a recorder or a database.
+
+    `model_call_payloads` had a complete inserter and no caller for seven weeks,
+    so the table was empty after six real nights — the defect this closes. These
+    tests are over the store alone; that it is reached from every completion is
+    `TestRetentionCannotBeSkipped` in `test_providers.py`.
+    """
+
+    def test_the_two_paths_differ_only_in_what_they_hold(self):
+        prompt, completion = relative_paths("01J9Z", 1_760_000_000_000)
+
+        assert prompt.endswith(".prompt.json")
+        assert completion.endswith(".completion.json")
+        assert prompt.removesuffix(".prompt.json") == completion.removesuffix(
+            ".completion.json"
+        )
+
+    def test_the_month_comes_from_the_call_not_the_clock(self):
+        """Externally-attributed telemetry arrives after the fact and carries
+        its own timestamp. Filing it under the month it is written would put
+        last night's work in next month's directory at a boundary."""
+        october, _ = relative_paths("01J9Z", 1_760_000_000_000)
+        january, _ = relative_paths("01J9Z", 1_767_225_600_000)
+
+        assert october.startswith("2025-10/")
+        assert january.startswith("2026-01/")
+
+    def test_the_stored_path_is_relative(self):
+        """The judge instance runs this code against another root, and an
+        absolute path in a row pins one machine's home directory into data a
+        judge reads — which `scripts/check-no-environment.sh` exists because of."""
+        for path in relative_paths("01J9Z", 1_760_000_000_000):
+            assert not Path(path).is_absolute()
+            assert not path.startswith("~")
+
+    def test_the_prompt_file_holds_every_message(self, tmp_path):
+        retained = write_payload(
+            model_call_id="01J9Z",
+            ts_ms=1_760_000_000_000,
+            prompt=[{"role": "user", "content": "score this"}],
+            completion={"text": "4", "finish_reason": "stop"},
+            root=tmp_path,
+        )
+
+        written = json.loads((tmp_path / retained.prompt_path).read_text())
+        assert written == [{"role": "user", "content": "score this"}]
+        assert json.loads((tmp_path / retained.completion_path).read_text()) == {
+            "text": "4",
+            "finish_reason": "stop",
+        }
+
+    def test_the_byte_counts_are_read_back_not_predicted(self, tmp_path):
+        """A count derived from the text passed in proves what was meant rather
+        than what landed. The files are JSON with separators and indentation, so
+        a count of the original string cannot accidentally agree."""
+        retained = write_payload(
+            model_call_id="01J9Z",
+            ts_ms=1_760_000_000_000,
+            prompt=[{"role": "user", "content": "x"}],
+            completion={"text": "y"},
+            root=tmp_path,
+        )
+
+        assert retained.prompt_bytes == len(
+            (tmp_path / retained.prompt_path).read_bytes()
+        )
+        assert retained.completion_bytes == len(
+            (tmp_path / retained.completion_path).read_bytes()
+        )
+        assert retained.prompt_bytes > len("x")
+
+    def test_a_root_that_cannot_be_written_raises_before_any_row(self, tmp_path):
+        """Raised rather than returned, so that the one caller decides what a
+        lost payload costs. A row pointing at a file that is not there records a
+        provenance nobody can check."""
+        blocked = tmp_path / "file"
+        blocked.write_text("not a directory")
+
+        with pytest.raises(PayloadWriteFailed, match="could not retain"):
+            write_payload(
+                model_call_id="01J9Z",
+                ts_ms=1_760_000_000_000,
+                prompt=[],
+                completion={},
+                root=blocked,
+            )
+
+
+class TestRetainingWhatACallSaid:
+    """The recorder's half: the row, the synthetic exclusion, and the failure.
+
+    That retention happens on every completion is `TestRetentionCannotBeSkipped`
+    in `test_providers.py`. These drive the recorder directly, which is also the
+    only way to reach the synthetic and failed-write cases — `Reasoner.complete`
+    passes neither.
+    """
+
+    def test_the_row_points_at_the_files_and_counts_their_bytes(
+        self, recorder, repo, run_id, agent_id
+    ):
+        with recorder.invocation(agent_id, run_id=run_id):
+            call_id = recorder.record_model_call(
+                provider="local-vllm", model="m", policy="local-only"
+            )
+            retained = recorder.record_model_call_payload(
+                model_call_id=call_id,
+                prompt=[{"role": "user", "content": "an idea"}],
+                completion={"text": "a brief"},
+            )
+
+        row = repo.connection.execute(
+            "SELECT * FROM model_call_payloads WHERE model_call_id = ?", (call_id,)
+        ).fetchone()
+        assert row["prompt_path"] == retained.prompt_path
+        assert row["completion_path"] == retained.completion_path
+        assert row["prompt_bytes"] == retained.prompt_bytes
+        assert row["completion_bytes"] == retained.completion_bytes
+        assert row["captured_at_ms"] > 0
+
+    def test_synthetic_content_is_never_trainable(
+        self, recorder, repo, run_id, agent_id
+    ):
+        """This table has no `is_synthetic` column, so `training_eligible` is
+        where the exclusion lives — the schema designates it for exactly that.
+        Seed data reaching a training set is the contamination `is_synthetic`
+        exists to prevent, one table further on."""
+        with recorder.invocation(agent_id, run_id=run_id):
+            real = recorder.record_model_call(
+                provider="local-vllm", model="m", policy="local-only"
+            )
+            recorder.record_model_call_payload(
+                model_call_id=real, prompt=[], completion={}
+            )
+            seeded = recorder.record_model_call(
+                provider="local-vllm", model="m", policy="local-only",
+                is_synthetic=True,
+            )
+            recorder.record_model_call_payload(
+                model_call_id=seeded, prompt=[], completion={}, is_synthetic=True
+            )
+
+        eligible = dict(
+            repo.connection.execute(
+                "SELECT model_call_id, training_eligible FROM model_call_payloads"
+            ).fetchall()
+        )
+        assert eligible[real] == 1
+        assert eligible[seeded] == 0
+
+    def test_redaction_is_recorded_not_inferred(
+        self, recorder, repo, run_id, agent_id
+    ):
+        """So a reader can tell raw captured content from what was prepared for
+        egress. `Reasoner.complete` already carries the flag."""
+        with recorder.invocation(agent_id, run_id=run_id):
+            raw = recorder.record_model_call(
+                provider="local-vllm", model="m", policy="local-only"
+            )
+            recorder.record_model_call_payload(
+                model_call_id=raw, prompt=[], completion={}
+            )
+            prepared = recorder.record_model_call(
+                provider="token-factory", model="nemotron-3-super",
+                policy="cloud-assisted",
+            )
+            recorder.record_model_call_payload(
+                model_call_id=prepared, prompt=[], completion={},
+                redaction_applied=True,
+            )
+
+        redacted = dict(
+            repo.connection.execute(
+                "SELECT model_call_id, redacted FROM model_call_payloads"
+            ).fetchall()
+        )
+        assert redacted[raw] == 0
+        assert redacted[prepared] == 1
+
+    def test_a_failed_write_costs_the_evidence_and_nothing_else(
+        self, recorder, repo, run_id, agent_id, monkeypatch, tmp_path
+    ):
+        """The completion is the product and this is evidence about it, so a
+        full disk at 2am must cost the evidence alone. Loud, though: a typed
+        failure is recorded, and no row points at a file that is not there."""
+        blocked = tmp_path / "not-a-directory"
+        blocked.write_text("in the way")
+        monkeypatch.setenv("SECOND_SHIFT_PAYLOADS", str(blocked))
+
+        with recorder.invocation(agent_id, run_id=run_id):
+            call_id = recorder.record_model_call(
+                provider="local-vllm", model="m", policy="local-only"
+            )
+            retained = recorder.record_model_call_payload(
+                model_call_id=call_id, prompt=[], completion={}
+            )
+
+        assert retained is None
+        assert len(repo.model_calls_for_run(run_id)) == 1, "the cost row was lost"
+        assert repo.connection.execute(
+            "SELECT count(*) FROM model_call_payloads"
+        ).fetchone()[0] == 0, "a row points at a file that is not there"
+        failures = repo.connection.execute(
+            "SELECT type, signature, message FROM failures"
+        ).fetchall()
+        assert len(failures) == 1, "the gap is silent"
+        assert "retain:payload" in failures[0]["signature"]
+
+    def test_a_night_is_not_lost_to_its_own_evidence(
+        self, recorder, repo, run_id, agent_id, monkeypatch, tmp_path
+    ):
+        """The same case through a provider, which is where it would actually
+        happen: the stage continues and the caller still gets its text."""
+        from secondshift.providers.base import Message, RawCompletion, Reasoner
+
+        class Backend(Reasoner):
+            provider_kind = "local-vllm"
+
+            def _do_complete(self, messages, *, effort):
+                return RawCompletion(text="the brief survives")
+
+        blocked = tmp_path / "in-the-way"
+        blocked.write_text("not a directory")
+        monkeypatch.setenv("SECOND_SHIFT_PAYLOADS", str(blocked))
+
+        with recorder.invocation(agent_id, run_id=run_id):
+            completion = Backend(recorder, model="m").complete(
+                [Message("user", "x")], policy="local-only"
+            )
+
+        assert completion.text == "the brief survives"
+        assert len(repo.model_calls_for_run(run_id)) == 1
+        assert repo.connection.execute(
+            "SELECT count(*) FROM failures"
+        ).fetchone()[0] == 1

@@ -90,6 +90,22 @@ contexts from dominating every query plan in the database. See
 `docs/decisions/0007` — the point of capturing payloads at all is to preserve the
 option of training later, which cannot be backfilled from token counts.
 
+The row holds paths relative to a root configured as `SECOND_SHIFT_PAYLOADS`,
+the way `artifacts.path` is relative to `SECOND_SHIFT_ARTIFACTS`, so the judge
+deployment runs the same code against its own directory and no row pins one
+machine's home into data another reads. Retention happens in
+`Reasoner.complete`, the provider base class — the same place and for the same
+reason the `model_calls` row is written there: an implementation cannot forget
+instrumentation it never writes. This table has no `is_synthetic` column;
+`training_eligible` is where that exclusion lives, which is what the schema
+designates it for.
+
+*This paragraph described a table that had never held a row. The inserter was
+written on 27 Aug with the schema, and nothing called it until 27 Oct — so six
+real nights and an eval run are permanently unreadable, which is exactly the
+loss ADR 0007 argued could not be backfilled. The orphan was found by asking,
+of each public symbol, whether anything outside its module names it.*
+
 ## Entity map
 
 ```

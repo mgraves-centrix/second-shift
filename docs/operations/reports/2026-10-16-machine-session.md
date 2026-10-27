@@ -262,6 +262,11 @@ Two findings a stranger would hit:
 
 ## `model_call_payloads` has never held a row, and nothing can put one there
 
+**Closed 27 Oct** by `retain-model-call-payloads` — retention in
+`Reasoner.complete`, the payload tree carried by a backup, and
+`eval_results.output_path` written from what was retained. The finding below
+stands as written; it is what was true on 16 Oct.
+
 `Repository.insert_model_call_payload` exists, is complete, and **has no caller
 anywhere in the repository — not in the orchestrator, not in a test.** The table
 is empty in the live database after six nights and an eval run, and empty in the
@@ -287,6 +292,11 @@ it protects is dead.
 ---
 
 ## The judge's prompt is not pinned
+
+**Closed 26 Oct.** `ask_sha()` hashes the instruction into
+`eval_runs.judge_model_version`, and the template that caused the echo was
+removed in the same change — in that order, which this section is the argument
+for.
 
 `eval_runs` records `judge_model` and `judge_model_version`, and
 `judge_version` is a constant in `config/models.toml`. **The text of `_ASK` is

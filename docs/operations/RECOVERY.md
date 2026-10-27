@@ -82,8 +82,16 @@ What it writes, under a timestamped directory:
 2026-09-21T21-10-39Z/
   second-shift.db     the database, through SQLite's online backup API
   artifacts/          what the night wrote
-  manifest.json       per-table row counts, schema version, a digest per member
+  payloads/           what every model call was given and what it said
+  manifest.json       per-table row counts, schema version, the file count and
+                      size of each tree, and a digest per member
 ```
+
+*`payloads/` arrived on 27 Oct. `CONTAINS` had promised it since the first
+backup and nothing copied it, because the table it describes had no writer —
+`insert_model_call_payload` existed with no caller anywhere. Every tree the
+archive holds is now counted in the manifest individually, which is what makes
+a claim like that one checkable rather than a sentence somebody has to trust.*
 
 The database is **never** copied as a file. It runs in write-ahead logging mode,
 so committed transactions — including `CREATE TABLE` — live in the `-wal` file
@@ -109,19 +117,32 @@ beforehand.
 
 ## Restoring
 
-**Status: rehearsed.** Executed against a generated night, not against the
-machine's data. See the measurements below, and the caveat under them.
+**Status: run against the real data, 16 Oct.** The newest NAS backup was
+restored onto a scratch path on the always-on machine and the result compared
+against the live database. The 21 Sep measurements below are kept because they
+are the ones with a concurrent writer; these are the ones on that machine, with
+that data.
+
+| | |
+|---|---|
+| `verify` of the backup, read from the NAS | 0.186 s |
+| Restore onto a local scratch path | 0.174 s |
+| Restored dump vs. live dump | **byte-identical**, 72,497 bytes each |
+| Artifacts | `diff -r` clean, 39 files |
+
+Payloads were not part of that restore, because there were none to carry. The
+next one is the first that exercises them.
 
 ```bash
 python -m secondshift.ops restore <backup>              # refuses an occupied path
 python -m secondshift.ops restore <backup> --overwrite  # says that is what you meant
 ```
 
-It verifies, writes the database and the artifacts, removes any `-wal` and
-`-shm` left beside the target — a write-ahead log belonging to a different
-database is read as that database's committed tail — and then compares what
-landed against the manifest. A count that disagrees fails loudly rather than
-reporting success because nothing raised.
+It verifies, writes the database, the artifacts and the retained payloads,
+removes any `-wal` and `-shm` left beside the target — a write-ahead log
+belonging to a different database is read as that database's committed tail —
+and then compares what landed against the manifest. A count that disagrees
+fails loudly rather than reporting success because nothing raised.
 
 ### Measured, 21 Sep
 
@@ -151,13 +172,19 @@ objective.
 python -m secondshift.ops doctor --backups <directory>
 ```
 
-Seven checks, all of them reported rather than stopping at the first failure:
+8 <!-- derived: matches apps/api/secondshift/ops/doctor.py ^def _.*-> Check: -->
+checks, all of them reported rather than stopping at the first failure:
 configuration resolves; the database opens in WAL with a current schema; the
 data path is not the root account's default; the local reasoner answers on the
 configured port serving the expected name; the newest backup is not stale — three
-nights, since they are nightly — and the backups are on a device other than the
-database's.
+nights, since they are nightly; the backups are on a device other than the
+database's; and whether a night is in flight, which is reported rather than
+counted as a fault.
 Exits non-zero if any fail. `deploy.sh` runs it at the end of every deploy.
+
+*This read "Seven checks" and listed six until 27 Oct. The night-in-flight
+check shipped on 22 Sep and the sentence was never revised, which is why the
+figure now carries a marker the drift gate can bind to.*
 
 `python -m secondshift.config show` has still never been run on that machine —
 `doctor` subsumes its first check, and running both after the next deploy is
@@ -209,19 +236,33 @@ and the units do, not from having done it. Expect it to be wrong somewhere.
 Listed here and in `docs/SPEC_ROADMAP.md`, because an obligation recorded only
 in the document that assumes it is a dropped one.
 
+Five of the six below closed on 16 Oct. See
+`docs/operations/reports/2026-10-16-machine-session.md` for the evidence of
+each; they are struck here rather than deleted, because a list that only ever
+grows is a list nobody believes.
+
 - **A reboot.** Not `systemctl status`, not "linger is enabled" — an actual
   reboot, with the API, the brain sync and the reasoner serving afterward.
-- **A restore of the real data** onto a scratch path, diffed against the live
-  database, and timed.
-- **`doctor` on that machine**, whose `data ownership` check exists because a
-  service running as the wrong account has corrupted the write-ahead log there
-  before.
-- **The reasoner switched to its unit**, following
-  `SUPERVISING_THE_REASONER.md` beside this file. Decided 22 Sep; the procedure
-  exists, and nobody has run it.
-- **The backup unit installed**, and `%h/.config/second-shift/backup.env`
-  written with the NAS path. The unit is `EnvironmentFile=` without a leading
-  `-`, so it fails loudly on a machine where that file is missing.
-- **One scheduled backup observed landing on the NAS**, which is also the first
-  real test of the same-device guard: if the share is not mounted, the unit
-  fails rather than quietly filling the local disk.
+  **Still owed.** It cannot be done over SSH from elsewhere, which is why it is
+  the one item that survived the session that closed the rest.
+- ~~**A restore of the real data**~~ — **run 16 Oct.** Byte-identical against
+  the live dump in 0.174 s; the numbers are under *Restoring* above.
+- ~~**`doctor` on that machine**~~ — **run 16 Oct**, 8/8 after the deploy. Its
+  `data ownership` check exists because a service running as the wrong account
+  has corrupted the write-ahead log there before, and that check passed.
+- ~~**The reasoner switched to its unit**~~ — **done 16 Oct**, following
+  `SUPERVISING_THE_REASONER.md` beside this file. It also moved off `0.0.0.0`
+  to `127.0.0.1:8200` in the same step.
+- ~~**The backup unit installed**~~ — **done 16 Oct**, with
+  `%h/.config/second-shift/backup.env` written. The night unit did not carry
+  `Wants=second-shift-backup.service` before that session, so the nightly
+  backup would never have been pulled in at all.
+- ~~**One scheduled backup observed landing on the NAS**~~ — **done 16 Oct**,
+  and the same-device guard was proven first as a control: it refused with exit
+  2 and named the unmounted-share case it exists for.
+
+**One finding from that session is open and is a decision, not a task.** The
+NAS exports four shares and none of them is a backup share, so the copy of
+every captured idea currently sits under `scratch` — a volume whose name says
+it is disposable. That wants a dedicated share before the archive starts
+carrying payloads as well.

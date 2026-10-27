@@ -29,6 +29,11 @@ DATABASE = "second-shift.db"
 #: The artifacts tree, under this name, inside a backup.
 ARTIFACTS = "artifacts"
 
+#: The retained prompts and completions, under this name, inside a backup.
+#: Added 27 Oct. `CONTAINS` had promised them since the first backup; nothing
+#: copied them, and nothing counted them, so the promise was unfalsifiable.
+PAYLOADS = "payloads"
+
 #: What a backup records about itself.
 MANIFEST = "manifest.json"
 
@@ -81,6 +86,12 @@ class Manifest:
     tables: dict[str, int]
     artifact_files: int
     artifact_bytes: int
+    #: No defaults, deliberately. Every tree the archive holds is counted
+    #: individually or the manifest does not construct — a tree copied but not
+    #: counted is a claim about the backup that cannot be checked, which is how
+    #: the payload tree stayed absent from both for seven weeks.
+    payload_files: int
+    payload_bytes: int
     members: list[Member]
     excluded: dict[str, str] = field(default_factory=lambda: dict(EXCLUDED))
 
@@ -96,6 +107,12 @@ class Manifest:
             tables=raw["tables"],
             artifact_files=raw["artifact_files"],
             artifact_bytes=raw["artifact_bytes"],
+            # Read with a default, unlike the fields above: backups written
+            # before 27 Oct have no payload counts, and they are still the
+            # restore path for everything taken until now. Zero is also the
+            # truth about them — there were no payloads to carry.
+            payload_files=raw.get("payload_files", 0),
+            payload_bytes=raw.get("payload_bytes", 0),
             members=[Member(**m) for m in raw["members"]],
             excluded=raw.get("excluded", {}),
         )
@@ -130,10 +147,12 @@ def create_backup(
     *,
     db_path: Path,
     artifacts_root: Path,
+    payloads_root: Path,
     destination: Path,
     same_device_ok: bool = False,
 ) -> Manifest:
-    """Write a consistent copy of the database and the artifacts to `destination`.
+    """Write a consistent copy of the database, the artifacts and the retained
+    payloads to `destination`.
 
     `destination` must not already hold a backup. There is no default for it
     anywhere in this package: a default destination is how a copy of every
@@ -168,7 +187,8 @@ def create_backup(
     finally:
         source.close()
 
-    artifact_files, artifact_bytes = _copy_artifacts(artifacts_root, destination / ARTIFACTS)
+    artifact_files, artifact_bytes = _copy_tree(artifacts_root, destination / ARTIFACTS)
+    payload_files, payload_bytes = _copy_tree(payloads_root, destination / PAYLOADS)
 
     members = [
         Member(path=str(p.relative_to(destination)), bytes=p.stat().st_size, sha256=digest(p))
@@ -181,6 +201,8 @@ def create_backup(
         tables=counts,
         artifact_files=artifact_files,
         artifact_bytes=artifact_bytes,
+        payload_files=payload_files,
+        payload_bytes=payload_bytes,
         members=members,
     )
     (destination / MANIFEST).write_text(manifest.to_json())
@@ -224,12 +246,12 @@ def _refuse_the_same_disk(db_path: Path, destination: Path) -> None:
     )
 
 
-def _copy_artifacts(root: Path, destination: Path) -> tuple[int, int]:
+def _copy_tree(root: Path, destination: Path) -> tuple[int, int]:
     """Ordinary files that nothing holds open, so an ordinary copy is correct.
 
     A missing root is not an error. A machine that has never run a night has no
-    artifacts, and refusing to back up its database over that would be refusing
-    the case where a backup matters most.
+    artifacts and no payloads, and refusing to back up its database over that
+    would be refusing the case where a backup matters most.
     """
     if not root.is_dir():
         destination.mkdir(parents=True, exist_ok=True)

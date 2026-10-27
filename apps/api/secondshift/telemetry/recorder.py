@@ -22,6 +22,7 @@ from ..db.connection import now_ms
 from ..db.repository import Repository
 from . import context as ctx
 from .failures import FailureType, classify, signature
+from .payloads import RetainedPayload, write_payload
 from .pricing import PricingTable
 
 
@@ -237,6 +238,61 @@ class Recorder:
                 ts_ms=ts,
                 is_synthetic=is_synthetic,
             )
+
+    def record_model_call_payload(
+        self,
+        *,
+        model_call_id: str,
+        prompt: object,
+        completion: object,
+        ts_ms: int | None = None,
+        redaction_applied: bool = False,
+        is_synthetic: bool = False,
+    ) -> RetainedPayload | None:
+        """Retain what a call said, and record the row that points at it.
+
+        The file write happens outside the writer lock and the row insert inside
+        it. Holding a single-writer lock across disk I/O would make every
+        completion's retention a point where a capture arriving from the API's
+        threadpool waits on a filesystem.
+
+        Returns `None` when the payload could not be written. **A retention
+        failure does not fail the completion**: the completion is the product
+        and this is evidence about it, so a full disk at 2am costs the evidence
+        and nothing else. It is not silent either — the failure is classified
+        and recorded, so the gap is visible in the failure ledger rather than
+        inferred later from an absent row. And no row is written for a file that
+        is not there, because a row pointing at a missing file records a
+        provenance nobody can check.
+
+        `training_eligible` is where the synthetic exclusion lives, because this
+        table has no `is_synthetic` column: the schema says synthetic data never
+        enters a training set, and `training_eligible` is the column it
+        designates for saying so.
+        """
+        ts = ts_ms if ts_ms is not None else now_ms()
+        try:
+            retained = write_payload(
+                model_call_id=model_call_id,
+                ts_ms=ts,
+                prompt=prompt,
+                completion=completion,
+            )
+        except OSError as exc:
+            self.record_failure(exc, scope="retain:payload", is_synthetic=is_synthetic)
+            return None
+
+        with self._lock:
+            self._repo.insert_model_call_payload(
+                model_call_id=model_call_id,
+                prompt_path=retained.prompt_path,
+                completion_path=retained.completion_path,
+                prompt_bytes=retained.prompt_bytes,
+                completion_bytes=retained.completion_bytes,
+                redacted=redaction_applied,
+                training_eligible=not is_synthetic,
+            )
+        return retained
 
     def record_tool_call(
         self,

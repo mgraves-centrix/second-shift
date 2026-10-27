@@ -20,6 +20,7 @@ from secondshift.db.connection import connect, now_ms
 from secondshift.ops import create_backup, restore_backup, run_checks, verify_backup
 from secondshift.ops.doctor import night_in_flight
 from secondshift.ops.backup import (
+    CONTAINS,
     DATABASE,
     MANIFEST,
     BackupRefused,
@@ -38,6 +39,7 @@ def _backup(db_path, artifacts_root, destination):
     return create_backup(
         db_path=db_path,
         artifacts_root=artifacts_root,
+        payloads_root=artifacts_root.parent / "payloads",
         destination=destination,
         same_device_ok=True,
     )
@@ -75,6 +77,17 @@ def machine(tmp_path):
     artifacts.mkdir(parents=True)
     (artifacts / "2026-08-27").mkdir()
     (artifacts / "2026-08-27" / "brief.md").write_text("# an idea\n\nand what to do about it\n")
+
+    # Retained prompts and completions, which `CONTAINS` has promised since the
+    # first backup and nothing copied until 27 Oct.
+    payloads = data / "payloads" / "2026-08"
+    payloads.mkdir(parents=True)
+    (payloads / "01M13BW0B39C6RTMM8Y4A2RFZ8.prompt.json").write_text(
+        '[{"role": "user", "content": "a tool that notices repeats"}]'
+    )
+    (payloads / "01M13BW0B39C6RTMM8Y4A2RFZ8.completion.json").write_text(
+        '{"text": "a brief", "finish_reason": "stop"}'
+    )
 
     db = data / "second-shift.db"
     conn = connect(db)
@@ -161,6 +174,32 @@ class TestWhatABackupRecords:
         assert manifest.artifact_files == 1
         assert manifest.artifact_bytes == (artifacts / "2026-08-27" / "brief.md").stat().st_size
 
+    def test_it_counts_the_retained_payloads(self, machine, tmp_path):
+        """`CONTAINS` promised these from the first backup and nothing copied
+        them. A tree copied but not counted is a claim about the archive that
+        cannot be checked, which is how it stayed absent from both."""
+        db, artifacts = machine
+        manifest = _backup(db, artifacts, tmp_path / "b")
+
+        source = sorted((artifacts.parent / "payloads").rglob("*.json"))
+        assert manifest.payload_files == 2
+        assert manifest.payload_bytes == sum(p.stat().st_size for p in source)
+
+    def test_the_warning_matches_the_archive(self, machine, tmp_path):
+        """The one assertion that ties the printed sentence to the bytes. A
+        warning about content the archive does not carry teaches an operator to
+        discount the warning."""
+        db, artifacts = machine
+        _backup(db, artifacts, tmp_path / "b")
+
+        assert "every recorded model payload" in CONTAINS
+        carried = sorted((tmp_path / "b" / "payloads").rglob("*.json"))
+        assert carried, "the archive does not hold what the warning says it holds"
+        assert carried[0].read_text() == (
+            artifacts.parent / "payloads" / "2026-08"
+            / carried[0].name
+        ).read_text()
+
     def test_it_digests_every_member(self, machine, tmp_path):
         db, artifacts = machine
         manifest = _backup(db, artifacts, tmp_path / "b")
@@ -168,6 +207,8 @@ class TestWhatABackupRecords:
         assert {m.path for m in manifest.members} == {
             DATABASE,
             "artifacts/2026-08-27/brief.md",
+            "payloads/2026-08/01M13BW0B39C6RTMM8Y4A2RFZ8.prompt.json",
+            "payloads/2026-08/01M13BW0B39C6RTMM8Y4A2RFZ8.completion.json",
         }
         assert all(len(m.sha256) == 64 for m in manifest.members)
 
@@ -205,7 +246,12 @@ class TestARefusal:
         _backup(db, artifacts, tmp_path / "b")
 
         with pytest.raises(BackupRefused, match="already exists"):
-            restore_backup(source=tmp_path / "b", db_path=db, artifacts_root=artifacts)
+            restore_backup(
+                source=tmp_path / "b",
+                db_path=db,
+                artifacts_root=artifacts,
+                payloads_root=artifacts.parent / "payloads",
+            )
 
     def test_the_refusal_says_what_is_already_there(self, machine, tmp_path):
         """A refusal that does not say what it is protecting is an obstruction."""
@@ -213,7 +259,12 @@ class TestARefusal:
         _backup(db, artifacts, tmp_path / "b")
 
         with pytest.raises(BackupRefused) as raised:
-            restore_backup(source=tmp_path / "b", db_path=db, artifacts_root=artifacts)
+            restore_backup(
+                source=tmp_path / "b",
+                db_path=db,
+                artifacts_root=artifacts,
+                payloads_root=artifacts.parent / "payloads",
+            )
 
         # Four, not one: the entry, and the three rows `migrate` wrote to
         # `schema_version`. A count that excluded the schema's own bookkeeping
@@ -228,6 +279,7 @@ class TestARefusal:
             source=tmp_path / "b",
             db_path=db,
             artifacts_root=artifacts,
+            payloads_root=artifacts.parent / "payloads",
             overwrite=True,
         )
 
@@ -250,7 +302,10 @@ class TestABackupWillNotLandOnTheDiskItProtects:
 
         with pytest.raises(BackupRefused, match="same device"):
             create_backup(
-                db_path=db, artifacts_root=artifacts, destination=tmp_path / "b"
+                db_path=db,
+                artifacts_root=artifacts,
+                payloads_root=artifacts.parent / "payloads",
+                destination=tmp_path / "b",
             )
 
     def test_the_refusal_names_the_way_out(self, machine, tmp_path):
@@ -260,7 +315,10 @@ class TestABackupWillNotLandOnTheDiskItProtects:
 
         with pytest.raises(BackupRefused) as raised:
             create_backup(
-                db_path=db, artifacts_root=artifacts, destination=tmp_path / "b"
+                db_path=db,
+                artifacts_root=artifacts,
+                payloads_root=artifacts.parent / "payloads",
+                destination=tmp_path / "b",
             )
 
         assert "--same-device-ok" in str(raised.value)
@@ -272,6 +330,7 @@ class TestABackupWillNotLandOnTheDiskItProtects:
         manifest = create_backup(
             db_path=db,
             artifacts_root=artifacts,
+            payloads_root=artifacts.parent / "payloads",
             destination=tmp_path / "b",
             same_device_ok=True,
         )
@@ -283,7 +342,10 @@ class TestABackupWillNotLandOnTheDiskItProtects:
         db, artifacts = machine
 
         manifest = create_backup(
-            db_path=db, artifacts_root=artifacts, destination=other_device / "b"
+            db_path=db,
+            artifacts_root=artifacts,
+            payloads_root=artifacts.parent / "payloads",
+            destination=other_device / "b",
         )
 
         assert manifest.tables["entries"] == 1
@@ -298,6 +360,7 @@ class TestABackupWillNotLandOnTheDiskItProtects:
         manifest = create_backup(
             db_path=db,
             artifacts_root=artifacts,
+            payloads_root=artifacts.parent / "payloads",
             destination=other_device / "nested" / "deeper" / "b",
         )
 
@@ -371,6 +434,7 @@ class TestVerifying:
                 source=backup,
                 db_path=tmp_path / "elsewhere.db",
                 artifacts_root=tmp_path / "elsewhere",
+                payloads_root=tmp_path / "elsewhere-payloads",
             )
 
 
@@ -385,6 +449,7 @@ class TestRestoring:
             source=tmp_path / "b",
             db_path=tmp_path / "restored" / "second-shift.db",
             artifacts_root=tmp_path / "restored" / "artifacts",
+            payloads_root=tmp_path / "restored" / "payloads",
         )
 
         original = sqlite3.connect(db)
@@ -395,6 +460,58 @@ class TestRestoring:
             original.close()
             restored.close()
 
+    def test_the_payloads_come_back(self, machine, tmp_path):
+        """Byte for byte. A restore that returns the database and loses what
+        the model said is a restore of the index without the content."""
+        db, artifacts = machine
+        _backup(db, artifacts, tmp_path / "b")
+
+        restore_backup(
+            source=tmp_path / "b",
+            db_path=tmp_path / "restored" / "second-shift.db",
+            artifacts_root=tmp_path / "restored" / "artifacts",
+            payloads_root=tmp_path / "restored" / "payloads",
+        )
+
+        source = artifacts.parent / "payloads"
+        restored = tmp_path / "restored" / "payloads"
+        originals = sorted(p.relative_to(source) for p in source.rglob("*.json"))
+        assert originals, "the fixture holds no payloads, so this proves nothing"
+        assert sorted(
+            p.relative_to(restored) for p in restored.rglob("*.json")
+        ) == originals
+        for relative in originals:
+            assert (restored / relative).read_bytes() == (source / relative).read_bytes()
+
+    def test_a_backup_taken_before_payloads_existed_still_restores(
+        self, machine, tmp_path
+    ):
+        """The four backups on the NAS were taken before any of this existed and
+        are the only restore path for everything to date. A manifest with no
+        payload counts reads as zero, which is also the truth about it."""
+        db, artifacts = machine
+        _backup(db, artifacts, tmp_path / "b")
+        import shutil as _shutil
+
+        _shutil.rmtree(tmp_path / "b" / "payloads")
+        manifest = json.loads((tmp_path / "b" / MANIFEST).read_text())
+        del manifest["payload_files"], manifest["payload_bytes"]
+        manifest["members"] = [
+            m for m in manifest["members"] if not m["path"].startswith("payloads/")
+        ]
+        (tmp_path / "b" / MANIFEST).write_text(json.dumps(manifest))
+
+        restored = restore_backup(
+            source=tmp_path / "b",
+            db_path=tmp_path / "restored" / "second-shift.db",
+            artifacts_root=tmp_path / "restored" / "artifacts",
+            payloads_root=tmp_path / "restored" / "payloads",
+        )
+
+        assert restored.payload_files == 0
+        assert restored.tables["entries"] == 1
+        assert not (tmp_path / "restored" / "payloads").exists()
+
     def test_the_artifacts_come_back(self, machine, tmp_path):
         db, artifacts = machine
         _backup(db, artifacts, tmp_path / "b")
@@ -403,6 +520,7 @@ class TestRestoring:
             source=tmp_path / "b",
             db_path=tmp_path / "restored" / "second-shift.db",
             artifacts_root=tmp_path / "restored" / "artifacts",
+            payloads_root=tmp_path / "restored" / "payloads",
         )
 
         landed = tmp_path / "restored" / "artifacts" / "2026-08-27" / "brief.md"
@@ -422,6 +540,7 @@ class TestRestoring:
             source=tmp_path / "b",
             db_path=target,
             artifacts_root=tmp_path / "restored" / "artifacts",
+            payloads_root=tmp_path / "restored" / "payloads",
         )
 
         assert not Path(f"{target}-wal").exists()
@@ -522,6 +641,41 @@ class TestWhetherANightIsInFlight:
         db, _ = machine
 
         assert main(["--db", str(db), "night-status"]) == 0
+
+
+class TestTheCommandSaysWhatItCarried:
+    """The printed counts, because `CONTAINS` is printed in the same breath and
+    the operator reads them together when deciding where to put the archive."""
+
+    def test_backup_prints_the_payload_count(self, machine, other_device, capsys):
+        from secondshift.ops.__main__ import main
+
+        db, artifacts = machine
+
+        assert main(
+            ["--db", str(db), "--artifacts", str(artifacts),
+             "--payloads", str(artifacts.parent / "payloads"),
+             "backup", "--to", str(other_device / "backups")]
+        ) == 0
+
+        printed = capsys.readouterr().out
+        assert "payloads    2 files" in printed
+        assert "every recorded model payload" in printed
+
+    def test_restore_prints_the_payload_count(self, machine, other_device, capsys):
+        from secondshift.ops.__main__ import main
+
+        db, artifacts = machine
+        _backup(db, artifacts, other_device / "b")
+        capsys.readouterr()
+
+        assert main(
+            ["--db", str(db), "--artifacts", str(artifacts),
+             "--payloads", str(artifacts.parent / "payloads"),
+             "restore", str(other_device / "b"), "--overwrite"]
+        ) == 0
+
+        assert "restored 2 payload files" in capsys.readouterr().out
 
 
 class TestDoctor:
@@ -728,6 +882,8 @@ def test_the_manifest_round_trips():
         tables={"entries": 4},
         artifact_files=2,
         artifact_bytes=99,
+        payload_files=4,
+        payload_bytes=420,
         members=[],
     )
 

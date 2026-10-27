@@ -182,6 +182,22 @@ class Reasoner(Provider):
             cache_hit=raw.cache_hit,
             redaction_applied=redaction_applied,
         )
+        # What the call said, beside what it cost. Here rather than in each
+        # implementation for the same reason the cost row is: an implementation
+        # cannot forget instrumentation it never writes. Here rather than inside
+        # `record_model_call` because this is the only scope that holds the
+        # messages, the text and the recorded id together.
+        #
+        # A retention failure returns `None` and does not raise — the completion
+        # below is the product, and the recorder has already written the failure
+        # row. ADR 0007: a token count cannot be reconstructed into a prompt, so
+        # a completion that runs before this exists is unreadable forever.
+        self._recorder.record_model_call_payload(
+            model_call_id=call_id,
+            prompt=[{"role": m.role, "content": m.content} for m in messages],
+            completion={"text": raw.text, "finish_reason": raw.finish_reason},
+            redaction_applied=redaction_applied,
+        )
         return Completion(
             text=raw.text,
             model_call_id=call_id,

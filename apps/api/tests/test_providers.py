@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
 from pathlib import Path
 
 import pytest
 
 import secondshift
+from secondshift import config
 from secondshift.airlock.policy import AirlockViolation
 from secondshift.providers.base import (
     JobHandle,
@@ -85,6 +88,98 @@ class TestBaseClassOwnsTelemetry:
                 [Message("user", "an idea")], policy="local-only"
             )
         assert result.model_call_id == repo.model_calls_for_run(run_id)[0]["id"]
+
+
+class TestRetentionCannotBeSkipped:
+    """`model_call_payloads` had a complete inserter and no caller for seven
+    weeks, so the table was empty after six real nights and an eval run. The
+    fix is the same argument the cost row already rests on: retention belongs to
+    the base class, because an implementation cannot forget what it never
+    writes."""
+
+    def test_a_backend_with_no_retention_code_retains_anyway(
+        self, recorder, repo, run_id, agent_id
+    ):
+        class AnotherBackend(Reasoner):
+            provider_kind = "local-vllm"
+
+            def _do_complete(self, messages, *, effort):
+                return RawCompletion(text="a judgement", prompt_tokens=4)
+
+        source = __import__("inspect").getsource(AnotherBackend)
+        assert "payload" not in source and "retain" not in source
+
+        backend = AnotherBackend(recorder, model="brand-new")
+        with recorder.invocation(agent_id, run_id=run_id):
+            completion = backend.complete(
+                [Message("user", "an idea worth keeping")], policy="local-only"
+            )
+
+        row = repo.connection.execute(
+            "SELECT * FROM model_call_payloads WHERE model_call_id = ?",
+            (completion.model_call_id,),
+        ).fetchone()
+        assert row is not None, "the completion was not retained"
+
+        root = Path(os.environ[config.ENV_PAYLOADS])
+        assert json.loads((root / row["prompt_path"]).read_text()) == [
+            {"role": "user", "content": "an idea worth keeping"}
+        ]
+        assert json.loads((root / row["completion_path"]).read_text())["text"] == (
+            "a judgement"
+        )
+
+    def test_the_stored_paths_are_relative_to_the_root(
+        self, recorder, repo, run_id, agent_id
+    ):
+        """One codebase, two deployments: the judge instance runs this against
+        its own root, and an absolute path would pin a home directory into a row
+        a judge reads."""
+
+        class Backend(Reasoner):
+            provider_kind = "local-vllm"
+
+            def _do_complete(self, messages, *, effort):
+                return RawCompletion(text="ok")
+
+        with recorder.invocation(agent_id, run_id=run_id):
+            call_id = Backend(recorder, model="m").complete(
+                [Message("user", "x")], policy="local-only"
+            ).model_call_id
+
+        row = repo.connection.execute(
+            "SELECT prompt_path, completion_path FROM model_call_payloads "
+            "WHERE model_call_id = ?",
+            (call_id,),
+        ).fetchone()
+        for stored in (row["prompt_path"], row["completion_path"]):
+            assert not Path(stored).is_absolute()
+
+    def test_the_database_holds_pointers_not_text(
+        self, recorder, repo, run_id, agent_id
+    ):
+        """Contexts run to a million tokens. Payload text in SQLite would
+        dominate every query plan in a database whose other tables are small and
+        read constantly."""
+
+        class Backend(Reasoner):
+            provider_kind = "local-vllm"
+
+            def _do_complete(self, messages, *, effort):
+                return RawCompletion(text="the quick brown fox")
+
+        with recorder.invocation(agent_id, run_id=run_id):
+            Backend(recorder, model="m").complete(
+                [Message("user", "a distinctive prompt")], policy="local-only"
+            )
+
+        row = repo.connection.execute(
+            "SELECT * FROM model_call_payloads"
+        ).fetchone()
+        stored = " ".join(str(value) for value in tuple(row))
+        assert "quick brown fox" not in stored
+        assert "a distinctive prompt" not in stored
+        assert row["prompt_bytes"] > 0 and row["completion_bytes"] > 0
 
 
 class TestFailuresEscapingABackend:

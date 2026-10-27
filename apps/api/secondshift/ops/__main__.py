@@ -33,8 +33,8 @@ from .restore import restore_backup, verify_backup
 NIGHT_IN_FLIGHT = 3
 
 
-def _paths(args) -> tuple[Path, Path]:
-    """The database and artifacts this machine is configured to use.
+def _paths(args) -> tuple[Path, Path, Path]:
+    """The database, artifacts and payloads this machine is configured to use.
 
     Read through `config.resolve_all` rather than from the environment
     directly, so that `ops` and `python -m secondshift.config show` can never
@@ -44,7 +44,8 @@ def _paths(args) -> tuple[Path, Path]:
     rows = {r.setting.name: r.value for r in config.resolve_all(dict(os.environ))}
     db = Path(args.db or rows[config.ENV_DB])
     artifacts = Path(args.artifacts or rows[config.ENV_ARTIFACTS])
-    return db, artifacts
+    payloads = Path(args.payloads or rows[config.ENV_PAYLOADS])
+    return db, artifacts, payloads
 
 
 def _stamp() -> str:
@@ -54,11 +55,12 @@ def _stamp() -> str:
 
 
 def _backup(args) -> int:
-    db, artifacts = _paths(args)
+    db, artifacts, payloads = _paths(args)
     destination = Path(args.to) / _stamp()
     manifest = create_backup(
         db_path=db,
         artifacts_root=artifacts,
+        payloads_root=payloads,
         destination=destination,
         same_device_ok=args.same_device_ok,
     )
@@ -66,6 +68,7 @@ def _backup(args) -> int:
     print(f"wrote {destination}")
     print(f"  database    {rows} rows across {len(manifest.tables)} tables, schema {manifest.schema_version}")
     print(f"  artifacts   {manifest.artifact_files} files, {manifest.artifact_bytes} bytes")
+    print(f"  payloads    {manifest.payload_files} files, {manifest.payload_bytes} bytes")
     for name, reason in sorted(manifest.excluded.items()):
         print(f"  excluded    {name} — {reason}")
     print(f"\n{CONTAINS}")
@@ -85,16 +88,18 @@ def _verify(args) -> int:
 
 
 def _restore(args) -> int:
-    db, artifacts = _paths(args)
+    db, artifacts, payloads = _paths(args)
     manifest = restore_backup(
         source=Path(args.backup),
         db_path=db,
         artifacts_root=artifacts,
+        payloads_root=payloads,
         overwrite=args.overwrite,
     )
     rows = sum(manifest.tables.values())
     print(f"restored {rows} rows across {len(manifest.tables)} tables to {db}")
     print(f"restored {manifest.artifact_files} artifact files to {artifacts}")
+    print(f"restored {manifest.payload_files} payload files to {payloads}")
     print("checked against the manifest: every count and the schema version agree")
     return 0
 
@@ -120,7 +125,7 @@ def _night_status(args) -> int:
     differently, which is the kind of disagreement nobody notices until it
     matters.
     """
-    db, _ = _paths(args)
+    db, _, _ = _paths(args)
     if night_in_flight(db):
         print(f"a night is in flight against {db}", file=sys.stderr)
         return NIGHT_IN_FLIGHT
@@ -132,6 +137,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m secondshift.ops")
     parser.add_argument("--db", help="override the configured database path")
     parser.add_argument("--artifacts", help="override the configured artifacts path")
+    parser.add_argument("--payloads", help="override the configured payloads path")
     sub = parser.add_subparsers(dest="command", required=True)
 
     take = sub.add_parser("backup", help="write a copy, with the evidence to check it")

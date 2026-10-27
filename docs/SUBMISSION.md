@@ -362,7 +362,7 @@ and why, which is the behavior wanted, but it is not what the sentence promised.
 
 11 gates <!-- derived: matches scripts/gate.py ^    \(" --> — the airlock tests
 first, two repository guards, a drift check, spec validation, the orchestrator
-suite, web unit/types/build, a browser test against a real Chromium, and 23 mutations <!-- derived: matches scripts/check-mutations.py ^    Mutation\( -->
+suite, web unit/types/build, a browser test against a real Chromium, and 25 mutations <!-- derived: matches scripts/check-mutations.py ^    Mutation\( -->
 that reintroduce defects this project has actually shipped and require the gate
 that should catch each one to fail. CI runs the same file; there is no second
 definition of passing.

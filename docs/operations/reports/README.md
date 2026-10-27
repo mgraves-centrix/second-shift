@@ -25,6 +25,11 @@ including a session that was not there.
   things.
 - **Placeholders, always.** `<spark>` for the machine, `<host>` for anything
   else, `~/...` or `$HOME` for a home directory. This repository is public.
+- **A report is not revised.** It is what was true on its date, and a document
+  that cites it is citing that. When a finding is later closed, it gets one
+  dated line under its own heading saying where — never an edit to the finding
+  itself. A report rewritten to match the present is a report that can no
+  longer be used as evidence about the past.
 
 ## What the push gate does on this path
 
@@ -54,3 +59,8 @@ project's compute-profile name — so no pattern can catch it by spelling, and
   subject's actual captured ideas. `model_call_payloads` exists so that content
   stays on that machine; a report quotes the *shape* of a completion, not its
   contents.
+
+  *That sentence described an empty table until 27 Oct. The 16 Oct session
+  found that nothing had ever written to it — "the protection around it is real
+  and carefully argued; the table it protects is dead". It holds rows now, so
+  this rule is load-bearing rather than anticipatory.*

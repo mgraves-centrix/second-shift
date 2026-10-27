@@ -40,6 +40,7 @@ ENV_PRICING = "SECOND_SHIFT_PRICING"
 ENV_SYNTHETIC = "SECOND_SHIFT_SYNTHETIC"
 ENV_RUBRIC_OVERWRITE = "SECOND_SHIFT_RUBRIC_OVERWRITE"
 ENV_ARTIFACTS = "SECOND_SHIFT_ARTIFACTS"
+ENV_PAYLOADS = "SECOND_SHIFT_PAYLOADS"
 #: Not a `SECOND_SHIFT_*` name — Tavily's own convention, and the CLI reads it
 #: too. Registered here anyway: a resolved view that omits a credential the
 #: system depends on is a view with a hole where the important part goes.
@@ -610,6 +611,12 @@ SETTINGS: tuple[Setting, ...] = (
         required=True,
     ),
     Setting(
+        ENV_PAYLOADS,
+        "telemetry.payloads.payload_root",
+        "where retained prompts and completions land on disk",
+        required=True,
+    ),
+    Setting(
         ENV_TAVILY_KEY,
         "providers.tavily.TavilyProvider",
         "search credential; absent means the research stage is skipped",
@@ -643,6 +650,7 @@ def resolve_all(env: dict[str, str] | None = None) -> list[Resolved]:
     """
     from .api.location import location_config_error, location_path
     from .artifacts.store import default_root as default_artifact_root
+    from .telemetry.payloads import default_root as default_payload_root
     from .brain.repo import brain_path
     from .telemetry.pricing import default_pricing_path
 
@@ -691,6 +699,7 @@ def resolve_all(env: dict[str, str] | None = None) -> list[Resolved]:
         ),
         _path_setting(ENV_PRICING, environment, default_pricing_path()),
         _path_setting(ENV_ARTIFACTS, environment, default_artifact_root()),
+        _path_setting(ENV_PAYLOADS, environment, default_payload_root()),
         Resolved(
             setting=by_name(ENV_TAVILY_KEY),
             value=environment.get(ENV_TAVILY_KEY, ""),

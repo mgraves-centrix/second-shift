@@ -43,23 +43,29 @@ with the Tavily credential (`add-research` 5.1): the redacted query was the only
 thing sent, five results came back for one credit in 1.2s, and the one
 `tool_calls` row holds the redacted query and no entry text.
 
-### Open, as of 21 Sep — what a machine session owes
+### What a machine session owes — as of 27 Oct
 
 Consolidated here because each of these is recorded in its own capability's
 section below, and a reader deciding what a Spark session should do needs one
 list rather than six. The detail stays where it is; this is the index.
 
+**Six rows closed on 16 Oct**, in one session on the machine; they are struck
+rather than removed, so that a reader can see what the machine actually settled.
+The evidence for each is in
+`docs/operations/reports/2026-10-16-machine-session.md`. What is left below is
+genuinely open, and the week-8 eval run is the one the submission turns on.
+
 | What | Owed by | Detail |
 |---|---|---|
 | A reboot, with the API, brain sync and reasoner serving afterward | `operations` | `docs/operations/RECOVERY.md` |
-| A restore of the **real** data onto a scratch path, diffed and timed | `operations` | The mechanism is rehearsed against a generated night; that disk and that data are not. |
-| `ops doctor` run there, which subsumes `config show` | `operations` | Its `data ownership` check exists because a service running as the wrong account has corrupted the write-ahead log on that machine. |
-| The reasoner switched to its unit | `operations` | **Decided 22 Sep: now.** `docs/operations/SUPERVISING_THE_REASONER.md`, gated on `ops night-status`. **Read step 2 before starting**: the unit removes `second-shift-reasoner` and the running container is `nemotron-lightning`, so a naive switch fails every fifteen seconds while the reasoner looks healthy — the old container is still serving on the port the probe checks. |
-| The backup unit installed, and one backup observed landing on the NAS | `operations` | **Decided 22 Sep: the NAS, nightly after the night run.** `second-shift-backup.user.service` plus a `backup.env` holding the path. Also the first real test of the same-device guard — an unmounted share fails the unit instead of quietly filling the local disk. |
-| The judge container built, stood up, and read by a stranger | `judge-mode` | Three gaps, below. The NAS runs containers. |
+| ~~A restore of the **real** data onto a scratch path, diffed and timed~~ | `operations` | **Closed 16 Oct.** Byte-identical against the live dump, 72,497 bytes each, in 0.174 s. `docs/operations/RECOVERY.md` carries the numbers. |
+| ~~`ops doctor` run there, which subsumes `config show`~~ | `operations` | **Closed 16 Oct**, 8/8 after the deploy, including the `data ownership` check that exists because a service running as the wrong account has corrupted the write-ahead log on that machine. |
+| ~~The reasoner switched to its unit~~ | `operations` | **Closed 16 Oct**, following `docs/operations/SUPERVISING_THE_REASONER.md`. It also moved off `0.0.0.0` to `127.0.0.1:8200` in the same step. The trap the old row warned about was real and the procedure handled it. |
+| ~~The backup unit installed, and one backup observed landing on the NAS~~ | `operations` | **Closed 16 Oct.** Four backups on the NAS; the same-device guard was proven first as a control, refusing with exit 2 and naming the unmounted-share case. The night unit did not carry `Wants=second-shift-backup.service` before that session, so the nightly backup would never have been pulled in. **One decision is open:** the NAS exports no backup share, so the archive sits under `scratch`. |
+| The judge container **read by a stranger** | `judge-mode` | **Built and stood up 16 Oct**, for the first time. Two caveats from that session: the image is `arm64`, built on that machine, so it needs a cross-build before it is deployed anywhere; and the demo night returns `outcome: null`, so a judge opening it sees a night that never finished. The stranger test is unanswered. |
 | One real night, to exercise the night's events against a live reasoner | `night-pipeline` | Also closes `2026-09-17-the-night-revises-what-it-believes` at 7/7. |
 | Live dispatch and telemetry collection against Nebius | `nebius-executor` | The credentials exist — on that machine, at `~/.config/second-shift/secrets.env`. Not a missing credential; a missing route to where it is. |
-| `ModelJudge` against the real local reasoner | `evals` | **Added 10 Oct and tested only against a stub.** A stub cannot predict what a real checkpoint writes around its JSON, and the extraction rule is the whole risk surface. One completion on the machine settles it. |
+| ~~`ModelJudge` against the real local reasoner~~ | `evals` | **Closed 16 Oct**, and it was worth doing: 17 of 18 samples scored, mean 16.53/25, and the one refusal exposed that the ask carried a copyable template the checkpoint echoed back. Fixed 26 Oct, with the instruction hashed into the judge version first. |
 | The week-8 eval run | `eval-scoring` | **Week 8 is 15–21 Oct.** The curve exists, the threshold is fixed (`config/evals/threshold.md`, 23 Sep, while nothing had been scored), and as of 10 Oct a judge exists that drives any reasoner. **It does not need Token Factory.** Resolved 10 Oct: the judge is the local reasoner, `local-only`, because ADR 0010 had made a cloud judge impermissible since 2 Sep — `docs/decisions/0015`. Both runs need the same judge on both sides; the curve refuses two judges as two instruments. |
 | Spike F, and `Transcriber` | `asr` | The model runs on the Spark and nowhere else. |
 

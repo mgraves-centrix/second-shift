@@ -111,17 +111,24 @@ claim whose age you can see.
 
 | | read |
 |---|---|
-| Eval baseline | 2 Sep — `01M1FYFECEXC5ZJEWHNP7WZMXB`, six prompts, rubric `b4decd6fe774`, brain `ad17b3bcddb6`, **awaiting scoring** |
-| Entries | 2 Sep — 4 real: 1 archived, **3 still queued and never processed** |
-| Runs | 2 Sep — **0.** No night has ever executed |
-| Production code | 2 Sep — deployed tree dated 30 Aug; `retrieval`, `agents` and the embedder are **not** on the machine |
-| Reasoner | 2 Sep — container up, but **unmanaged**: the systemd unit was never installed, so a reboot ends it |
-| API / brain sync | 2 Sep — both live as enabled user units |
+| Eval baseline | 16 Oct — `01M1FYFECEXC5ZJEWHNP7WZMXB` **untouched and still unscored**, which was deliberate; see the stopped run below |
+| Scoring | 16 Oct — `ModelJudge` ran against the real checkpoint: 17 of 18 samples scored, mean 16.53/25. The run started for the curve was **stopped on purpose** after three refusals at one offset, and that run id is burned. The baseline was not spent. |
+| Entries | 16 Oct — **0 queued.** The real entries have been processed; a night needs an idea queued and there was none |
+| Runs | 16 Oct — **six real nights have executed.** Their payloads were not retained, because nothing wrote to `model_call_payloads` until 27 Oct |
+| Database | 16 Oct — 219 rows across 17 tables, schema 3, 39 artifact files |
+| Production code | 16 Oct — redeployed at `308e18a`, API serving. `secondshift.ops` was **absent** from the tree before that deploy, so no backup had ever been possible |
+| Reasoner | 16 Oct — **on its systemd unit**, and moved off `0.0.0.0` to `127.0.0.1:8200` |
+| Backups | 16 Oct — four on the NAS, under `scratch`, which exports no backup share |
+| Judge container | 16 Oct — **built for the first time**, `arm64`, needs a cross-build before it is deployed anywhere |
+| API / brain sync | 16 Oct — both live as enabled user units |
 
-**Nothing reasons in production.** `local-inference` and `agents` both shipped,
-and a real completion was made through an agent from a development window — but
-the deployed code predates all of it, and `model_calls` on the machine is still
-empty. The gap is a deploy, not a missing capability.
+**Production reasons now.** This paragraph read "Nothing reasons in production"
+and "`model_calls` on the machine is still empty" until 27 Oct, on the strength
+of a 2 Sep reading — which was correct then and had been wrong for six weeks by
+the time anybody re-read it. **The claim is not that the table was wrong; it is
+that a table of dated claims still has to be re-read.** The dates above are
+from `docs/operations/reports/2026-10-16-machine-session.md`, which is where
+every line of them comes from.
 
 ---
 

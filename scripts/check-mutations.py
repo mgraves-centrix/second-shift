@@ -194,8 +194,8 @@ MUTATIONS = [
         "column as NULL is the silent version of the same defect: it reads as "
         "populated and the guard that reads it reads as holding.",
         "apps/api/secondshift/evals/runner.py",
-        "json.dumps(judgement.scores), model_call_id,",
-        "json.dumps(judgement.scores), None,",
+        "             self._output_path(model_call_id), model_call_id,",
+        "             self._output_path(model_call_id), None,",
         PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
     ),
     Mutation(
@@ -290,6 +290,38 @@ MUTATIONS = [
         '        self.version = f"{version}+ask.{ask_sha()}"',
         "        self.version = version",
         PYTEST + [str(ROOT / "apps/api/tests/test_evals.py")],
+    ),
+    Mutation(
+        "a-completion-is-not-retained",
+        "16 Oct: `insert_model_call_payload` had no caller anywhere, so "
+        "`model_call_payloads` was empty after six real nights and an eval "
+        "run — and a token count cannot be reconstructed into a prompt, so "
+        "those nights are unreadable forever. The defect was invisible "
+        "because every suite was green. Removing the call reintroduces it.",
+        "apps/api/secondshift/providers/base.py",
+        """        self._recorder.record_model_call_payload(
+            model_call_id=call_id,
+            prompt=[{"role": m.role, "content": m.content} for m in messages],
+            completion={"text": raw.text, "finish_reason": raw.finish_reason},
+            redaction_applied=redaction_applied,
+        )""",
+        "        pass",
+        PYTEST + [
+            str(ROOT / "apps/api/tests/test_providers.py"),
+            str(ROOT / "apps/api/tests/test_telemetry.py"),
+        ],
+    ),
+    Mutation(
+        "a-backup-does-not-carry-the-payloads",
+        "27 Oct: `CONTAINS` told every operator the archive holds every "
+        "recorded model payload, and `create_backup` copied the database and "
+        "the artifacts root only. The spec required it in words; no scenario "
+        "pinned it, so the claim was false for seven weeks with a green "
+        "suite. A tree counted but not copied fails the same way.",
+        "apps/api/secondshift/ops/backup.py",
+        "    payload_files, payload_bytes = _copy_tree(payloads_root, destination / PAYLOADS)",
+        "    payload_files, payload_bytes = 0, 0",
+        PYTEST + [str(ROOT / "apps/api/tests/test_operations.py")],
     ),
 ]
 

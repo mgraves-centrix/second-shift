@@ -16,8 +16,8 @@ from secondshift.telemetry.recorder import Recorder
 
 
 @pytest.fixture(autouse=True)
-def _artifacts_under_tmp(tmp_path, monkeypatch):
-    """Keep every test's artifact writes inside its own tmp directory.
+def _files_under_tmp(tmp_path, monkeypatch):
+    """Keep every test's file writes inside its own tmp directory.
 
     `artifact_root()` falls back to `~/second-shift-data/artifacts` when nothing
     says otherwise, which was harmless while only the night wrote files and the
@@ -25,11 +25,17 @@ def _artifacts_under_tmp(tmp_path, monkeypatch):
     writing real bytes on 19 Sep, so without this a test run would deposit
     artifacts in a developer's home directory — and on CI, in the runner's.
 
+    `payload_root()` joined it on 27 Oct and is worse: retention happens in
+    `Reasoner.complete`, so **every** test that drives any reasoner writes two
+    files, and the first run of the wired version left six of them in a home
+    directory before this line existed.
+
     Autouse rather than opt-in: a test that writes outside tmp is a test nobody
     notices until it pollutes something, and remembering to ask for isolation is
     exactly the kind of thing that erodes.
     """
     monkeypatch.setenv(config.ENV_ARTIFACTS, str(tmp_path / "artifacts"))
+    monkeypatch.setenv(config.ENV_PAYLOADS, str(tmp_path / "payloads"))
 
 
 @pytest.fixture

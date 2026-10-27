@@ -591,12 +591,30 @@ class EvalRunner:
 
         self._repo.connection.execute(
             "INSERT INTO eval_results (id, eval_run_id, eval_prompt_id, sample_index, "
-            "score, subscores_json, model_call_id, is_synthetic) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "score, subscores_json, output_path, model_call_id, is_synthetic) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (new_ulid(now_ms()), eval_run_id, prompt_id, sample,
-             float(judgement.total), json.dumps(judgement.scores), model_call_id,
+             float(judgement.total), json.dumps(judgement.scores),
+             self._output_path(model_call_id), model_call_id,
              int(self._is_synthetic)),
         )
+
+    def _output_path(self, model_call_id: str) -> str | None:
+        """Where the text that was scored is, or `None`.
+
+        Read from the payload row rather than composed from the path
+        convention, so this cannot name a file that was never written. The
+        column was NULL for all 17 samples of the 16 Oct run, which left the
+        submission's centerpiece with numbers and nothing to read behind them.
+
+        `None` where nothing was retained. A path to a file that is not there is
+        worse than no path: it reads as evidence until somebody opens it.
+        """
+        row = self._repo.connection.execute(
+            "SELECT completion_path FROM model_call_payloads WHERE model_call_id = ?",
+            (model_call_id,),
+        ).fetchone()
+        return row["completion_path"] if row else None
 
     # -- reading -----------------------------------------------------------
 

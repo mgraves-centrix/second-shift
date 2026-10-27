@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from secondshift.evals.__main__ import main
 from secondshift.evals.content import Rubric, load_prompts, load_rubric, load_threshold
 from secondshift.agents.invoke import invoke
 from secondshift.agents.roster import discover, register
+from secondshift import config
 from secondshift.config import LocalReasonerSettings
 from secondshift.evals.judge import (
     DIMENSIONS,
@@ -32,7 +34,7 @@ from secondshift.evals.runner import (
     RubricMismatch,
     UNRECORDED,
 )
-from secondshift.providers.base import Completion
+from secondshift.providers.base import Completion, Message
 from secondshift.providers.vllm import VllmReasoner
 
 GOOD = {d: 4 for d in DIMENSIONS}
@@ -1153,6 +1155,65 @@ class TestAScoreKnowsWhichModelProducedIt:
         ).fetchall()
         assert len(rows) == 6, "two prompts, three samples, every one joined to its call"
         assert {r["model"] for r in rows} == {"nemotron-3.5-lightning-30b"}
+
+    def test_the_scored_output_is_readable_afterwards(
+        self, runner, rubric, repo, recorder, vllm_stub
+    ):
+        """`output_path` was NULL for all 17 samples of the 16 Oct run, so the
+        submission's centerpiece had numbers and nothing to read behind them. A
+        score is a claim about a specific output, and a claim nobody can read
+        back is a number on its own authority.
+
+        Generated through a real reasoner rather than the `generate` fixture,
+        because retention happens in `Reasoner.complete` — which is the point.
+        """
+        vllm_stub.answers(text="the answer that was graded")
+        reasoner = VllmReasoner(
+            recorder,
+            settings=LocalReasonerSettings(
+                host=vllm_stub.host, port=vllm_stub.port,
+                model="stub-served-model", max_tokens=64, temperature=0.0,
+                timeout_s=5.0,
+            ),
+        )
+
+        def generate(*, prompt, brain, sample):
+            return reasoner.complete([Message("user", prompt)], policy="local-only")
+
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+        runner.score(run_id, judge=_FixedJudge(GOOD), generate=generate, rubric=rubric)
+
+        root = Path(os.environ[config.ENV_PAYLOADS])
+        rows = repo.connection.execute(
+            "SELECT output_path FROM eval_results WHERE eval_run_id = ?", (run_id,)
+        ).fetchall()
+        assert len(rows) == 6
+        for row in rows:
+            assert row["output_path"], "the scored output is not pointed at"
+            landed = root / row["output_path"]
+            assert landed.exists(), f"{row['output_path']} names no file"
+            assert json.loads(landed.read_text())["text"] == (
+                "the answer that was graded"
+            )
+
+    def test_retention_that_did_not_happen_is_not_invented(
+        self, runner, rubric, repo, generate
+    ):
+        """The `generate` fixture records a call without retaining anything,
+        which is also what happens when a disk refuses the write. A path to a
+        file that is not there is worse than no path: it reads as evidence until
+        somebody opens it."""
+        _seed_and_activate(runner, rubric)
+        run_id = runner.record_baseline(week_of="2026-08-31", rubric=rubric)
+
+        runner.score(run_id, judge=_FixedJudge(GOOD), generate=generate, rubric=rubric)
+
+        paths = repo.connection.execute(
+            "SELECT output_path FROM eval_results WHERE eval_run_id = ?", (run_id,)
+        ).fetchall()
+        assert len(paths) == 6
+        assert all(row["output_path"] is None for row in paths)
 
     def test_a_generator_that_returns_only_text_is_refused(self, runner, rubric):
         """Refused by name, and not caught as a failed sample.
